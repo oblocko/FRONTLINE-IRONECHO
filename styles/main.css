@@ -313,7 +313,7 @@ html.js #about { display: none; }
 .jammer-hud .a b { position: absolute; left: -9px; top: -14px; border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 16px solid rgba(255,255,255,0.85); }
 .jammer-hud .a.danger b { border-bottom-color: #ff5a46; animation: pulse 0.3s infinite; }
 .jammer-hud .a span { position: absolute; left: -20px; top: 6px; width: 40px; text-align: center; font: 600 11px var(--mono); color: #fff; text-shadow: 0 1px 2px #000; }
-.jammer-hud .bat { position: absolute; right: 40px; bottom: 130px; width: 200px; }
+.jammer-hud .bat { position: absolute; right: 40px; bottom: 200px; width: 200px; }
 .jammer-hud .bat .bar { height: 6px; background: rgba(255,255,255,0.12); margin: 4px 0; } .jammer-hud .bat .bar i { display: block; height: 100%; background: #6effa8; }
 .jammer-hud .bat.low .bar i { background: #ff5a46; } .jammer-hud .bat .st { font: 600 11px var(--mono); color: #cfe; letter-spacing: 0.1em; }
 .jammer-hud .b.occ { opacity: 0.45; border-style: dashed; }
@@ -329,3 +329,4 @@ html.js #about { display: none; }
 .choice-box { position: absolute; left: 50%; bottom: 22%; transform: translateX(-50%); background: rgba(8,10,10,0.82); border: 1px solid var(--line-strong); border-left: 3px solid var(--accent); padding: 14px 20px; min-width: 420px; }
 .choice-box .opt { margin-top: 8px; font-size: 15px; } .choice-box kbd { margin-right: 8px; }
 .choice-box kbd { font-family: var(--mono); border: 1px solid #aaa; padding: 0 6px; font-size: 12px; }
+#hud.jamming .ammo { opacity: 0.25; }

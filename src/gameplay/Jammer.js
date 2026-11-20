@@ -57,7 +57,7 @@ export class Jammer {
   toggle(on = !this.active) {
     const g = this.game, p = g.player;
     if (on && (p.seat || !p.alive)) return;
-    this.active = on; g.weapons.hidden = on; this.setHum(false);
+    this.active = on; g.weapons.hidden = on; this.setHum(false); g.ui.hud?.classList.toggle('jamming', on);
     g.audio.click(0.2, on ? 1400 : 700, 0.05);
   }
   setHum(on) {
@@ -100,8 +100,8 @@ export class Jammer {
     // ---- viewmodel ----
     this.model.visible = this.raise > 0.05 && !p.cameraOverride;
     const t = performance.now() / 1000;
-    this.model.position.set(0.16, -0.19 - (1 - this.raise) * 0.3 + Math.sin(t * 1.7) * 0.003, -0.42 + (firing ? Math.sin(t * 60) * 0.002 : 0));
-    this.model.rotation.set(-0.02, 0.05, 0);
+    this.model.position.set(0.2, -0.25 - (1 - this.raise) * 0.3 + Math.sin(t * 1.7) * 0.003, -0.68 + (firing ? Math.sin(t * 60) * 0.002 : 0));
+    this.model.rotation.set(0.03, 0.06, 0); this.model.scale.setScalar(0.85);
     this.ledM.color.setHex(firing ? (Math.sin(t * 30) > 0 ? 0xffd040 : 0x40ff90) : 0x40ff90);
     this.screen.material.color.setHex(this.battery < 0.15 ? 0xff5040 : 0x40ff90);
     this.renderHud(cam, list, firing);
@@ -134,5 +134,5 @@ export class Jammer {
     }
     el.querySelector('.brk').innerHTML = brk; el.querySelector('.arrows').innerHTML = arr;
   }
-  dispose() { this.setHum(false); this.game.renderer.vmScene.remove(this.model); this.el.remove(); if (this.active) this.game.weapons.hidden = false; }
+  dispose() { this.setHum(false); this.game.ui.hud?.classList.remove('jamming'); this.game.renderer.vmScene.remove(this.model); this.el.remove(); if (this.active) this.game.weapons.hidden = false; }
 }
