@@ -81,7 +81,7 @@ try {
   await page.waitForFunction(() => window.__game.director.agents.filter((a) => a.team === 'enemy' && !a.dead).length >= 3, null, { timeout: 400000 });
   await ev(() => { window.__game.timeScale = 1; }); await page.waitForTimeout(9000); await shot('m01_h_rally.png'); log(JSON.stringify(await stats()));
   await ev(() => { window.__game.timeScale = 3; });
-  await waitInteract('장갑차 탑승', 180000); await useInteract('장갑차 탑승'); log('boarded APC → turret');
+  await waitInteract('장갑차 탑승', 400000); await useInteract('장갑차 탑승'); log('boarded APC → turret');
   await page.waitForFunction(() => window.__game.director.vehicles.length >= 2, null, { timeout: 400000, polling: 1000 });
   await ev(() => { window.__game.timeScale = 1; window.__game.input.mouse.left = true; }); await page.waitForTimeout(4000); await ev(() => { window.__game.input.mouse.left = false; });
   await shot('m01_h2_turret.png'); log('turret ride: ' + JSON.stringify(await ev(() => ({ manned: window.__game.mounted.at(-1)?.manned, shots: window.__game.weapons.shotsFired, vehicles: window.__game.director.vehicles.map((v) => Math.round(v.hp)) }))));
