@@ -5,6 +5,19 @@
 - 엔진: three.js r187 (WebGL 2) + Vite — 엔진 선택 사유는 [docs/ENGINE_DECISION.md](docs/ENGINE_DECISION.md)
 - 캐릭터·무기·건물·차량·애니메이션·효과음·음악은 코드로 절차적 생성. 일부 텍스처와 소품은 CC0 실사 에셋(Poly Haven, `assets/CREDITS.md`)
 - 진행 상황: [PROJECT_STATUS.md](PROJECT_STATUS.md)
+- **바로 플레이**: https://oblocko.github.io/Modern-Warfare-Iron-Storm-FPS/ (JavaScript와 WebGL 2가 켜진 데스크톱 브라우저). 텍스트만 읽는 도구로 열면 게임 대신 소개 페이지가 보입니다.
+
+## 스크린샷
+
+| | |
+|---|---|
+| ![메인 메뉴](docs/screenshots/01_menu.jpg) | ![M01 브리핑](docs/screenshots/02a_m01_briefing.jpg) |
+| ![M01 트럭 이동](docs/screenshots/02_m01_truck.jpg) | ![M01 GOP 소초](docs/screenshots/03_m01_gp.jpg) |
+| ![M01 관측소](docs/screenshots/04_m01_mg.jpg) | ![M01 민통선 마을](docs/screenshots/05_m01_village.jpg) |
+| ![M02 연서시 대로](docs/screenshots/06_m02_avenue.jpg) | ![M02 지하 역사](docs/screenshots/07_m02_station.jpg) |
+| ![M02 버스 호송](docs/screenshots/08_m02_bus.jpg) | |
+
+(헤드리스 소프트웨어 렌더링으로 캡처했습니다. GPU 브라우저에서는 더 선명하고 부드럽게 보입니다.)
 
 ## 실행
 

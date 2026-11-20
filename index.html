@@ -4,7 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>FRONTLINE — IRON ECHO</title>
+  <meta name="description" content="FRONTLINE — IRON ECHO: 2029년 한반도 전쟁을 배경으로 한 1인칭 싱글플레이 현대전 FPS 캠페인. 브라우저(WebGL 2)에서 바로 플레이. Mission 01–02 플레이 가능." />
+  <meta property="og:title" content="FRONTLINE — IRON ECHO" />
+  <meta property="og:description" content="Single-player modern military FPS campaign set in a fictional 2029 Korean war. Runs in the browser (three.js / WebGL 2). Missions 01–02 playable." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="https://oblocko.github.io/Modern-Warfare-Iron-Storm-FPS/docs/screenshots/06_m02_avenue.jpg" />
   <link rel="stylesheet" href="./styles/main.css" />
+  <script>document.documentElement.classList.add('js');</script>
   <!-- Lets the unbundled source run on static hosting (GitHub Pages) without a build step.
        Vite (dev/build) resolves 'three' from node_modules itself and never uses this map. -->
   <script type="importmap">
@@ -16,7 +22,80 @@
     <div id="viewport"></div>
     <div id="ui"></div>
   </div>
-  <noscript>이 게임은 JavaScript와 WebGL2가 필요합니다.</noscript>
+
+  <!-- Static description of the game. Shown to readers that do not run JavaScript/WebGL
+       (text-only crawlers, AI browsing tools, no-JS browsers); removed as soon as the game boots. -->
+  <article id="about">
+    <header>
+      <p class="kicker">SINGLE-PLAYER MODERN MILITARY FPS · 1인칭 현대전 FPS</p>
+      <h1>FRONTLINE — IRON ECHO</h1>
+      <p class="lead">2029년, 한반도 전면전. 신병 한민재의 한국 전선과, 지워진 전직 요원 다니엘 보스의 해외 추적이 하나의 거짓말로 이어지는 16개 미션 캠페인. 브라우저에서 바로 실행되는 3D 게임입니다(three.js · WebGL 2).</p>
+      <p class="notice"><strong>이 페이지는 게임 소개입니다.</strong> 게임 자체는 JavaScript와 WebGL 2가 켜진 데스크톱 브라우저(Chrome · Edge · Firefox)에서 이 주소를 열면 실행됩니다. 텍스트만 읽는 도구나 자동 브라우저에서는 3D 게임 화면이 렌더링되지 않으므로 아래 정보·스크린샷·소스 코드로 확인할 수 있습니다.</p>
+      <p class="links"><a href="https://github.com/oblocko/Modern-Warfare-Iron-Storm-FPS">소스 코드 (GitHub)</a> · <a href="https://github.com/oblocko/Modern-Warfare-Iron-Storm-FPS/blob/main/docs/CAMPAIGN.md">캠페인 시나리오</a> · <a href="https://github.com/oblocko/Modern-Warfare-Iron-Storm-FPS/blob/main/docs/STORY_BIBLE.md">스토리 바이블</a> · <a href="https://github.com/oblocko/Modern-Warfare-Iron-Storm-FPS/blob/main/PROJECT_STATUS.md">개발 현황</a></p>
+    </header>
+
+    <section>
+      <h2>현재 상태 (빌드 0.2.0)</h2>
+      <ul>
+        <li><strong>플레이 가능:</strong> Mission 01 ROUTINE PATROL, Mission 02 BLACKOUT — 각각 처음부터 끝까지 진행 가능(약 30–40분), 미션 완료 후 메뉴를 거치지 않고 다음 미션으로 자동 연결</li>
+        <li><strong>설계 완료·제작 예정:</strong> Mission 03–16 (시나리오와 미션별 이벤트 계획 문서화)</li>
+        <li>메인 메뉴 · 임무 선택 · 영화식 브리핑 · 그래픽/오디오/조작 설정(키 변경, 게임패드) · 체크포인트 저장/이어하기 · 일시정지 · 결과 화면 · 크레딧</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>스크린샷</h2>
+      <div class="shots">
+        <figure><img src="./docs/screenshots/01_menu.jpg" alt="메인 메뉴: 야간 철책선 실시간 3D 배경과 군 지휘체계 스타일 메뉴" loading="lazy" /><figcaption>메인 메뉴 — 실시간 3D 배경(철책선, 서치라이트, 눈)</figcaption></figure>
+        <figure><img src="./docs/screenshots/02a_m01_briefing.jpg" alt="Mission 01 브리핑 화면: 작전 지도, 인물, 목표" loading="lazy" /><figcaption>미션 브리핑 — 전술 지도, 등장인물, 목표</figcaption></figure>
+        <figure><img src="./docs/screenshots/02_m01_truck.jpg" alt="Mission 01 오프닝: 군용 트럭 화물칸에 탄 분대원들" loading="lazy" /><figcaption>M01 오프닝 — 트럭 이동 중 분대 대화(자유 시점)</figcaption></figure>
+        <figure><img src="./docs/screenshots/03_m01_gp.jpg" alt="Mission 01 GOP 소초: 눈 덮인 철책 순찰로" loading="lazy" /><figcaption>M01 — GOP 소초와 철책 순찰로, 새벽 눈</figcaption></figure>
+        <figure><img src="./docs/screenshots/04_m01_mg.jpg" alt="Mission 01 관측소 OP 백두-3: 언덕 위 벙커와 여명, 무전 교신 자막" loading="lazy" /><figcaption>M01 — 언덕 위 관측소, 무전 복구 직후</figcaption></figure>
+        <figure><img src="./docs/screenshots/05_m01_village.jpg" alt="Mission 01 민통선 마을: 기와지붕 가옥" loading="lazy" /><figcaption>M01 — 민통선 마을 철수 구간</figcaption></figure>
+        <figure><img src="./docs/screenshots/06_m02_avenue.jpg" alt="Mission 02 연서시 대로: 정전된 도시, 고층 건물과 버려진 차량" loading="lazy" /><figcaption>M02 — 정전된 연서시 대로</figcaption></figure>
+        <figure><img src="./docs/screenshots/07_m02_station.jpg" alt="Mission 02 지하철 역사: 비상등만 켜진 어두운 승강장" loading="lazy" /><figcaption>M02 — 어두운 지하 역사, 손전등</figcaption></figure>
+        <figure><img src="./docs/screenshots/08_m02_bus.jpg" alt="Mission 02 버스 호송: 기관총이 달린 호송 트럭과 연서시 대로" loading="lazy" /><figcaption>M02 — 대피 버스 호송 출발 직전, 기관총 호송 트럭</figcaption></figure>
+      </div>
+    </section>
+
+    <section>
+      <h2>플레이 가능한 미션</h2>
+      <h3>MISSION 01 — ROUTINE PATROL (일상 순찰)</h3>
+      <p>2029년 3월 14일 04:52, 강원도 중부전선 GOP. 오경보가 잦은 철책 감지 센서를 점검하는 평범한 새벽 순찰이 정전과 교신 두절, 지평선의 섬광으로 무너진다.</p>
+      <p><em>이벤트:</em> 트럭 탑승 진입 · 센서 점검 · 정전 · 포격 속 교통호 이동 · 감시탑 붕괴 · 관측소 침투조 교전 · 무전 복구 · 거치 기관총 방어 · 쌍안경 박격포 유도 · 적 정찰조를 숨어서 지나보내기 · 매복 속 부상병 끌기 · 장갑차 포탑 사수로 적 기관총 트럭 격파 · 헬기 편대 엔딩</p>
+      <h3>MISSION 02 — BLACKOUT (블랙아웃)</h3>
+      <p>같은 날 09:30, 전력과 통신이 끊긴 주인공의 고향 연서시. 지하철 역사에 갇힌 시민들을 구출해 대피 버스로 호송한다.</p>
+      <p><em>이벤트:</em> 차량 밀어 도로 개척 · 자폭 드론 떼 · 관측 드론(발각되면 포격) · 도로 위 적 특수부대 · 손전등을 켜고 들어가는 어두운 역사 · 셔터 개방 · 150초 시한 폭약 해체 · 시민 8명 인솔 · 트럭 기관총으로 버스 호송(버스 내구도) · 고가도로 붕괴</p>
+    </section>
+
+    <section>
+      <h2>게임 시스템</h2>
+      <ul>
+        <li><strong>1인칭:</strong> 걷기·달리기·앉기·점프·장애물 넘기, 조준(홀로 사이트), 재장전 애니메이션, 무기 교체, 수류탄, 손전등, 쌍안경, 차량 좌석·포탑·거치 화기</li>
+        <li><strong>AI:</strong> 시야·청각 인지, 엄폐 지점 점수화, 숨기/노출 사격 사이클, 측면 우회, 수류탄, 분대 경보 전파, 난이도별 동시 사격 제한, 함께 싸우는 분대원, 총성에 웅크리는 시민</li>
+        <li><strong>적 유형:</strong> 보병, 특수부대, 기관총 트럭, 정찰 드론, 자폭 드론</li>
+        <li><strong>연출:</strong> 우선순위 대사·무전·자막, 레터박스, 타이틀 카드, 붕괴 연출, 여명 변화, 날씨(눈)</li>
+        <li><strong>사운드:</strong> 효과음과 적응형 음악을 Web Audio로 실시간 합성, 3D 위치 음향, 실내 잔향, 메뉴 테마곡</li>
+        <li><strong>그래픽:</strong> PBR 재질, 그림자, 블룸·필름 그레인·색보정, 파티클(연기·화염·파편), Poly Haven CC0 실사 텍스처·스캔 소품</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>조작</h2>
+      <p>WASD 이동 · 마우스 시점 · Shift 달리기 · C 앉기 · Space 점프/넘기 · 좌클릭 사격 · 우클릭 조준 · R 재장전 · F 상호작용(길게 누르기) · G 수류탄 · 1/2 무기 · B 쌍안경(화력 지원) · L 손전등 · Esc 일시정지. 게임패드 지원, 모든 키 변경 가능.</p>
+    </section>
+
+    <section>
+      <h2>기술과 한계</h2>
+      <p>three.js r187(WebGL 2) + Vite. 캐릭터·무기·건물·차량·애니메이션은 코드로 생성한 원본 모델이며, 일부 텍스처와 소품은 Poly Haven CC0 에셋입니다. 성우 음성은 없고 자막으로 대사를 전달합니다. 캐릭터는 아직 단순한 형태이며, 차량은 직접 운전할 수 없습니다. 모든 인물·부대·사건은 허구이며, 전투는 게임용으로 추상화되고 비고어 방식으로 표현됩니다.</p>
+    </section>
+
+    <section lang="en">
+      <h2>English summary</h2>
+      <p>FRONTLINE — IRON ECHO is a single-player first-person modern military shooter that runs in the browser (three.js / WebGL 2). Set in a fictional 2029 war on the Korean peninsula, it follows conscript Han Min-jae on the Korean front and ex-operative Daniel Voss abroad across a 16-mission campaign. Missions 01 and 02 are fully playable and chain into each other; missions 03–16 are designed. Gameplay mixes infantry combat with mounted machine guns, an IFV turret section, binocular-directed mortar strikes, recon and kamikaze drones, a stealth beat, a timed bomb defusal in a dark subway station, civilian escort, a bus escort and scripted collapses. To play, open this page with JavaScript and WebGL 2 enabled in a desktop browser.</p>
+    </section>
+  </article>
+
   <script type="module" src="./src/main.js"></script>
 </body>
 </html>
