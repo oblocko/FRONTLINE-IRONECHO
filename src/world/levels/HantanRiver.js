@@ -357,9 +357,13 @@ export class HantanRiver {
       if (k >= 1) { g.effects.explosion(V(0, RIVER.water + 0.2, 0), 1.6); return false; }
     });
   }
+  // thermal sight: cold sky, grey ground, hot engines glow white
   setThermal(on) {
+    const scene = this.game.renderer.scene;
     this.thermal = on ? 1 : 0;
     for (const t of this.ghosts) t.visible = on && !this.ghostsGone;
+    if (on) { this._fog = scene.fog; scene.fog = new THREE.FogExp2(0x2c2c2c, 0.0035); this.sky.mesh.visible = false; this._bg = scene.background; scene.background = new THREE.Color(0x0c0c0c); this.weather.points.visible = false; }
+    else { scene.fog = this._fog; this.sky.mesh.visible = true; scene.background = this._bg ?? null; this.weather.points.visible = true; }
   }
   update(dt, t) {
     const g = this.game;

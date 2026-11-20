@@ -163,8 +163,10 @@ export const SEGMENTS = [
       const p = game.player; const canvas = game.renderer.renderer.domElement;
       const ov = document.createElement('div'); ov.className = 'thermal-ov'; ov.innerHTML = '<div class="ret"></div><div class="lbl">THERMAL · WHT · ×8 &nbsp; 방위 270°</div><div class="rec">● REC</div>';
       game.ui.hud.appendChild(ov);
-      const to = R.ford.clone().add(V(0, 0, -30)).sub(lv.thermalPos); p.teleport(V(lv.thermalPos.x + 0.9, lv.hf(lv.thermalPos.x + 0.9, lv.thermalPos.z), lv.thermalPos.z), Math.atan2(-to.x, -to.z));
-      p.pitch = -0.02; p.fovOverride = 7; game.weapons.hidden = true; canvas.style.filter = 'grayscale(1) contrast(1.9) brightness(1.5)'; lv.setThermal(true);
+      const c = lv.ghosts.reduce((a, t) => a.add(t.position), V(0, 0, 0)).multiplyScalar(1 / lv.ghosts.length).add(V(0, 1.4, 0));
+      p.teleport(V(lv.thermalPos.x + 0.9, lv.hf(lv.thermalPos.x + 0.9, lv.thermalPos.z), lv.thermalPos.z), 0);
+      const to = c.clone().sub(p.eyePos(V(0, 0, 0))); p.yaw = Math.atan2(-to.x, -to.z); p.pitch = Math.atan2(to.y, Math.hypot(to.x, to.z));
+      p.fovOverride = 6; game.weapons.hidden = true; canvas.style.filter = 'grayscale(1) contrast(1.35) brightness(1.15)'; lv.setThermal(true);
       game.objectives.complete('thermal');
       await m.talk([
         ['minjae', '…보입니다. 여울 건너편에 전차… 여섯 대.', { priority: 3 }],
