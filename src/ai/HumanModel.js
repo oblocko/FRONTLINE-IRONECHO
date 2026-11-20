@@ -57,15 +57,15 @@ function materialsFor(faction, variant) {
     M.boot = mat(`civShoe${variant % 3}`, () => std([0xd8d8d4, 0x2a2a2a, 0x5a4636][variant % 3], 0.7));
     M.glove = M.skin; M.gear = mat('civBag', () => std(0x1f2a3a, 0.8));
   } else {
-    const kpa = faction === 'kpa';
-    M.uniform = mat(`uni_${faction}`, () => { const m = pbr(kpa ? 'camoEnemy' : 'camoROK', { repeat: [3, 3], key: `uni${faction}` }); m.normalScale.set(0.6, 0.6); return m; });
+    const kpa = faction === 'kpa', us = faction === 'us';
+    M.uniform = mat(`uni_${faction}`, () => { const m = pbr(kpa ? 'camoEnemy' : us ? 'camoUS' : 'camoROK', { repeat: [3, 3], key: `uni${faction}` }); m.normalScale.set(0.6, 0.6); return m; });
     M.top = M.uniform;
-    M.gear = mat(`gear_${faction}`, () => pbr('fabric', { color: kpa ? 0x5a5537 : 0x4b5036, repeat: [4, 4], key: `gear${faction}` }));
-    M.plate = mat(`plate_${faction}`, () => pbr('fabric', { color: kpa ? 0x4a4630 : 0x3c4130, repeat: [4, 4], key: `plate${faction}` }));
-    M.helmet = mat(`helm_${faction}`, () => kpa ? pbr('paintedMetal', { color: 0x5c6040, key: 'helmkpa' }) : pbr('camoROK', { repeat: [1.5, 1.5], key: 'helmrok' }));
+    M.gear = mat(`gear_${faction}`, () => pbr('fabric', { color: kpa ? 0x5a5537 : us ? 0x7a6a4e : 0x4b5036, repeat: [4, 4], key: `gear${faction}` }));
+    M.plate = mat(`plate_${faction}`, () => pbr('fabric', { color: kpa ? 0x4a4630 : us ? 0x6c5e44 : 0x3c4130, repeat: [4, 4], key: `plate${faction}` }));
+    M.helmet = mat(`helm_${faction}`, () => kpa ? pbr('paintedMetal', { color: 0x5c6040, key: 'helmkpa' }) : us ? pbr('paintedMetal', { color: 0x76684c, key: 'helmus' }) : pbr('camoROK', { repeat: [1.5, 1.5], key: 'helmrok' }));
     M.boot = mat('boot', () => std(0x231e19, 0.62));
     M.glove = mat('glove', () => std(0x2a2a24, 0.88));
-    M.patch = mat(`patch_${faction}`, () => std(kpa ? 0x7a2020 : 0x2a4a8a, 0.7));
+    M.patch = mat(`patch_${faction}`, () => std(kpa ? 0x7a2020 : faction === 'us' ? 0x3c3c34 : 0x2a4a8a, 0.7));
   }
   return M;
 }

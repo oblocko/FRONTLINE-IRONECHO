@@ -20,6 +20,10 @@ export const CHARACTERS = {
   convoy: { name: '수송대장', en: 'Convoy lead', rank: '상사', rankEn: 'SFC', unit: '', color: '#ffe0a0', pitch: 0.88, role: '' },
   engineer: { name: '공병 2소대장', en: 'Engineer PL', rank: '중위', rankEn: '1LT', unit: '공병대대', color: '#ffe0a0', pitch: 0.95, role: '' },
   medevac: { name: '후송 1호', en: 'Casevac 1', rank: '', rankEn: '', unit: '', color: '#cccccc', pitch: 1.0, role: 'Radio' },
+  reyes: { name: '레예스', en: 'Capt. Reyes', rank: '대위', rankEn: 'CPT', unit: '미 해병대 연합 상륙 중대장', color: '#ffc48a', pitch: 1.2, role: 'US Marine company commander' },
+  harris: { name: '해리스', en: 'Lt. Harris', rank: '중위', rankEn: '1LT', unit: '미 해병대 통신정보장교', color: '#b8d8ff', pitch: 0.95, role: 'US comms officer' },
+  pilot: { name: '조종사', en: 'Pilot', rank: '', rankEn: '', unit: '육군 항공', color: '#cccccc', pitch: 0.9, role: 'Radio' },
+  marine: { name: '미 해병', en: 'Marine', rank: '', rankEn: '', unit: '', color: '#ffc48a', pitch: 1.0, role: '' },
   enemy: { name: '적군', en: 'Hostile', rank: '', rankEn: '', unit: '', color: '#ff7a6a', pitch: 0.9, role: '' },
   narrator: { name: '', en: '', rank: '', rankEn: '', unit: '', color: '#ffffff', pitch: 1, role: '' },
 };

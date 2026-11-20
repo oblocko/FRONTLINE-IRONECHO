@@ -217,11 +217,11 @@ export class Effects {
         size: 3 * s, endSize: 14 * s, life: 9 + Math.random() * 4, alpha: 0.55, endAlpha: 0, r: color[0], g: color[1], b: color[2], fadeIn: 0.1, drag: 0.1 });
     } });
   }
-  smokeGrenade(pos) {
-    return this.addEmitter({ pos: pos.clone(), rate: 18 * this.budget, life: 22, spawn: (p) => {
+  smokeGrenade(pos, color = [0.82, 0.82, 0.8], life = 22) {
+    return this.addEmitter({ pos: pos.clone(), rate: 18 * this.budget, life, spawn: (p) => {
       const a = Math.random() * 6.28;
       this.smoke.spawn({ x: p.x, y: p.y + 0.3, z: p.z, vx: Math.cos(a) * 1.5, vy: 0.6 + Math.random() * .6, vz: Math.sin(a) * 1.5,
-        size: 1.5, endSize: 7, life: 8, alpha: 0.85, endAlpha: 0, r: 0.82, g: 0.82, b: 0.8, drag: 0.6, fadeIn: 0.05 });
+        size: 1.5, endSize: 7, life: 8, alpha: 0.85, endAlpha: 0, r: color[0], g: color[1], b: color[2], drag: 0.6, fadeIn: 0.05 });
     } });
   }
 

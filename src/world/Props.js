@@ -526,6 +526,6 @@ export function buildHelicopter() {
   const tail = new THREE.Group(); tail.position.set(0.12, 1.0, -7.1); g.add(tail);
   for (let i = 0; i < 2; i++) add(new THREE.BoxGeometry(0.02, 1.4, 0.12), dark, 0, 0, 0, i * Math.PI / 2, 0, 0, tail);
   const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 4), new THREE.MeshBasicMaterial({ color: 0xff2010 })); beacon.position.set(0, -1.15, -1.5); g.add(beacon);
-  g.userData = { rotor, tail, beacon };
+  g.userData = { dynamic: true, rotor, tail, beacon };
   return g;
 }

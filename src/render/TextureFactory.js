@@ -224,6 +224,16 @@ const RECIPES = {
       return { r: c[0] + fab, g: c[1] + fab, b: c[2] + fab, h: fab * 8, rough: 0.95 };
     }, { normalStrength: 0.8 });
   },
+  camoUS(size) {
+    // Original arid multi-tone pattern for allied US troops (stylised, not an official pattern copy)
+    const A = makeNoiseSet(291, 3, 4), B = makeNoiseSet(301, 6, 4), C = makeNoiseSet(311, 64, 1);
+    const pal = [hex(0x8a7a5c), hex(0x6e6347), hex(0xa2916c), hex(0x585a3e)];
+    return buildTextures(size, (u, v, x, y) => {
+      const a = fbm(A, u, v, 4, 3), b = fbm(B, u, v, 4, 6); let c = pal[0]; if (a > 0.58) c = pal[1]; if (b > 0.62) c = pal[2]; if (a < 0.36 && b < 0.45) c = pal[3];
+      const fab = C[0].at(x * 0.5, y * 0.5) * 0.05;
+      return { r: c[0] + fab, g: c[1] + fab, b: c[2] + fab, h: fab * 8, rough: 0.95 };
+    }, { normalStrength: 0.8 });
+  },
   camoEnemy(size) {
     const A = makeNoiseSet(251, 3, 4), C = makeNoiseSet(261, 64, 1);
     const pal = [hex(0x5a5a3c), hex(0x3d3f2a), hex(0x6f6a4c)];

@@ -11,7 +11,7 @@ const PORT = 4195;
 const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], { stdio: 'pipe' });
 await new Promise((r) => { server.stdout.on('data', (d) => { if (String(d).includes('Local')) r(); }); setTimeout(r, 6000); });
 const browser = await pw.chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
-const CPS = { m01: ['truck', 'gp', 'op_move', 'op_radio', 'fallback', 'extraction'], m02: ['convoy', 'jam', 'avenue', 'station', 'escort', 'busrun'], m03: ['convoy', 'command', 'assault', 'demolition', 'casevac'] };
+const CPS = { m01: ['truck', 'gp', 'op_move', 'op_radio', 'fallback', 'extraction'], m02: ['convoy', 'jam', 'avenue', 'station', 'escort', 'busrun'], m03: ['convoy', 'command', 'assault', 'demolition', 'casevac'], m04: ['insertion', 'batteries', 'descent', 'crane', 'lz'] };
 if (process.env.ONLY) for (const k of Object.keys(CPS)) if (!process.env.ONLY.split(',').includes(k)) delete CPS[k];
 const RUN_MS = +(process.env.RUN_MS || 25000);
 const all = []; const T0 = Date.now(); const log = (s) => console.log(`[${((Date.now() - T0) / 1000).toFixed(0)}s] ${s}`);
@@ -57,7 +57,7 @@ async function newPage(save) {
 }
 // ---- every checkpoint ----
 for (const [mission, cps] of Object.entries(CPS)) for (const cp of cps) {
-  const save = { version: 1, unlocked: ['m01', 'm02', 'm03'], completed: {}, checkpoint: { missionId: mission, checkpointId: cp, savedAt: Date.now() }, lastMission: mission, storyFlags: {} };
+  const save = { version: 1, unlocked: ['m01', 'm02', 'm03', 'm04'], completed: {}, checkpoint: { missionId: mission, checkpointId: cp, savedAt: Date.now() }, lastMission: mission, storyFlags: {} };
   const { page, errs } = await newPage(save);
   try {
     await page.goto(`http://localhost:${PORT}/?nolock&autostart`);
