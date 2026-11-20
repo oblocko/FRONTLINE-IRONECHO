@@ -195,7 +195,7 @@ export class HantanRiver {
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 6, 8), rail); pole.position.set(s * (B.half - 0.2), B.deck + 3, z + s * 4); scene.add(pole);
       const arm = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.15), rail); arm.position.set(s * (B.half - 0.75), B.deck + 5.95, z + s * 4); scene.add(arm);
     }
-    p.sign(6.5, 31, '한탄대교', { sub: 'HANTAN BRIDGE · 중량 40t', bg: '#1e4c7a', rotY: Math.PI, w: 2.6, h: 0.9, height: 2.2 });
+    p.sign(-7, 31, '한탄대교', { sub: 'HANTAN BRIDGE · 중량 40t', bg: '#1e4c7a', rotY: Math.PI, w: 2.6, h: 0.9, height: 2.2 });
     // abandoned cars on the bridge (cover for the enemy rush)
     const car = (x, z, c, rot) => { const t = buildTruck({ canopy: false }); t.scale.setScalar(0.6); t.position.set(x, B.deck, z); t.rotation.y = rot; t.remove(t.userData.cargoLamp); t.traverse((o) => { if (o.isMesh && o.material?.map) { o.material = o.material.clone(); o.material.color.setHex(c); } }); scene.add(t); w.addBoxCentered(V(x, B.deck + 0.9, z), V(1.8, 1.8, 4.4), { surface: 'metal' }); return t; };
     car(-2, -22, 0x6a7a8a, 0.15); car(2.3, 17, 0x8a3a2a, Math.PI - 0.1);
