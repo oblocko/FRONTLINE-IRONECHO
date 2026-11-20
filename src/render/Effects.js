@@ -266,27 +266,49 @@ export class Weather {
     const budget = { low: 0.35, medium: 0.65, high: 1 }[settings.data.graphics.effects] ?? 1;
     this.n = Math.floor((kind === 'rain' ? 9000 : 5000) * density * budget);
     this.box = kind === 'rain' ? 40 : 50;
-    const pos = new Float32Array(this.n * 3);
-    for (let i = 0; i < this.n * 3; i++) pos[i] = (Math.random() - 0.5) * this.box;
-    this.geo = new THREE.BufferGeometry(); this.geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     this.offsets = new Float32Array(this.n).map(() => Math.random() * 100);
-    this.mat = new THREE.PointsMaterial({ map: softSprite('flake'), size: kind === 'rain' ? 0.05 : 0.09, transparent: true, opacity: kind === 'rain' ? 0.5 : 0.85, depthWrite: false, color: kind === 'rain' ? 0x9aa4b0 : 0xffffff, sizeAttenuation: true });
-    this.points = new THREE.Points(this.geo, this.mat); this.points.frustumCulled = false; scene.add(this.points);
     this.wind = new THREE.Vector3(kind === 'rain' ? 1.2 : 0.8, 0, 0.3);
     this.t = 0;
+    if (kind === 'rain') {
+      // rain: short streaks (line segments) stretched along the fall velocity
+      const pos = new Float32Array(this.n * 6);
+      for (let i = 0; i < this.n; i++) { const x = (Math.random() - 0.5) * this.box, y = (Math.random() - 0.5) * this.box, z = (Math.random() - 0.5) * this.box; pos.set([x, y, z, x, y, z], i * 6); }
+      this.geo = new THREE.BufferGeometry(); this.geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      this.mat = new THREE.LineBasicMaterial({ color: 0x9fb0c0, transparent: true, opacity: 0.32, depthWrite: false });
+      this.points = new THREE.LineSegments(this.geo, this.mat);
+    } else {
+      const pos = new Float32Array(this.n * 3);
+      for (let i = 0; i < this.n * 3; i++) pos[i] = (Math.random() - 0.5) * this.box;
+      this.geo = new THREE.BufferGeometry(); this.geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      this.mat = new THREE.PointsMaterial({ map: softSprite('flake'), size: 0.09, transparent: true, opacity: 0.85, depthWrite: false, color: 0xffffff, sizeAttenuation: true });
+      this.points = new THREE.Points(this.geo, this.mat);
+    }
+    this.points.frustumCulled = false; scene.add(this.points);
   }
   update(dt, camPos) {
     this.t += dt;
     const p = this.geo.attributes.position.array; const B = this.box, half = B / 2;
-    const fall = this.kind === 'rain' ? 14 : 1.4;
-    for (let i = 0; i < this.n; i++) {
-      const o = this.offsets[i];
-      p[i * 3 + 1] -= fall * dt * (0.8 + (o % 1) * 0.4);
-      p[i * 3] += (this.wind.x + (this.kind === 'snow' ? Math.sin(this.t + o) * 0.4 : 0)) * dt;
-      p[i * 3 + 2] += (this.wind.z + (this.kind === 'snow' ? Math.cos(this.t * 0.7 + o) * 0.3 : 0)) * dt;
-      for (let k = 0; k < 3; k++) {
-        const rel = p[i * 3 + k] - camPos.getComponent(k);
-        if (rel < -half) p[i * 3 + k] += B; else if (rel > half) p[i * 3 + k] -= B;
+    if (this.kind === 'rain') {
+      const fall = 16, len = 0.55;
+      for (let i = 0; i < this.n; i++) {
+        const k = i * 6, sp = fall * (0.85 + (this.offsets[i] % 1) * 0.3);
+        p[k + 1] -= sp * dt; p[k] += this.wind.x * dt; p[k + 2] += this.wind.z * dt;
+        for (let c = 0; c < 3; c++) {
+          const rel = p[k + c] - camPos.getComponent(c);
+          if (rel < -half) p[k + c] += B; else if (rel > half) p[k + c] -= B;
+        }
+        p[k + 3] = p[k] - this.wind.x / sp * len; p[k + 4] = p[k + 1] + len; p[k + 5] = p[k + 2] - this.wind.z / sp * len;
+      }
+    } else {
+      for (let i = 0; i < this.n; i++) {
+        const o = this.offsets[i];
+        p[i * 3 + 1] -= 1.4 * dt * (0.8 + (o % 1) * 0.4);
+        p[i * 3] += (this.wind.x + Math.sin(this.t + o) * 0.4) * dt;
+        p[i * 3 + 2] += (this.wind.z + Math.cos(this.t * 0.7 + o) * 0.3) * dt;
+        for (let k = 0; k < 3; k++) {
+          const rel = p[i * 3 + k] - camPos.getComponent(k);
+          if (rel < -half) p[i * 3 + k] += B; else if (rel > half) p[i * 3 + k] -= B;
+        }
       }
     }
     this.geo.attributes.position.needsUpdate = true;
