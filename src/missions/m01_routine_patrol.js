@@ -68,7 +68,7 @@ async function artillery(game, m, pos, { delay = 0, scale = 1.3, safeRadius = 9 
   // never land directly on the player: push out to safeRadius
   const dx = at.x - p.x, dz = at.z - p.z, d = Math.hypot(dx, dz);
   if (d < safeRadius) { const k = safeRadius / Math.max(0.01, d); at.x = p.x + dx * k; at.z = p.z + dz * k; at.y = game.world.heightFn(at.x, at.z); }
-  game.combat.explode(at, { radius: 6, damage: 60, scale, shake: 1.2, snow: true });
+  game.combat.explode(at, { radius: 6, damage: 60, scale, shake: 1.2, snow: true, kind: 'artillery' });
   if (Math.random() < 0.35) { const em = game.effects.fireEmitter(at.clone().add(V(0, 0.2, 0)), 0.8); setTimeout(() => game.effects.removeEmitter(em), 40000); }
 }
 

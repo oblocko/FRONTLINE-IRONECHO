@@ -1,0 +1,24 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><base href="../"><title>MG viewer</title>
+<style>html,body{margin:0;background:#2a2d30;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">{ "imports": { "three": "./vendor/three/build/three.module.js", "three/examples/jsm/": "./vendor/three/examples/jsm/" } }</script>
+</head><body>
+<script type="module">
+// Dev tool: renders the crew-served MG model (?view=gunner for the seated view).
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { buildMG } from './src/gameplay/MountedWeapon.js';
+const view = new URLSearchParams(location.search).get('view') || 'side';
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(innerWidth, innerHeight); r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.shadowMap.enabled = true; document.body.appendChild(r.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x6a7078);
+scene.environment = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), 0.04).texture; scene.environmentIntensity = 0.5;
+scene.add(new THREE.HemisphereLight(0xc8d0dc, 0x4a4a44, 1.1));
+const sun = new THREE.DirectionalLight(0xfff0dc, 2.4); sun.position.set(2, 4, 3); sun.castShadow = true; scene.add(sun);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), new THREE.MeshStandardMaterial({ color: 0x7a7468, roughness: 0.95 })); ground.rotation.x = -Math.PI / 2; ground.position.y = -0.62; ground.receiveShadow = true; scene.add(ground);
+const m = buildMG(); scene.add(m.g); m.g.rotation.y = 0;
+const cam = new THREE.PerspectiveCamera(view === 'gunner' ? 70 : 30, innerWidth / innerHeight, 0.02, 50);
+if (view === 'gunner') { cam.position.set(0, 0.25, 0.88); cam.lookAt(0, 0.25, -2); }
+else if (view === 'top') { cam.position.set(-1.6, 1.4, 1.4); cam.lookAt(0, -0.05, -0.15); }
+else { cam.position.set(-2.4, 0.35, -0.2); cam.lookAt(0, -0.1, -0.15); }
+r.render(scene, cam); window.__ready = true;
+</script></body></html>

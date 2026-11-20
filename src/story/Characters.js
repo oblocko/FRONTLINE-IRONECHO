@@ -18,6 +18,8 @@ export const CHARACTERS = {
   civilian: { name: '대피 주민', en: 'Evacuee', rank: '', rankEn: '', unit: '', color: '#e8d8b0', pitch: 1.25, role: '' },
   pa: { name: '안내방송', en: 'PA system', rank: '', rankEn: '', unit: '', color: '#cfcfcf', pitch: 1.1, role: '' },
   convoy: { name: '수송대장', en: 'Convoy lead', rank: '상사', rankEn: 'SFC', unit: '', color: '#ffe0a0', pitch: 0.88, role: '' },
+  engineer: { name: '공병 2소대장', en: 'Engineer PL', rank: '중위', rankEn: '1LT', unit: '공병대대', color: '#ffe0a0', pitch: 0.95, role: '' },
+  medevac: { name: '후송 1호', en: 'Casevac 1', rank: '', rankEn: '', unit: '', color: '#cccccc', pitch: 1.0, role: 'Radio' },
   enemy: { name: '적군', en: 'Hostile', rank: '', rankEn: '', unit: '', color: '#ff7a6a', pitch: 0.9, role: '' },
   narrator: { name: '', en: '', rank: '', rankEn: '', unit: '', color: '#ffffff', pitch: 1, role: '' },
 };

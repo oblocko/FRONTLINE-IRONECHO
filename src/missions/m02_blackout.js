@@ -12,6 +12,7 @@ import { keyName } from '../player/Player.js';
 import { MountedWeapon } from '../gameplay/MountedWeapon.js';
 import { EnemyVehicle } from '../gameplay/EnemyVehicle.js';
 import { Drone } from '../gameplay/Drone.js';
+import { Jammer } from '../gameplay/Jammer.js';
 import { V, spawnEnemies, attackOrder, spawnCivilians, squadFollow, hintKeys, giveLoadout, shell, interact } from './common.js';
 
 export const TEXTURES = ['concrete', 'asphalt', 'dirt', 'metal', 'paintedMetal', 'corrugated', 'wood', 'fabric', 'camoROK', 'camoEnemy', 'sandbag'];
@@ -54,6 +55,7 @@ function unseatSquad(game, truck, at) {
   const scene = game.renderer.scene; const sq = game.squad;
   [sq.yoon, sq.jung].forEach((a, i) => { if (a.actor.root.parent === truck) truck.remove(a.actor.root); scene.add(a.actor.root); a.actor.root.position.set(at.x + (i ? 1.5 : -1.5), 0, at.z + 1); a.unpose(); a.follow(game.player); });
 }
+function giveJammer(game) { if (!game.gadget) game.gadget = new Jammer(game); }
 function wrap(a) { return Math.atan2(Math.sin(a), Math.cos(a)); }
 // drive a group along a curve; returns {done(), set(speed)} controller
 function driver(game, m, obj, pts, { speed = 8, accel = 0.6, onStep = null } = {}) {
@@ -136,22 +138,45 @@ export const SEGMENTS = [
       await m.wait(2.5);
       game.audio.setMusic('combat');
       await m.say('seoyeon', '순찰조! 자폭 드론 다수, 북서쪽에서 접근 중! 차량에서 떨어지세요!', { radio: true, priority: 3 });
-      const first = new Drone(game, { pos: V(-60, 40, -170), target: proxy, speed: 18 });
+      // the first one is already committed to the truck — nothing on the ground can stop it in time
+      const first = new Drone(game, { pos: V(-34, 30, -150), target: proxy, speed: 22, hp: 600 }); first.isDrone = false;
       await m.say('yoon', '트럭에서 떨어져! 산개!', { priority: 3 });
-      game.objectives.add('drones', '공격 드론 격추', { count: 6 });
-      const swarm = [first];
-      for (let i = 0; i < 5; i++) swarm.push(new Drone(game, { pos: V(-70 + i * 12, 38 + i * 3, -175 - i * 6), speed: 13 + i, delay: 4 + i * 2.5 }));
-      const offD = m.bind(events.on('drone:down', ({ drone }) => { if (swarm.includes(drone)) game.objectives.progress('drones'); }));
-      const offT = m.bind(events.on('drone:detonated', ({ drone }) => {
-        if (!swarm.includes(drone)) return; game.objectives.progress('drones');
-        if (drone.target === proxy && !lv.truckDead) { lv.truckDead = true; game.combat.explode(truck.position.clone().add(V(0, 1, 0)), { radius: 6, damage: 80, scale: 1.6, playerSafe: game.player.position.distanceTo(truck.position) > 7 }); game.effects.fireEmitter(truck.position.clone().add(V(0, 1.5, 0)), 1.4); truck.traverse((o) => { if (o.isMesh && o.material) { o.material = o.material.clone(); o.material.color?.multiplyScalar(0.2); } }); game.engine?.stop(); m.spawn(() => m.say('jung', '트럭이…! 운전병은!?', { priority: 3 })); }
-      }));
-      game.ui.hint('드론은 급강하 직전에 가장 쏘기 쉽습니다. 머리 위를 주시하십시오.', 6);
-      await m.until(() => swarm.every((dr) => dr.dead || dr.removed), 150);
+      await m.until(() => first.removed || first.dead, 25);
+      if (!lv.truckDead) { lv.truckDead = true; game.combat.explode(truck.position.clone().add(V(0, 1, 0)), { radius: 6, damage: 80, scale: 1.6, playerSafe: game.player.position.distanceTo(truck.position) > 7, kind: 'drone' }); game.effects.fireEmitter(truck.position.clone().add(V(0, 1.5, 0)), 1.4); truck.traverse((o) => { if (o.isMesh && o.material) { o.material = o.material.clone(); o.material.color?.multiplyScalar(0.2); } }); game.engine?.stop(); }
+      await m.say('jung', '트럭이…! 운전병은!?', { priority: 3 });
+      // the squad's counter-drone jammer goes to the player
+      sq.jung.moveTo(game.player.position.clone().add(V(1.4, 0, 0.8)), { run: true, face: game.player.position });
+      await m.talk([
+        ['jung', '민재! 이거 받아라 — 휴대용 재밍건이다. 총으로 저 작은 걸 맞히는 건 운이야.', { priority: 3 }],
+        ['yoon', '드론을 원 안에 붙잡아 두면 통제 신호가 끊긴다. 배터리 아껴 써!', { priority: 3 }],
+      ]);
+      giveJammer(game); game.gadget.announce();
+      game.objectives.add('drones', '재밍건으로 자폭 드론 무력화', { count: 6 });
+      const wave = []; const resolved = (d) => d.dead || d.removed;
+      const offD = m.bind(events.on('drone:down', ({ drone }) => { if (wave.includes(drone)) game.objectives.progress('drones'); }));
+      const offT = m.bind(events.on('drone:detonated', ({ drone }) => { if (wave.includes(drone)) game.objectives.progress('drones'); }));
+      const launch = (list) => { const ds = list.map(([x, y, z, o = {}]) => new Drone(game, { pos: V(x, y, z), speed: 11, ...o })); wave.push(...ds); return ds; };
+      // wave 1 — a single slow drone to learn the jammer on
+      const w1 = launch([[-40, 34, -190, { speed: 6 }]]);
+      m.spawn(async () => { await m.until(() => game.gadget?.active, 10); if (!game.gadget?.active) game.ui.hint(`<b>${hintKeys(game)('support')}</b> 를 눌러 재밍건을 드십시오`, 5); });
+      await m.say('jung', '하나 온다, 북쪽! 천천히 오는 놈부터 연습해라!', { priority: 2 });
+      await m.until(() => w1.every(resolved), 60);
+      // wave 2 — two drones from different bearings
+      await m.say('seoyeon', '두 대 추가 — 북서쪽, 그리고 서쪽 건물 뒤에서!', { radio: true, priority: 3 });
+      const w2 = launch([[-70, 38, -170], [-80, 30, -110, { delay: 3, speed: 12 }]]);
+      game.ui.hint('화면 가장자리의 화살표가 접근 중인 드론 방향입니다. <b style="color:var(--danger)">붉게 점멸</b>하면 곧 급강하합니다.', 6);
+      await m.until(() => w2.every(resolved), 70);
+      // wave 3 — three at once, one from behind
+      await m.say('seoyeon', '마지막 무리입니다! 세 대 — 동쪽, 북쪽, 그리고… 남쪽 후방!', { radio: true, priority: 3 });
+      const w3 = launch([[70, 40, -150, { speed: 12 }], [10, 44, -200, { delay: 2, speed: 13 }], [-10, 36, -60, { delay: 5, speed: 12 }]]);
+      m.spawn(async () => { await m.wait(9); if (!w3[2].dead && !w3[2].removed) await m.say('jung', '뒤! 민재, 뒤에 하나!', { priority: 3 }); });
+      await m.until(() => w3.every(resolved), 90);
+      for (const d of wave) if (!resolved(d)) d.jam();
       offD(); offT(); game.objectives.complete('drones');
       game.audio.setMusic('tension');
       await m.talk([
         ['convoy', '…운전병은 무사하다. 차는 끝났다. 도보로 이동해.', { radio: true, priority: 3 }],
+        ['jung', '재밍건은 네가 계속 들고 있어라. 저것들 또 올 거다.'],
         ['yoon', '연서역까지 1.4킬로. 도로 따라 남쪽으로 간다. 붙어.'],
       ]);
     },
@@ -161,7 +186,7 @@ export const SEGMENTS = [
   {
     id: 'avenue',
     async setup(game) {
-      giveLoadout(game); const lv = game.level; lv.truck.position.set(-2.5, 0, -122); lv.truckDead = true;
+      giveLoadout(game); giveJammer(game); const lv = game.level; lv.truck.position.set(-2.5, 0, -122); lv.truckDead = true;
       game.player.teleport(V(-3, 0, -105), Math.PI); squadFollow(game, ['yoon', 'jung']);
       game.squad.yoon.actor.root.position.set(-5, 0, -108); game.squad.jung.actor.root.position.set(-1, 0, -108);
     },
@@ -201,7 +226,7 @@ export const SEGMENTS = [
   // ============ 3. THE DARK STATION ============
   {
     id: 'station',
-    async setup(game) { giveLoadout(game); game.level.truckDead = true; game.player.teleport(V(12, 0, 18), 0); squadFollow(game, ['yoon', 'jung']); },
+    async setup(game) { giveLoadout(game); giveJammer(game); game.level.truckDead = true; game.player.teleport(V(12, 0, 18), 0); squadFollow(game, ['yoon', 'jung']); },
     async run(game, m) {
       const lv = game.level, sq = game.squad, k = hintKeys(game);
       await interact(game, { pos: CITY.stationExit.clone().add(V(0, 1, 2)), prompt: '역사로 내려가기', radius: 3.5 });
@@ -235,7 +260,7 @@ export const SEGMENTS = [
         if (defused) { events.emit('hud:timer', null); return false; }
         left -= dt; led.visible = Math.sin(t * (left < 30 ? 16 : 6)) > 0;
         events.emit('hud:timer', { label: '폭약 기폭까지', seconds: left });
-        if (left <= 0) { events.emit('hud:timer', null); game.combat.explode(lv.chargeSite.clone(), { radius: 60, damage: 999, scale: 3 }); return false; }
+        if (left <= 0) { events.emit('hud:timer', null); game.failMission('변전실 폭약이 기폭되었습니다', '폭약 해체'); game.combat.explode(lv.chargeSite.clone(), { radius: 60, damage: 999, scale: 3, kind: 'mission' }); return false; }
       });
       await interact(game, { pos: lv.chargeSite, prompt: '폭약 해체', hold: 4, radius: 2.0 });
       defused = true; ledM.color.setHex(0x30ff60); events.emit('hud:timer', null);
@@ -264,7 +289,7 @@ export const SEGMENTS = [
   {
     id: 'escort',
     async setup(game) {
-      giveLoadout(game); const lv = game.level; lv.truckDead = true; lv.setDark(1); game.player.setFlashlight(true);
+      giveLoadout(game); giveJammer(game); const lv = game.level; lv.truckDead = true; lv.setDark(1); game.player.setFlashlight(true);
       game.player.teleport(V(350, 0, 0), -Math.PI / 2); squadFollow(game, ['yoon', 'jung']);
       game.squad.yoon.actor.root.position.set(347, 0, 2); game.squad.jung.actor.root.position.set(347, 0, -2);
       lv.survivors = spawnCivilians(game, V(352, 0, 3), 8, { spread: 2.5 });
@@ -309,7 +334,7 @@ export const SEGMENTS = [
   {
     id: 'busrun',
     async setup(game) {
-      giveLoadout(game); const lv = game.level; lv.truckDead = true;
+      giveLoadout(game); giveJammer(game); const lv = game.level; lv.truckDead = true;
       lv.evacBus = lv.kit.bus({ x: -6.5, z: 74, rotY: 0 });
       game.player.teleport(V(-3, 0, 58), 0); squadFollow(game, ['yoon', 'jung']);
     },
@@ -330,7 +355,7 @@ export const SEGMENTS = [
       seatSquadInTruck(game, esc);
       const busHp = { hp: 1000, max: 1000 };
       const busTarget = { position: bus.position, aimHeight: 1.6, damage: (n) => { busHp.hp -= n; game.player.addShake(0.05); } };
-      m.every(() => { events.emit('hud:escort', { name: '대피 버스', frac: busHp.hp / busHp.max }); if (busHp.hp <= 0 && !lv.busLost) { lv.busLost = true; busRun.target = 0; game.combat.explode(bus.position.clone().add(V(0, 1.5, 0)), { radius: 8, damage: 999, scale: 2 }); m.spawn(async () => { await m.say('yoon', '버스가…! 안 돼!', { priority: 3 }); game.ui.hint('<b style="color:var(--danger)">임무 실패 — 대피 버스가 파괴되었습니다</b>', 4); await m.wait(1.5); game.player.godMode = false; game.player.takeDamage(999, null); }); } });
+      m.every(() => { events.emit('hud:escort', { name: '대피 버스', frac: busHp.hp / busHp.max }); if (busHp.hp <= 0 && !lv.busLost) { lv.busLost = true; busRun.target = 0; game.combat.explode(bus.position.clone().add(V(0, 1.5, 0)), { radius: 8, damage: 999, scale: 2 }); m.spawn(async () => { await m.say('yoon', '버스가…! 안 돼!', { priority: 3 }); game.ui.hint('<b style="color:var(--danger)">임무 실패 — 대피 버스가 파괴되었습니다</b>', 4); await m.wait(1.5); game.player.godMode = false; game.failMission('대피 버스가 파괴되었습니다', '버스 호송'); }); } });
       game.objectives.add('escort', '대피 버스 호송 — 남쪽 검문소까지', { marker: V(0, 1, 200) });
       game.audio.setMusic('combat');
       const route = [[-6.5, 74], [-6, 100], [-5.5, 130], [-5, 160], [-4.5, 196]];
@@ -361,7 +386,7 @@ export const SEGMENTS = [
       lv.collapseOverpass();
       await m.until(() => busRun.done, 60);
       events.emit('hud:escort', null);
-      if (lv.busLost) { game.player.takeDamage(999, null); return; }
+      if (lv.busLost) { game.failMission('대피 버스가 파괴되었습니다', '버스 호송'); return; }
       game.objectives.complete('escort');
 
       // ---------------- ENDING ----------------

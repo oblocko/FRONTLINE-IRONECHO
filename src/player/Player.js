@@ -44,14 +44,19 @@ export class Player {
     this.position.copy(pos); this.position.y = this.world.groundHeight(pos.x, pos.z, Math.max(pos.y, this.world.heightFn(pos.x, pos.z)) + 1.2);
     this.velocity.set(0, 0, 0); this.yaw = yaw; this.pitch = pitch; this.vault = null;
   }
-  reset() { this.health = this.maxHealth; this.alive = true; this.trauma = 0; this.seat = null; this.vault = null; this.crouching = false; }
+  reset() { this.health = this.maxHealth; this.alive = true; this.trauma = 0; this.seat = null; this.vault = null; this.crouching = false; this.deathCam = null; this.damageLog = []; }
 
   setFlashlight(on) { this.flashOn = on; this.flashlight.visible = true; this.flashlight.intensity = on ? 40 : 0; this.audio.click(0.12, 2600, 0.02); }
   addShake(amount) { this.trauma = Math.min(1, this.trauma + amount); }
 
-  takeDamage(amount, fromPos, source = null) {
+  // info: { kind: 'bullet'|'grenade'|'drone'|'artillery'|'vehicle'|'blast'|'mission', label }
+  takeDamage(amount, fromPos, source = null, info = null) {
     if (!this.alive || this.godMode) return;
-    this.health -= amount; this.regenDelay = 4.5; this.lastDamageT = performance.now() / 1000;
+    const now = performance.now() / 1000;
+    const kind = info?.kind || (source?.isVehicle ? 'vehicle' : source?.team ? 'bullet' : fromPos ? 'blast' : 'mission');
+    (this.damageLog ||= []).push({ t: now, amount: Math.min(amount, Math.max(0, this.health)), pos: fromPos ? fromPos.clone() : (source?.position ? source.position.clone() : null), source, kind, label: info?.label || null });
+    this.damageLog = this.damageLog.filter((e) => now - e.t < 12).slice(-8);
+    this.health -= amount; this.regenDelay = 4.5; this.lastDamageT = now;
     this.addShake(0.15 + amount / 100);
     const dir = fromPos ? fromPos.clone().sub(this.position) : null;
     let angle = 0; if (dir) { const a = Math.atan2(-dir.x, -dir.z); angle = a - this.yaw; }
@@ -214,6 +219,7 @@ export class Player {
   updateCamera(dt, time) {
     const cam = this.camera;
     if (this.cameraOverride) return; // cinematic system drives the camera
+    if (!this.alive) { this.updateDeathCam(dt); return; }
     // head bob
     const moving = this.grounded && this.speed > 0.5 && !this.seat;
     if (moving) this.bobT += dt * (this.sprinting ? 13 : this.crouching ? 6.5 : 9);
@@ -239,6 +245,32 @@ export class Player {
     const target = this.fovOverride ?? (base * (1 - ads * (this.weapons?.current?.adsZoom ?? 0.22)) + (this.sprinting ? 6 : 0) + this.fovKick);
     cam.fov = damp(cam.fov, target, 10, dt); this.fovKick = damp(this.fovKick, 0, 6, dt);
     cam.updateProjectionMatrix();
+  }
+
+  // Death: the view drops to the ground, rolls onto its side and turns toward
+  // whatever caused it; FOV narrows and the world sways with the last breaths.
+  updateDeathCam(dt) {
+    const cam = this.camera;
+    if (!this.deathCam) {
+      const last = [...(this.damageLog || [])].reverse().find((e) => e.pos);
+      let yawTo = this.yaw;
+      if (last) { const d = last.pos.clone().sub(this.position); yawTo = Math.atan2(-d.x, -d.z); }
+      let dy = yawTo - this.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      this.deathCam = { t: 0, yaw0: this.yaw, dyaw: dy, pitch0: this.pitch, eye0: this.eye, roll: (Math.random() < 0.5 ? -1 : 1), fov0: cam.fov, seated: !!this.seat, base: cam.position.clone() };
+    }
+    const d = this.deathCam; d.t += dt;
+    const k = (a, b) => { const x = Math.min(1, Math.max(0, (d.t - a) / (b - a))); return x * x * (3 - 2 * x); };
+    const fall = k(0.05, 0.85), turn = k(0.7, 2.6), settle = k(0.85, 1.25);
+    const ground = this.seat ? d.base.y - 0.5 : this.position.y + 0.22;
+    const bounce = Math.sin(Math.min(1, Math.max(0, (d.t - 0.85) / 0.4)) * Math.PI) * 0.06;
+    const y = d.seated ? d.base.y - fall * 0.5 : this.position.y + d.eye0 + (ground - this.position.y - d.eye0) * fall + bounce;
+    const breathe = Math.sin(d.t * 1.6) * 0.012 * (1 - k(3, 6));
+    const fwd = new THREE.Vector3(-Math.sin(d.yaw0), 0, -Math.cos(d.yaw0));
+    cam.position.set(d.seated ? d.base.x : this.position.x, y + breathe, d.seated ? d.base.z : this.position.z).addScaledVector(fwd, fall * 0.35);
+    cam.rotation.order = 'YXZ';
+    const roll = d.roll * (fall * 1.18 - settle * 0.08);
+    cam.rotation.set(d.pitch0 * (1 - fall) + fall * 0.12 - turn * 0.06 + breathe, d.yaw0 + d.dyaw * turn * 0.85, roll);
+    cam.fov = d.fov0 + (46 - d.fov0) * k(1.2, 4); cam.updateProjectionMatrix();
   }
 
   updateInteract(dt) {

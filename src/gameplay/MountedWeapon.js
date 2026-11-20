@@ -4,6 +4,7 @@
 // The player is seated on the weapon (constrained look); the weapon's pivot
 // follows the player's aim; firing uses the shared Combat hitscan.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { events } from '../core/Events.js';
 import { keyName } from '../player/Player.js';
 
@@ -13,26 +14,142 @@ const DEFS = {
     explosive: { radius: 3.6, damage: 160, owner: 'player', scale: 0.55, playerSafe: true } },
 };
 
-function buildMG() {
+// ---- crew-served MG model (general-purpose MG on a tripod with T&E gear) ----
+// Barrel points along -Z, the gunner sits at +Z. Geometry is merged per material
+// into three moving parts: static tripod (root), traversing cradle (pivot) and
+// the elevating gun (tilt), so the whole weapon is ~12 draw calls.
+let MGM = null;
+function mgMats() {
+  if (MGM) return MGM;
+  MGM = {
+    park: new THREE.MeshStandardMaterial({ color: 0x26282a, metalness: 0.72, roughness: 0.42 }),     // parkerized steel
+    worn: new THREE.MeshStandardMaterial({ color: 0x55585a, metalness: 0.92, roughness: 0.26 }),     // worn bare edges
+    black: new THREE.MeshStandardMaterial({ color: 0x18191a, metalness: 0.35, roughness: 0.55 }),
+    poly: new THREE.MeshStandardMaterial({ color: 0x1d1e1d, metalness: 0.05, roughness: 0.78 }),     // stock / grip
+    od: new THREE.MeshStandardMaterial({ color: 0x48503a, metalness: 0.25, roughness: 0.62 }),       // ammo can, tripod paint
+    brass: new THREE.MeshStandardMaterial({ color: 0xb08d45, metalness: 0.92, roughness: 0.3 }),
+    link: new THREE.MeshStandardMaterial({ color: 0x2c2c2a, metalness: 0.8, roughness: 0.4 }),
+  };
+  return MGM;
+}
+function mgProfile(pts, width, bevel = 0.003) {
+  const s = new THREE.Shape(); pts.forEach(([z, y], i) => (i ? s.lineTo(z, y) : s.moveTo(z, y)));
+  const g = new THREE.ExtrudeGeometry(s, { depth: width - 2 * bevel, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 1, curveSegments: 4 });
+  g.translate(0, 0, -(width - 2 * bevel) / 2); g.rotateY(-Math.PI / 2); return g;
+}
+class Parts {
+  constructor() { this.m = new Map(); }
+  add(mat, geo, { x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0 } = {}) {
+    const g = geo.index ? geo.toNonIndexed() : geo; for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
+    if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+    g.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new THREE.Vector3(1, 1, 1)));
+    if (!this.m.has(mat)) this.m.set(mat, []); this.m.get(mat).push(g); return this;
+  }
+  build(parent) { for (const [mat, list] of this.m) { const mesh = new THREE.Mesh(mergeGeometries(list, false), mat); mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh); } }
+}
+const bx = (w, h, d) => new THREE.BoxGeometry(w, h, d);
+const cz = (r, len, seg = 14, r2 = r) => new THREE.CylinderGeometry(r, r2, len, seg).rotateX(Math.PI / 2);   // along Z
+const cy = (r, len, seg = 10, r2 = r) => new THREE.CylinderGeometry(r, r2, len, seg);                        // along Y
+const cx = (r, len, seg = 10) => new THREE.CylinderGeometry(r, r, len, seg).rotateZ(Math.PI / 2);           // along X
+
+export function buildMG() {
+  const M = mgMats();
   const g = new THREE.Group();
-  const dark = new THREE.MeshStandardMaterial({ color: 0x1f2122, metalness: 0.6, roughness: 0.42 });
-  const poly = new THREE.MeshStandardMaterial({ color: 0x2a2b2a, metalness: 0.05, roughness: 0.7 });
-  const add = (geo, m, x, y, z, p = g) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; p.add(o); return o; };
-  // tripod
-  for (const a of [0, 2.2, -2.2]) { const leg = add(new THREE.CylinderGeometry(0.015, 0.012, 0.75, 6), dark, Math.sin(a) * 0.22, -0.32, Math.cos(a) * 0.22); leg.rotation.set(Math.cos(a) * 0.5, 0, -Math.sin(a) * 0.5); }
-  const pivot = new THREE.Group(); g.add(pivot);                        // yaw
-  const tilt = new THREE.Group(); tilt.position.y = 0.05; pivot.add(tilt); // pitch
-  add(new THREE.BoxGeometry(0.1, 0.12, 0.5), dark, 0, 0.0, 0.05, tilt);    // receiver
-  add(new THREE.BoxGeometry(0.11, 0.035, 0.32), dark, 0, 0.075, 0.0, tilt); // feed cover
-  const bar = add(new THREE.CylinderGeometry(0.022, 0.022, 0.62, 12), dark, 0, 0.0, -0.5, tilt); bar.rotation.x = Math.PI / 2;
-  const jacket = add(new THREE.CylinderGeometry(0.032, 0.032, 0.3, 10), dark, 0, 0.0, -0.33, tilt); jacket.rotation.x = Math.PI / 2;
-  add(new THREE.CylinderGeometry(0.03, 0.03, 0.08, 10).rotateX(Math.PI / 2), dark, 0, 0, -0.83, tilt);
-  add(new THREE.BoxGeometry(0.06, 0.13, 0.2), poly, 0, -0.03, 0.38, tilt);  // stock
-  for (const s of [-1, 1]) add(new THREE.CylinderGeometry(0.016, 0.016, 0.11, 8), poly, s * 0.08, -0.04, 0.2, tilt); // spade grips
-  const box = add(new THREE.BoxGeometry(0.12, 0.13, 0.2), new THREE.MeshStandardMaterial({ color: 0x4a5236, roughness: 0.8 }), 0.13, -0.04, -0.02, tilt); // ammo can
-  const belt = add(new THREE.BoxGeometry(0.06, 0.012, 0.09), new THREE.MeshStandardMaterial({ color: 0xa88a40, metalness: 0.8, roughness: 0.35 }), 0.075, 0.04, -0.02, tilt);
-  belt.rotation.z = -0.5;
-  const muzzle = new THREE.Object3D(); muzzle.position.set(0, 0, -0.88); tilt.add(muzzle);
+  const pivot = new THREE.Group(); g.add(pivot);                          // traverse (yaw)
+  const tilt = new THREE.Group(); tilt.position.y = 0.05; pivot.add(tilt); // elevation (pitch)
+
+  // ---------- tripod (static) ----------
+  const T = new Parts();
+  T.add(M.od, cy(0.045, 0.07, 16), { y: -0.07 });                                  // tripod head
+  T.add(M.park, cy(0.02, 0.06, 10), { y: -0.02 });                                 // pintle
+  const leg = (ax, az, len, spread) => {                                            // tube + foot from the head outward/downward
+    const dir = new THREE.Vector3(ax, -1.25, az).normalize(); const mid = dir.clone().multiplyScalar(len / 2);
+    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir); const e = new THREE.Euler().setFromQuaternion(q);
+    T.add(M.od, cy(0.016, len, 8, 0.013), { x: mid.x, y: -0.09 + mid.y, z: mid.z, rx: e.x, ry: e.y, rz: e.z });
+    const foot = dir.clone().multiplyScalar(len); T.add(M.park, bx(0.07, 0.012, 0.05), { x: foot.x, y: -0.09 + foot.y, z: foot.z, ry: Math.atan2(ax, az) });
+    T.add(M.park, cx(0.019, 0.05), { x: dir.x * 0.08, y: -0.09 - 0.1, z: dir.z * 0.08, ry: Math.atan2(ax, az) + spread });  // leg clamp
+  };
+  leg(-0.75, -0.8, 0.62, 0); leg(0.75, -0.8, 0.62, 0); leg(0, 1, 0.78, Math.PI / 2);
+  // traversing bar between the rear leg and the head (the T&E slides on it)
+  T.add(M.park, bx(0.26, 0.012, 0.02), { y: -0.2, z: 0.2 });
+  T.add(M.worn, bx(0.012, 0.012, 0.11), { y: -0.2, z: 0.14 });
+  T.build(g);
+
+  // ---------- cradle (yaws with the gun) ----------
+  const C = new Parts();
+  C.add(M.park, bx(0.06, 0.05, 0.16), { y: 0.0, z: 0.02 });                        // cradle body
+  for (const s of [-1, 1]) C.add(M.park, bx(0.012, 0.07, 0.06), { x: s * 0.05, y: 0.03, z: -0.03 });   // trunnion cheeks
+  // T&E mechanism: elevating screw + handwheel behind the cradle
+  C.add(M.worn, cy(0.009, 0.14, 8), { y: -0.04, z: 0.2 });
+  C.add(M.park, cy(0.018, 0.05, 10), { y: -0.12, z: 0.2 });
+  C.add(M.black, new THREE.TorusGeometry(0.035, 0.006, 5, 14).rotateX(Math.PI / 2), { y: -0.07, z: 0.2 });
+  C.add(M.park, bx(0.02, 0.012, 0.18), { y: -0.03, z: 0.11 });
+  // ammo tray on the left of the cradle + ammo can
+  C.add(M.park, bx(0.11, 0.008, 0.19), { x: -0.125, y: -0.135, z: 0.0 });
+  for (const s of [-1, 1]) C.add(M.park, bx(0.008, 0.06, 0.008), { x: -0.075, y: -0.1, z: s * 0.08 });   // tray struts
+  C.add(M.od, bx(0.085, 0.13, 0.22), { x: -0.125, y: -0.066, z: 0.0 });           // can
+  C.add(M.od, bx(0.089, 0.016, 0.224), { x: -0.125, y: 0.0, z: 0.0 });            // lid lip
+  C.add(M.black, bx(0.012, 0.008, 0.07), { x: -0.125, y: 0.012, z: 0.0 });        // handle
+  C.add(M.park, bx(0.012, 0.026, 0.02), { x: -0.08, y: -0.01, z: 0.1 });          // latch
+  C.build(pivot);
+
+  // ---------- gun (elevates) ----------
+  const G = new Parts();
+  // receiver: side profile with sloped front, extruded
+  G.add(M.park, mgProfile([[-0.17, -0.045], [0.2, -0.045], [0.22, -0.02], [0.22, 0.04], [-0.12, 0.04], [-0.17, 0.0]], 0.078));
+  G.add(M.worn, bx(0.08, 0.004, 0.36), { y: -0.045, z: 0.02 });                  // worn lower edge
+  // feed cover (hinged at rear) + latch + feed tray
+  G.add(M.black, mgProfile([[-0.12, 0.04], [0.1, 0.04], [0.1, 0.07], [-0.08, 0.075], [-0.12, 0.06]], 0.088));
+  G.add(M.park, cx(0.008, 0.095), { y: 0.06, z: 0.105 });
+  G.add(M.worn, bx(0.03, 0.008, 0.012), { x: 0.03, y: 0.075, z: -0.11 });
+  G.add(M.park, bx(0.05, 0.03, 0.06), { x: -0.06, y: 0.035, z: -0.04 });          // feed tray guide (left)
+  // rear sight leaf + aperture
+  G.add(M.park, bx(0.036, 0.012, 0.03), { y: 0.081, z: 0.12 });
+  G.add(M.black, bx(0.026, 0.05, 0.008), { y: 0.108, z: 0.13, rx: -0.25 });
+  G.add(M.worn, new THREE.TorusGeometry(0.006, 0.0025, 4, 10), { y: 0.125, z: 0.135 });
+  // charging handle (right) + slot
+  G.add(M.black, bx(0.004, 0.012, 0.15), { x: 0.04, y: 0.0, z: -0.02 });
+  G.add(M.worn, cx(0.009, 0.05), { x: 0.065, y: 0.0, z: -0.07 });
+  // trigger group: housing, guard, pistol grip
+  G.add(M.park, bx(0.05, 0.03, 0.12), { y: -0.06, z: 0.1 });
+  G.add(M.park, new THREE.TorusGeometry(0.028, 0.004, 4, 12, Math.PI).rotateY(Math.PI / 2).rotateX(Math.PI), { y: -0.075, z: 0.08 });
+  G.add(M.black, bx(0.005, 0.022, 0.006), { y: -0.085, z: 0.08, rx: 0.2 });
+  G.add(M.poly, mgProfile([[0.1, -0.07], [0.14, -0.07], [0.175, -0.19], [0.14, -0.2], [0.115, -0.19]], 0.034, 0.006));
+  for (let i = 0; i < 4; i++) G.add(M.black, bx(0.036, 0.004, 0.026), { y: -0.1 - i * 0.022, z: 0.135 + i * 0.008, rx: 0.32 });   // grip grooves
+  // butt stock with buffer tube line and shoulder rest
+  G.add(M.poly, mgProfile([[0.22, 0.035], [0.52, 0.03], [0.53, -0.09], [0.5, -0.11], [0.3, -0.06], [0.22, -0.04]], 0.052, 0.006));
+  G.add(M.black, bx(0.056, 0.13, 0.02), { y: -0.035, z: 0.535 });                // butt plate
+  G.add(M.park, bx(0.06, 0.012, 0.03), { y: 0.03, z: 0.46 });                     // shoulder rest hinge
+  G.add(M.worn, cx(0.006, 0.062), { y: -0.0, z: 0.3 });                           // sling swivel pin
+  // barrel group: chamber/barrel extension, finned handguard-free barrel, gas cylinder
+  G.add(M.park, cz(0.027, 0.06, 16), { z: -0.2 });                                 // barrel nut
+  G.add(M.park, cz(0.0175, 0.62, 16), { z: -0.53 });                               // barrel
+  for (let i = 0; i < 9; i++) G.add(M.park, cz(0.022, 0.008, 14), { z: -0.25 - i * 0.022 });   // cooling rings near chamber
+  G.add(M.park, cz(0.011, 0.42, 10), { y: -0.033, z: -0.43 });                   // gas cylinder
+  G.add(M.park, bx(0.03, 0.04, 0.025), { y: -0.016, z: -0.64 });                // gas block
+  for (const z of [-0.29, -0.52]) G.add(M.park, bx(0.026, 0.05, 0.012), { y: -0.012, z }); // gas cylinder bands
+  // carrying handle (on the barrel, folds to the left)
+  G.add(M.park, bx(0.03, 0.03, 0.03), { y: 0.03, z: -0.36 });
+  G.add(M.black, new THREE.TorusGeometry(0.05, 0.007, 5, 14, Math.PI).rotateY(Math.PI / 2), { x: -0.02, y: 0.045, z: -0.36, rz: 0.5 });
+  // front sight + protective ears
+  G.add(M.park, bx(0.02, 0.034, 0.02), { y: 0.03, z: -0.79 });
+  G.add(M.black, bx(0.004, 0.026, 0.004), { y: 0.058, z: -0.79 });
+  for (const s of [-1, 1]) G.add(M.park, bx(0.004, 0.03, 0.016), { x: s * 0.013, y: 0.06, z: -0.79 });
+  // flash hider: slotted cone
+  G.add(M.black, cz(0.02, 0.012, 12), { z: -0.845 });
+  for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; G.add(M.black, bx(0.005, 0.005, 0.075), { x: Math.cos(a) * 0.018, y: Math.sin(a) * 0.018, z: -0.885 }); }
+  // folded bipod under the barrel
+  G.add(M.park, bx(0.03, 0.02, 0.03), { y: -0.04, z: -0.74 });
+  for (const s of [-1, 1]) { G.add(M.park, cz(0.006, 0.3, 6), { x: s * 0.012, y: -0.05, z: -0.6 }); G.add(M.black, bx(0.012, 0.01, 0.03), { x: s * 0.012, y: -0.052, z: -0.45 }); }
+  // belt: links + brass rounds running from the can up into the feed tray
+  const belt = [[-0.12, 0.0, 0.0], [-0.11, 0.022, 0.0], [-0.097, 0.04, 0.0], [-0.083, 0.052, 0.0]];
+  for (const [x, y, z] of belt) for (let i = -1; i <= 1; i++) {
+    G.add(M.brass, cx(0.0055, 0.06, 7), { x, y, z: z + i * 0.012 - 0.04, rz: 0.1 });
+    G.add(M.brass, new THREE.ConeGeometry(0.0055, 0.016, 7).rotateZ(Math.PI / 2), { x: x + 0.038, y, z: z + i * 0.012 - 0.04 });
+    G.add(M.link, bx(0.03, 0.006, 0.01), { x: x - 0.004, y: y + 0.004, z: z + i * 0.012 - 0.04 });
+  }
+  G.build(tilt);
+  const muzzle = new THREE.Object3D(); muzzle.position.set(0, 0, -0.93); tilt.add(muzzle);
   return { g, pivot, tilt, muzzle };
 }
 
@@ -44,7 +161,7 @@ export class MountedWeapon {
     if (opts.kind === 'mg') {
       const m = buildMG(); this.root = m.g; this.pivot = m.pivot; this.tilt = m.tilt; this.muzzle = m.muzzle;
       this.root.position.copy(opts.pos); this.root.rotation.y = opts.yaw ?? 0; game.renderer.scene.add(this.root);
-      this.seat = new THREE.Object3D(); this.seat.position.set(0, 0.12, 0.72); this.pivot.add(this.seat);
+      this.seat = new THREE.Object3D(); this.seat.position.set(0, 0.25, 0.88); this.pivot.add(this.seat);
       this.baseYaw = opts.yaw ?? 0;
     } else {
       // APC: drive an existing turret group (pivot = turret, tilt = gun mantlet)

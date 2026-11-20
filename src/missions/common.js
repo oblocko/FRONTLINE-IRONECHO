@@ -25,7 +25,7 @@ export async function shell(game, m, pos, { delay = 0, scale = 1.3, safeRadius =
   const dx = at.x - p.x, dz = at.z - p.z, d = Math.hypot(dx, dz);
   if (d < safeRadius) { const k = safeRadius / Math.max(0.01, d); at.x = p.x + dx * k; at.z = p.z + dz * k; }
   at.y = game.world.groundHeight(at.x, at.z, 50);
-  game.combat.explode(at, { radius: 6, damage, scale, shake: 1.2, snow });
+  game.combat.explode(at, { radius: 6, damage, scale, shake: 1.2, snow, kind: 'artillery' });
 }
 // a hold-to-use interaction as a promise
 export function interact(game, opts) {

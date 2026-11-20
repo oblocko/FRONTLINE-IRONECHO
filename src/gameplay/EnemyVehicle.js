@@ -43,7 +43,7 @@ export class EnemyVehicle {
   }
   destroy() {
     const g = this.game; this.dead = true; this.engine?.stop();
-    g.combat.explode(this.position.clone().add(new THREE.Vector3(0, 1, 0)), { radius: 7, damage: 150, owner: 'world', scale: 1.6, playerSafe: g.player.position.distanceTo(this.position) > 9 });
+    g.combat.explode(this.position.clone().add(new THREE.Vector3(0, 1, 0)), { radius: 7, damage: 150, owner: 'world', kind: 'vehicle', label: '차량 폭발', scale: 1.6, playerSafe: g.player.position.distanceTo(this.position) > 9 });
     this.fire = g.effects.fireEmitter(this.position.clone().add(new THREE.Vector3(0, 1.2, 0)), 1.3);
     if (this.smoke) g.effects.removeEmitter(this.smoke);
     this.root.traverse((o) => { if (o.isMesh && o.material) { o.material = o.material.clone(); o.material.color?.multiplyScalar(0.18); o.material.map = null; } });

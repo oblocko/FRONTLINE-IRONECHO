@@ -25,7 +25,7 @@ function buildDrone() {
 
 export class Drone {
   constructor(game, { pos, mode = 'kamikaze', target = null, hp = 30, speed = 14, orbit = null, delay = 0 } = {}) {
-    this.game = game; this.isVehicle = true; this.mode = mode; this.hp = hp; this.dead = false; this.radius = 0.6;
+    this.game = game; this.isVehicle = true; this.isDrone = true; this.mode = mode; this.hp = hp; this.dead = false; this.radius = 0.85;
     const m = buildDrone(); this.root = m.g; this.rotors = m.rotors; this.led = m.led;
     this.root.position.copy(pos); game.renderer.scene.add(this.root); this.position = this.root.position;
     this.vel = new THREE.Vector3(); this.speed = speed; this.target = target; this.orbit = orbit; this.t = Math.random() * 10; this.delay = delay;
@@ -53,9 +53,17 @@ export class Drone {
     this.game.effects.impact(this.position.clone(), new THREE.Vector3(0, 1, 0), 'metal');
     events.emit('drone:down', { drone: this });
   }
+  // counter-drone jammer: the control link drops — it wobbles and spirals down
+  jam() {
+    if (this.dead) return; this.dead = true; this.jammed = true; this.falling = true; this.buzz?.stop();
+    this.vel.set(this.vel.x * 0.3, 1.5, this.vel.z * 0.3); this.spin = (Math.random() < 0.5 ? -1 : 1) * 6; this.led.visible = false;
+    this.game.effects.impact(this.position.clone(), new THREE.Vector3(0, 1, 0), 'metal');
+    events.emit('drone:down', { drone: this, jammed: true });
+  }
+  jamFlicker() { this.flicker = 0.15; }
   detonate() {
     const g = this.game; this.dead = true; this.buzz?.stop();
-    g.combat.explode(this.position.clone(), { radius: 4.5, damage: 70, owner: 'enemy', scale: 0.7 });
+    g.combat.explode(this.position.clone(), { radius: 4.5, damage: 70, owner: 'enemy', scale: 0.7, kind: 'drone' });
     if (this.target && !this.target.isPlayer && this.target.damage) this.target.damage(this.payload ?? 120, this.position);
     g.renderer.scene.remove(this.root); this.removed = true;
     events.emit('drone:detonated', { drone: this, target: this.target });
@@ -65,7 +73,9 @@ export class Drone {
     if (this.removed) return;
     for (const r of this.rotors) r.rotation.y += dt * (this.falling ? 5 : 60);
     if (this.falling) {
-      this.vel.y -= 14 * dt; this.position.addScaledVector(this.vel, dt); this.root.rotation.y += this.spin * dt; this.root.rotation.z += dt * 3;
+      if (this.jammed) { this.vel.y = Math.max(-7, this.vel.y - 6 * dt); this.vel.x += Math.sin(this.t * 7) * dt * 6; this.vel.z += Math.cos(this.t * 6) * dt * 6; this.t += dt; this.root.rotation.z = Math.sin(this.t * 9) * 0.5; }
+      else { this.vel.y -= 14 * dt; this.root.rotation.z += dt * 3; }
+      this.position.addScaledVector(this.vel, dt); this.root.rotation.y += this.spin * dt;
       if (this.position.y <= g.world.groundHeight(this.position.x, this.position.z, this.position.y + 0.5) + 0.2) {
         g.combat.explode(this.position.clone(), { radius: 2.5, damage: 40, owner: 'player', scale: 0.35, playerSafe: g.player.position.distanceTo(this.position) > 4 });
         g.renderer.scene.remove(this.root); this.removed = true;
@@ -73,7 +83,9 @@ export class Drone {
       return;
     }
     if (this.delay > 0) { this.delay -= dt; return; }
-    this.t += dt; this.led.visible = Math.sin(this.t * 10) > 0;
+    this.t += dt; this.flicker = Math.max(0, (this.flicker || 0) - dt);
+    this.led.visible = this.flicker > 0 ? Math.random() < 0.5 : this.state === 'arm' ? true : Math.sin(this.t * 10) > 0;
+    if (this.flicker > 0) this.root.position.y += (Math.random() - 0.5) * 0.08;
     this.buzz?.setPos(this.position);
     const tp = this.targetPos(); const to = tp.clone().sub(this.position); const dist = to.length();
     let desired;
@@ -86,12 +98,17 @@ export class Drone {
       // close in at altitude, slight weave, then commit to the dive
       const hover = tp.clone().add(new THREE.Vector3(Math.sin(this.t * 1.7) * 6, 14, Math.cos(this.t * 1.3) * 6));
       desired = hover.sub(this.position).clampLength(0, this.speed);
-      if (dist < 26) { this.state = 'dive'; g.audio.whiz?.(this.position); }
+      // telegraph: hover and beep before committing, so the player can react
+      if (dist < 26) { this.state = 'arm'; this.armT = 1.5; this.beepT = 0; }
+    } else if (this.state === 'arm') {
+      desired = new THREE.Vector3(); this.armT -= dt; this.beepT -= dt;
+      if (this.beepT <= 0) { this.beepT = 0.22; g.audio.click(0.12, 3200, 0.04); }
+      if (this.armT <= 0) { this.state = 'dive'; g.audio.whiz?.(this.position); }
     } else {
       desired = to.clone().normalize().multiplyScalar(this.speed * 1.5);
       if (dist < 1.6) { this.detonate(); return; }
     }
-    this.vel.lerp(desired, Math.min(1, dt * (this.state === 'dive' ? 4 : 1.8)));
+    this.vel.lerp(desired, Math.min(1, dt * (this.state === 'dive' ? 4 : this.state === 'arm' ? 3 : 1.8)));
     this.position.addScaledVector(this.vel, dt);
     const floor = g.world.groundHeight(this.position.x, this.position.z, this.position.y + 1) + 1.2;
     if (this.position.y < floor && this.state !== 'dive') this.position.y = floor;

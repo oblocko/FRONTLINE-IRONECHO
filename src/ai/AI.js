@@ -525,7 +525,7 @@ export class AIDirector {
         if (hit) { if (Math.abs(hit.normal.y) > 0.5) g.v.y *= -0.3; else { if (hit.normal.x) g.v.x *= -0.4; if (hit.normal.z) g.v.z *= -0.4; } g.v.multiplyScalar(0.6); }
         else p.add(step);
       } else { p.y = gy + 0.06; g.v.multiplyScalar(Math.max(0, 1 - dt * 6)); g.v.y = 0; p.x += g.v.x * dt; p.z += g.v.z * dt; }
-      if (g.fuse <= 0) { this.scene.remove(g.mesh); g.dead = true; this.combat.explode(p.clone(), { radius: 7, damage: 120, owner: g.enemy ? 'enemy' : 'player' }); }
+      if (g.fuse <= 0) { this.scene.remove(g.mesh); g.dead = true; this.combat.explode(p.clone(), { radius: 7, damage: 120, owner: g.enemy ? 'enemy' : 'player', kind: 'grenade' }); }
     }
     this.grenades = this.grenades.filter((g) => !g.dead);
   }

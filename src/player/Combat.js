@@ -64,7 +64,7 @@ export class Combat {
   }
 
   // Area damage. Cover occlusion: line of sight from blast to target chest.
-  explode(pos, { radius = 7, damage = 120, owner = 'world', shake = 1, scale = 1, playerSafe = false, snow = false } = {}) {
+  explode(pos, { radius = 7, damage = 120, owner = 'world', shake = 1, scale = 1, playerSafe = false, snow = false, kind = 'blast', label = null } = {}) {
     this.effects.explosion(pos, scale, { snow });
     this.audio.explosion(pos, scale);
     const p = this.player;
@@ -73,7 +73,7 @@ export class Combat {
       p.addShake(Math.max(0, 1 - d / (radius * 5)) * shake);
       if (d < radius * 4) events.emit('fx:blast', { intensity: Math.max(0, 1 - d / (radius * 4)) });
       if (!playerSafe && d < radius && this.world.lineOfSight(pos.clone().setY(pos.y + 0.5), p.chestPos(new THREE.Vector3()))) {
-        p.takeDamage(damage * Math.pow(1 - d / radius, 1.4), pos, owner);
+        p.takeDamage(damage * Math.pow(1 - d / radius, 1.4), pos, owner, { kind, label });
       }
     }
     for (const a of this.director.agents) {

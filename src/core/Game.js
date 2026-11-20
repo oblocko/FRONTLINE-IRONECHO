@@ -119,7 +119,7 @@ export class Game {
     await nextFrame();
     this.missionMeta = p.meta; this.missionMod = p.mod; this.missionId = id;
     this.renderer.clearScene(); this.menuScene = null;
-    audio.stopAllLoops(); audio.setMusic('silent');
+    audio.stopAllLoops(); audio.setMusic('silent'); audio.recover(); this.failReason = null;
     // fresh systems
     const scene = this.renderer.scene;
     this.world = new World();
@@ -137,7 +137,7 @@ export class Game {
     this.dialogue.clear(); this.dialogue = new Dialogue(audio);
     this.objectives.clear();
     this.mission = new MissionRunner(this); this.cine = new Cinematics(this);
-    this.squadList = []; this.mounted = []; this.support = null;
+    this.squadList = []; this.mounted = []; this.support = null; this.gadget = null;
     this.stats = stats || { time: 0, deaths: 0, kills: 0, headshots: 0, shotsFired: 0, shotsHit: 0 };
     this.killOff = events.on('player:kill', (e) => { this.stats.kills++; if (e.head) this.stats.headshots++; });
     // build level
@@ -174,6 +174,7 @@ export class Game {
   saveCheckpoint(id) {
     if (!this.missionId) return;
     this.checkpointId = id;
+    this.cpStats = { time: this.stats.time, kills: this.stats.kills, fired: this.weapons.shotsFired, hit: this.weapons.shotsHit };
     saves.saveCheckpoint({ missionId: this.missionId, checkpointId: id, weapons: this.weapons.serialize(), stats: { ...this.stats } });
   }
 
@@ -182,6 +183,7 @@ export class Game {
     this.mission = null;
     this.killOff?.(); this.killOff = null;
     if (this.director) { for (const v of this.director.vehicles) v.remove(); this.director.clear(); }
+    this.gadget?.dispose(); this.gadget = null;
     if (this.player) this.player.fovOverride = null;
     events.emit('hud:mounted', null); events.emit('hud:binoculars', null); events.emit('hud:escort', null); events.emit('hud:timer', null);
     this.dialogue?.clear();
@@ -204,13 +206,77 @@ export class Game {
     audio.setMusic('ending');
   }
 
+  // Scripted failure (escort destroyed, charge detonated...): ends the attempt with a reason.
+  failMission(reason, objective = null) {
+    if (this.state !== 'playing' || !this.player?.alive) return;
+    this.failReason = { reason, objective }; const p = this.player; p.godMode = false;
+    p.takeDamage(9999, null, null, { kind: 'mission', label: reason });
+  }
+
+  // Builds the after-action card shown on death: cause, attacker, direction,
+  // recent hits, attempt stats and a tip that matches what actually happened.
+  deathReport() {
+    const p = this.player; const log = p.damageLog || []; const last = log[log.length - 1] || null;
+    const fail = this.failReason; this.failReason = null;
+    const bearing = (pos) => {
+      if (!pos) return null;
+      const d = pos.clone().sub(p.position); const dist = Math.hypot(d.x, d.z);
+      const abs = Math.atan2(-d.x, -d.z); let rel = abs - (p.deathCam?.yaw0 ?? p.yaw); rel = Math.atan2(Math.sin(rel), Math.cos(rel));
+      const a = Math.abs(rel); const side = a < 0.6 ? '정면' : a > 2.4 ? '후방' : rel > 0 ? '좌측' : '우측';
+      return { dist, rel, side };
+    };
+    const name = (e) => {
+      if (!e) return '알 수 없음';
+      if (e.label) return e.label;
+      switch (e.kind) {
+        case 'bullet': return e.source?.role === 'flanker' ? '측면 우회조 사격' : e.source?.role === 'sniper' ? '적 저격수 사격' : '적 소총수 사격';
+        case 'vehicle': return e.source?.isVehicle ? '적 기관총 차량 사격' : '차량 폭발';
+        case 'grenade': return e.source === 'player' ? '자신의 수류탄' : '적 수류탄';
+        case 'drone': return '자폭 드론 폭발';
+        case 'artillery': return '적 박격포 · 포격';
+        case 'mission': return '임무 실패';
+        default: return e.source === 'player' ? '아군 폭발물' : '폭발';
+      }
+    };
+    const kind = fail ? 'mission' : last?.kind || 'bullet';
+    const b = fail ? null : bearing(last?.pos);
+    const tips = {
+      bullet: b && b.dist > 45 ? '원거리 사수에게 노출되었습니다. 다음 엄폐물을 먼저 정하고 짧게 끊어 이동하십시오. 조준(우클릭) 사격으로 먼저 제압하는 것이 안전합니다.'
+        : b && (b.side === '후방' || b.side === '좌측' || b.side === '우측') ? `${b.side}에서 사격당했습니다. 분대원이 지키지 않는 방향을 주기적으로 확인하고, 교전 중에도 측면 엄폐를 유지하십시오.`
+        : '정면 교전에서 쓰러졌습니다. 엄폐물 뒤에서 앉은 자세(C)로 짧게 사격하고, 체력이 줄면 즉시 몸을 숨겨 회복하십시오.',
+      grenade: '수류탄 경고(!) 표시가 뜨면 표시 반대 방향으로 즉시 3~4m 이상 벗어나십시오. 좁은 엄폐물 뒤에 오래 머물면 수류탄의 표적이 됩니다.',
+      drone: '자폭 드론은 급강하 직전 제자리에서 멈춰 삐 소리를 냅니다. 재밍건(B)을 들고 좌클릭을 유지해 드론을 원 안에 1초간 붙잡아 두면 추락합니다. 화면 가장자리 화살표로 다가오는 드론의 방향을 확인하십시오.',
+      artillery: '포격 경고 후 같은 자리에 머물지 마십시오. 포탄은 관측된 위치 주변에 연속으로 떨어집니다.',
+      vehicle: '차량 기관총은 소총으로 버티기 어렵습니다. 엄폐한 채 폭발물·거치 화기·지원 사격으로 차량부터 무력화하십시오.',
+      blast: '폭발 반경에 들어갔습니다. 차량·드럼통 근처에서 교전하지 마십시오.',
+      mission: fail ? `목표 실패: ${fail.reason}. ${fail.objective ? `"${fail.objective}" 목표를 우선 처리하십시오.` : ''}` : '임무 목표를 확인하십시오.',
+    };
+    const cpStats = this.cpStats || { time: 0, kills: 0, fired: 0, hit: 0 };
+    const fired = this.weapons.shotsFired - cpStats.fired, hit = this.weapons.shotsHit - cpStats.hit;
+    const now = performance.now() / 1000;
+    return {
+      title: fail ? '임무 실패' : '전투 불능', tag: fail ? 'MISSION FAILED' : 'KILLED IN ACTION',
+      cause: fail ? fail.reason : name(last), kind,
+      dist: b ? Math.round(b.dist) : null, side: b?.side || null, rel: b?.rel ?? null,
+      hits: fail ? [] : log.slice(-5).reverse().map((e) => ({ what: name(e), dmg: Math.round(e.amount), ago: Math.max(0, now - e.t), dist: e.pos ? Math.round(Math.hypot(e.pos.x - p.position.x, e.pos.z - p.position.z)) : null })),
+      survived: Math.max(0, this.stats.time - cpStats.time), kills: this.stats.kills - cpStats.kills, accuracy: fired > 0 ? Math.round(hit / fired * 100) : 0, fired,
+      checkpoint: this.missionMeta ? `MISSION ${this.missionMeta.num} · ${this.missionMeta.title}` : '', objectives: this.objectives.active().map((o) => o.text),
+      deaths: this.stats.deaths, tip: tips[kind] || tips.bullet,
+    };
+  }
+
   onPlayerDeath() {
     if (this.state !== 'playing') return;
     this.state = 'dead'; this.stats.deaths++;
     this.renderer.fx.desat = 0.8;
     this.input.exitLock();
-    const tips = ['엄폐물 뒤에 앉으면(C) 피격 확률이 크게 줄어듭니다.', '피해를 입지 않으면 체력이 회복됩니다. 위험할 때는 엄폐물 뒤로 물러나십시오.', '분대원들과 함께 움직이면 적의 화력이 분산됩니다.', '수류탄 경고 표시(!)가 보이면 즉시 그 방향에서 멀어지십시오.', '조준(우클릭) 사격은 탄 퍼짐이 훨씬 적습니다.'];
-    setTimeout(() => { if (this.state === 'dead') { this.ui.setHUDVisible(false); this.ui.death(tips[Math.floor(Math.random() * tips.length)]); } }, 1400);
+    this.weapons.hidden = true; for (const mw of this.mounted || []) if (mw.manned) { mw.manned = false; events.emit('hud:mounted', null); }
+    if (this.support?.active) this.support.toggle(false);
+    if (this.gadget?.active) this.gadget.toggle(false);
+    audio.deathSequence();
+    const report = this.deathReport();
+    events.emit('ui:fade', { to: 0.35, dur: 2.6 });
+    setTimeout(() => { if (this.state === 'dead') { this.ui.setHUDVisible(false); this.ui.death(report); } }, 2800);
   }
   async restartCheckpoint() {
     const cp = saves.data.checkpoint;
@@ -280,7 +346,7 @@ export class Game {
   updateWorld(dt) {
     this.time += dt; if (this.state === 'playing') this.stats.time += dt;
     const t = this.time;
-    if (this.state === 'playing') { this.player.update(dt, t); for (const m of this.mounted) m.update(dt, t); this.support?.update(dt); this.weapons.update(dt, t); }
+    if (this.state === 'playing') { this.player.update(dt, t); for (const m of this.mounted) m.update(dt, t); this.support?.update(dt); this.gadget?.update(dt); this.weapons.update(dt, t); }
     else { this.player.updateCamera(dt, t); this.weapons.updateViewmodel(dt, t); }
     this.director.update(dt, t);
     for (const v of this.director.vehicles) v.update(dt);

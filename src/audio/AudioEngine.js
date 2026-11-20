@@ -229,6 +229,21 @@ export class AudioEngine {
       o.connect(g).connect(this.master); o.start(t + d); o.stop(t + d + 0.2);
     }
   }
+  // death: world sound sinks under a ringing tone and a slowing heartbeat
+  deathSequence() {
+    if (!this.ready) return; const c = this.ctx, t = c.currentTime;
+    this.duckSfx.gain.cancelScheduledValues(t); this.duckSfx.gain.setTargetAtTime(0.08, t, 0.5);
+    this.duckAmb.gain.cancelScheduledValues(t); this.duckAmb.gain.setTargetAtTime(0.25, t, 0.8);
+    this.duckMusic.gain.cancelScheduledValues(t); this.duckMusic.gain.setTargetAtTime(0.15, t, 0.6);
+    const o = c.createOscillator(); o.frequency.value = 3400; const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.03, t + 0.3); g.gain.exponentialRampToValueAtTime(0.0001, t + 5);
+    o.connect(g).connect(this.master); o.start(t); o.stop(t + 5.1);
+    [0.4, 1.5, 2.9, 4.6].forEach((d, i) => setTimeout(() => this.heartbeat(0.9 - i * 0.2), d * 1000));
+  }
+  recover() {
+    if (!this.ready) return; const t = this.ctx.currentTime;
+    for (const g of [this.duckSfx, this.duckAmb, this.duckMusic]) { g.gain.cancelScheduledValues(t); g.gain.setTargetAtTime(1, t, 0.3); }
+  }
   ui(kind = 'hover') {
     if (!this.ready) return; const c = this.ctx, t = c.currentTime;
     const o = c.createOscillator(); o.type = 'square';

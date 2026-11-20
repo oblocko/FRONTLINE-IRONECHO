@@ -298,10 +298,28 @@ export class UI {
     this.show('pause');
   }
 
-  death(tip) {
-    const el = this.mount('death', h(`<div><div class="tag">STATUS</div><h1>전투 불능</h1><p>${esc(tip)}</p><button class="btn small">체크포인트에서 재개 ▸</button></div>`));
+  death(r) {
+    if (typeof r === 'string') r = { title: '전투 불능', tag: 'KILLED IN ACTION', cause: '', tip: r, hits: [] };
+    const fail = r.tag === 'MISSION FAILED';
+    const deg = r.rel != null ? Math.round(-r.rel * 180 / Math.PI) : null;
+    const compass = deg != null ? `<div class="dir" title="공격 방향"><svg viewBox="-50 -50 100 100"><circle r="44" class="ring"/><circle r="3" class="me"/><path d="M0,-28 L0,-6" class="tick"/><g transform="rotate(${deg})"><path d="M0,-44 L-9,-26 L9,-26 Z" class="arrow"/></g></svg><div class="mono">${esc(r.side)} · ${r.dist} m</div></div>` : '';
+    const hits = (r.hits || []).map((x) => `<li><span>${esc(x.what)}</span><span class="mono">${x.dist != null ? `${x.dist} m · ` : ''}-${x.dmg}${x.ago > 0.2 ? ` · ${x.ago.toFixed(1)}s 전` : ''}</span></li>`).join('');
+    const stat = (k, v) => `<div class="st"><div class="tag">${k}</div><div class="v mono">${v}</div></div>`;
+    const el = this.mount('death', h(`<div class="${fail ? 'fail' : ''}"><div class="card">
+      <div class="top"><div><div class="tag">${esc(r.tag)} // ${esc(r.checkpoint || '')}</div><h1>${esc(r.title)}</h1><div class="cause">${esc(r.cause || '')}</div></div>${compass}</div>
+      ${hits ? `<div class="tag">마지막 피격 기록</div><ul class="hits">${hits}</ul>` : ''}
+      ${r.objectives?.length ? `<div class="tag">진행 중이던 목표</div><div class="objs">${r.objectives.map((o) => `<div>□ ${esc(o)}</div>`).join('')}</div>` : ''}
+      ${r.survived != null ? `<div class="sts">${stat('체크포인트 이후', fmtTime(r.survived))}${stat('사살', r.kills)}${stat('명중률', r.fired ? r.accuracy + '%' : '—')}${stat('누적 전사', r.deaths)}</div>` : ''}
+      <p class="tip"><b>TIP</b> ${esc(r.tip || '')}</p>
+      <div class="row-actions"><button class="btn small" data-a="menu" data-snd="back">메인 메뉴</button><button class="btn small primary" data-a="retry">체크포인트에서 재개 <kbd>R</kbd></button></div>
+    </div></div>`));
     this.show('death');
-    $('button', el).onclick = () => this.game.restartCheckpoint();
+    const retry = () => { off(); this.game.restartCheckpoint(); };
+    const key = (e) => { if ((e.code === 'KeyR' || e.code === 'Enter') && this.game.state === 'dead') { e.preventDefault(); retry(); } };
+    const off = () => removeEventListener('keydown', key);
+    addEventListener('keydown', key);
+    $('[data-a=retry]', el).onclick = retry;
+    $('[data-a=menu]', el).onclick = () => { off(); this.game.quitToMenu(); };
   }
 
   missionComplete(meta, stats, next) {
