@@ -28,6 +28,10 @@ npm run build
 npm run preview
 ```
 
+### 웹에서 바로 플레이 (GitHub Pages)
+
+https://oblocko.github.io/Modern-Warfare-Iron-Storm-FPS/ — 빌드 없이 원본 소스를 그대로 제공합니다. `index.html`의 import map이 `vendor/three`(three.js r187, MIT)를 가리킵니다. three.js 버전을 올리면 `vendor/three`도 함께 갱신해야 합니다.
+
 ## 조작 (기본값, 설정에서 변경 가능)
 
 | 동작 | 키보드/마우스 | 게임패드 |

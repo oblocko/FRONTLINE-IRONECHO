@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>FRONTLINE — IRON ECHO</title>
   <link rel="stylesheet" href="./styles/main.css" />
+  <!-- Lets the unbundled source run on static hosting (GitHub Pages) without a build step.
+       Vite (dev/build) resolves 'three' from node_modules itself and never uses this map. -->
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three/build/three.module.js", "three/examples/jsm/": "./vendor/three/examples/jsm/" } }
+  </script>
 </head>
 <body>
   <div id="app">
