@@ -24,6 +24,7 @@ import { buildMenuScene } from '../world/MenuScene.js';
 import { PropLibrary, PROP_IDS } from '../world/PropLibrary.js';
 import { preloadPhotoTextures } from '../render/TextureFactory.js';
 import { loadGLTF } from './Assets.js';
+import { batchStatic } from '../render/StaticBatcher.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
@@ -141,6 +142,7 @@ export class Game {
     this.killOff = events.on('player:kill', (e) => { this.stats.kills++; if (e.head) this.stats.headshots++; });
     // build level
     await p.mod.build(this);
+    this.batchStats = batchStatic(this.renderer.scene);   // merge non-moving level geometry
     this.director.buildCovers();
     this.world.buildNav();
     // restore checkpoint state

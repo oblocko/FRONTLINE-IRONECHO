@@ -15,7 +15,9 @@
 | ![M01 트럭 이동](docs/screenshots/02_m01_truck.jpg) | ![M01 GOP 소초](docs/screenshots/03_m01_gp.jpg) |
 | ![M01 관측소](docs/screenshots/04_m01_mg.jpg) | ![M01 민통선 마을](docs/screenshots/05_m01_village.jpg) |
 | ![M02 연서시 대로](docs/screenshots/06_m02_avenue.jpg) | ![M02 지하 역사](docs/screenshots/07_m02_station.jpg) |
-| ![M02 버스 호송](docs/screenshots/08_m02_bus.jpg) | |
+| ![M02 버스 호송](docs/screenshots/08_m02_bus.jpg) | ![M02 역사의 시민](docs/screenshots/10_m02_station_civilians.jpg) |
+
+![캐릭터 라인업](docs/screenshots/09_characters.jpg)
 
 (헤드리스 소프트웨어 렌더링으로 캡처했습니다. GPU 브라우저에서는 더 선명하고 부드럽게 보입니다.)
 

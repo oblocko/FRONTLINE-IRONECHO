@@ -1,0 +1,35 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><base href="../"><title>Character viewer</title>
+<style>html,body{margin:0;background:#2a2d30;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">{ "imports": { "three": "./vendor/three/build/three.module.js", "three/examples/jsm/": "./vendor/three/examples/jsm/" } }</script>
+</head><body>
+<script type="module">
+// Dev tool: renders the skinned characters in several factions and poses (?view=close for portraits).
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { Actor } from './src/ai/Actor.js';
+const q = new URLSearchParams(location.search); const close = q.get('view') === 'close';
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(innerWidth, innerHeight); r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.shadowMap.enabled = true; document.body.appendChild(r.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x6a7078);
+scene.environment = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), 0.04).texture; scene.environmentIntensity = 0.35;
+scene.add(new THREE.HemisphereLight(0xc8d0dc, 0x4a4a44, 1.1));
+const sun = new THREE.DirectionalLight(0xfff0dc, 2.2); sun.position.set(3, 6, 5); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6 }); scene.add(sun);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ color: 0x8a8a84, roughness: 0.95 })); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+const cast = [
+  { faction: 'rok', variant: 0, pose: 'idle' }, { faction: 'rok', variant: 1, pose: 'aim' }, { faction: 'rok', variant: 2, pose: 'walk' },
+  { faction: 'kpa', variant: 3, pose: 'aim' }, { faction: 'kpa', variant: 4, pose: 'crouch', hat: 'cap' }, { faction: 'civ', variant: 5, pose: 'idle', hat: 'none', weapon: false },
+  { faction: 'civ', variant: 6, pose: 'walk', hat: 'none', weapon: false }, { faction: 'rok', variant: 7, pose: 'wounded' }, { faction: 'kpa', variant: 8, pose: 'dead' },
+];
+const actors = cast.map((c, i) => {
+  const a = new Actor(scene, { faction: c.faction, variant: c.variant, hat: c.hat || 'helmet', weapon: c.weapon !== false });
+  a.root.position.set((i - 4) * 1.15, 0, 0); a.root.rotation.y = 0.35;
+  const t = a.target; if (c.pose === 'aim') t.aim = 1; if (c.pose === 'walk') t.speed = 1.6; if (c.pose === 'crouch') { t.crouch = 1; t.aim = 1; } if (c.pose === 'wounded') t.wounded = 1;
+  if (c.pose === 'dead') a.die(new THREE.Vector3(0, 0, -1));
+  return a;
+});
+for (let i = 0; i < 90; i++) for (const a of actors) a.update(1 / 30);
+const cam = new THREE.PerspectiveCamera(close ? 28 : 34, innerWidth / innerHeight, 0.05, 100);
+if (close) { cam.position.set(-3.35, 1.7, 1.55); cam.lookAt(-3.5, 1.55, 0); } else { cam.position.set(0, 1.6, 8.6); cam.lookAt(0, 0.95, 0); }
+r.render(scene, cam);
+window.__ready = true;
+</script></body></html>

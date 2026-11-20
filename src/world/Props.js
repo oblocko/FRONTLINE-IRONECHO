@@ -217,7 +217,7 @@ export class Props {
 
   // Watchtower with searchlight
   watchtower(x, z, { light = true } = {}) {
-    const gy = this.world.heightFn(x, z); const grp = new THREE.Group(); grp.position.set(x, gy, z); this.scene.add(grp);
+    const gy = this.world.heightFn(x, z); const grp = new THREE.Group(); grp.position.set(x, gy, z); grp.userData.dynamic = true; this.scene.add(grp); // can collapse
     const metal = pbr('paintedMetal', { color: 0x9aa088 });
     const colliders = [];
     for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
@@ -240,7 +240,7 @@ export class Props {
       spot.castShadow = false; this.scene.add(spot); this.scene.add(spot.target);
       const beamGeo = new THREE.ConeGeometry(4.5, 40, 16, 1, true); beamGeo.translate(0, -20, 0); beamGeo.rotateX(-Math.PI / 2);
       const beam = new THREE.Mesh(beamGeo, new THREE.MeshBasicMaterial({ color: 0xfff0d0, transparent: true, opacity: 0.045, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
-      beam.position.copy(spot.position); this.scene.add(beam);
+      beam.position.copy(spot.position); beam.userData.dynamic = true; this.scene.add(beam);
       const st = { spot, beam, lens, t: Math.random() * 10, base: V(x, gy, z), on: true };
       this.animated.push({ update: (dt) => {
         st.t += dt * 0.25; if (!st.on) return;
@@ -415,7 +415,7 @@ export class Props {
 // ======================= VEHICLE MODELS =======================
 // All vehicles are original designs (generic modern military silhouettes).
 export function buildTruck({ canopy = true } = {}) {
-  const g = new THREE.Group();
+  const g = new THREE.Group(); g.userData.dynamic = true;
   const paint = pbr('paintedMetal', { color: 0x8a9478, repeat: [1, 1] });
   const dark = new THREE.MeshStandardMaterial({ color: 0x1b1d1a, roughness: 0.9 });
   const canvasMat = pbr('fabric', { color: 0x6a6e52, repeat: [2, 2] });
@@ -460,7 +460,7 @@ export function buildTruck({ canopy = true } = {}) {
 }
 
 export function buildAPC() {
-  const g = new THREE.Group();
+  const g = new THREE.Group(); g.userData.dynamic = true;
   const paint = pbr('paintedMetal', { color: 0x6f7860, repeat: [2, 2] });
   const dark = new THREE.MeshStandardMaterial({ color: 0x1c1d1a, roughness: 0.95 });
   const add = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); m.castShadow = true; m.receiveShadow = true; g.add(m); return m; };
@@ -502,7 +502,7 @@ export function buildAPC() {
 }
 
 export function buildHelicopter() {
-  const g = new THREE.Group();
+  const g = new THREE.Group(); g.userData.dynamic = true;
   const paint = pbr('paintedMetal', { color: 0x4f5a48, repeat: [2, 2] });
   const dark = new THREE.MeshStandardMaterial({ color: 0x171816, roughness: 0.8 });
   const glass = new THREE.MeshStandardMaterial({ color: 0x0f1820, roughness: 0.05, metalness: 0.5, transparent: true, opacity: 0.75 });

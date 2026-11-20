@@ -118,7 +118,7 @@ export class YeonseoCity {
     const k = this.kit, colors = [0x9aa0a6, 0x2a2d33, 0xd8d8d4, 0x6a1a1a, 0x1f3a6a, 0x5a5a52, 0xb8b0a0];
     let i = 0; const car = (x, z, rot, opts = {}) => k.car({ x, z, rotY: rot, color: colors[i++ % colors.length], kind: i % 3 === 0 ? 'suv' : 'sedan', ...opts });
     // northern traffic jam (truck must stop here)
-    this.jamCar = car(-1.8, -112, 0.35); car(4.5, -114, -0.2); car(-7.5, -109, 0.1); car(8.5, -118, 0.6, { wrecked: true });
+    this.jamCar = car(-1.8, -112, 0.35, { dynamic: true }); car(4.5, -114, -0.2); car(-7.5, -109, 0.1); car(8.5, -118, 0.6, { wrecked: true });
     car(-9, -128, 0.05); car(9.5, -100, Math.PI + 0.1); car(-3, -98, Math.PI - 0.05);
     // abandoned cars down the avenue (cover)
     const spots = [[-5, -78, 0.4], [6, -70, -0.3], [-8, -55, 0.1, true], [3, -22, 1.2], [-6, -12, -0.2], [7, 8, 0.15], [-9, 30, -0.5, true], [9, 52, 0.2], [-2, 64, 1.4], [6, 90, -0.1], [-7, 104, 0.3], [5, 132, 0.6, true], [-6, 150, -0.2]];
@@ -144,7 +144,7 @@ export class YeonseoCity {
     // ticket gates row
     for (let z = -16; z <= 16; z += 2) box(0.3, 1.0, 0.9, 322, 0.5, z, pbr('metal', { color: 0x8a9096, key: 'gate' }), { surface: 'metal' });
     // security shutter blocking the platform opening at z=0 (raised by the player)
-    this.shutter = box(0.15, H, 6, dx + 0.1, H / 2, 0, pbr('corrugated', { color: 0x8a8c88, key: 'shutter' }), { surface: 'metal' });
+    this.shutter = box(0.15, H, 6, dx + 0.1, H / 2, 0, pbr('corrugated', { color: 0x8a8c88, key: 'shutter' }), { surface: 'metal' }); this.shutter.userData.dynamic = true;
     // pillars on the platform
     for (let z = -36; z <= 36; z += 12) box(0.8, H, 0.8, 348, H / 2, z, conc);
     // platform edge strip
@@ -181,7 +181,7 @@ export class YeonseoCity {
     const g = this.game, scene = g.renderer.scene, conc = pbr('concrete', { color: 0x9c9a92, key: 'overpass' });
     this.overpass = { z, spans: [] };
     for (const [x0, x1] of [[-60, -9], [-9, 9], [9, 60]]) {
-      const span = new THREE.Group(); span.position.set((x0 + x1) / 2, 7.6, z); scene.add(span);
+      const span = new THREE.Group(); span.position.set((x0 + x1) / 2, 7.6, z); span.userData.dynamic = true; scene.add(span);
       const deck = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 1.2, 12), conc); deck.castShadow = true; deck.receiveShadow = true; span.add(deck);
       for (const s of [-1, 1]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 1.0, 0.3), conc); rail.position.set(0, 1.1, s * 5.85); span.add(rail); }
       this.overpass.spans.push(span);

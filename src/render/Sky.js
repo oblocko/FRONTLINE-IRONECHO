@@ -45,7 +45,7 @@ export class Sky {
         }`,
     });
     this.mesh = new THREE.Mesh(new THREE.SphereGeometry(1000, 32, 16), mat);
-    this.mesh.frustumCulled = false; this.mesh.renderOrder = -1000;
+    this.mesh.frustumCulled = false; this.mesh.renderOrder = -1000; this.mesh.userData.dynamic = true;
     scene.add(this.mesh);
   }
   update(dt, camera) {

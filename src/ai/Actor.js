@@ -3,9 +3,39 @@
 // death fall, wounded/lying pose, talk gestures, look-at head tracking, breathing.
 // Hitboxes (spheres) are derived from bone positions for bullet tests.
 import * as THREE from 'three';
-import { pbr } from '../render/TextureFactory.js';
+import { buildHuman, buildNpcRifle } from './HumanModel.js';
 
 const lerp = (a, b, t) => a + (b - a) * t;
+
+// ---- two-bone arm IK (shoulder → elbow → palm), solved in the chest bone's space ----
+const UPPER = 0.32, FORE = 0.30, DOWN = new THREE.Vector3(0, -1, 0), X = new THREE.Vector3(1, 0, 0);
+const _d = new THREE.Vector3(), _n = new THREE.Vector3(), _u = new THREE.Vector3(), _x = new THREE.Vector3(), _f = new THREE.Vector3(), _h = new THREE.Vector3(), _p = new THREE.Vector3();
+const _q1 = new THREE.Quaternion(), _qt = new THREE.Quaternion(), _qe = new THREE.Quaternion();
+function signedAngle(from, to, axis) {
+  const a = from.clone().projectOnPlane(axis).normalize(), b = to.clone().projectOnPlane(axis).normalize();
+  return Math.atan2(axis.dot(_x.crossVectors(a, b)), a.dot(b));
+}
+function solveArm(shoulderPos, target, pole) {
+  _d.copy(target).sub(shoulderPos);
+  const dist = Math.max(0.1, Math.min(UPPER + FORE - 0.004, _d.length())); _d.normalize();
+  const A = Math.acos(Math.max(-1, Math.min(1, (UPPER * UPPER + dist * dist - FORE * FORE) / (2 * UPPER * dist))));
+  _n.crossVectors(_d, pole); if (_n.lengthSq() < 1e-8) _n.set(1, 0, 0); _n.normalize();
+  _u.copy(_d).applyAxisAngle(_n, A);                                   // upper arm direction (elbow toward the pole)
+  _q1.setFromUnitVectors(DOWN, _u);
+  _x.copy(X).applyQuaternion(_q1);
+  _qt.setFromAxisAngle(_u, signedAngle(_x, _n, _u));                  // twist so the elbow hinge axis = plane normal
+  const q = _qt.multiply(_q1).clone();
+  const bend = Math.PI - Math.acos(Math.max(-1, Math.min(1, (UPPER * UPPER + FORE * FORE - dist * dist) / (2 * UPPER * FORE))));
+  // pick the hinge direction that actually reaches the target
+  let best = 0, bestErr = Infinity;
+  for (const sgn of [-1, 1]) {
+    _qe.setFromAxisAngle(X, sgn * bend);
+    _f.copy(DOWN).applyQuaternion(_qe).applyQuaternion(q).multiplyScalar(FORE);
+    _h.copy(DOWN).applyQuaternion(q).multiplyScalar(UPPER).add(shoulderPos).add(_f);
+    const err = _h.distanceToSquared(target); if (err < bestErr) { bestErr = err; best = sgn * bend; }
+  }
+  return { q, elbow: best };
+}
 const damp = (a, b, k, dt) => lerp(a, b, 1 - Math.exp(-k * dt));
 
 const LOOKS = {
@@ -15,94 +45,29 @@ const LOOKS = {
   civ: { camo: 'fabric', vest: 0x2d3440, helmet: 0x1c1a18, skin: 0xd1a685, gear: 0x24262a, patch: 0x2d3440, civilian: true },
 };
 
-function rifleModel() {
-  const g = new THREE.Group();
-  const black = new THREE.MeshStandardMaterial({ color: 0x1a1b1a, roughness: 0.55, metalness: 0.4 });
-  const poly = new THREE.MeshStandardMaterial({ color: 0x2a2b28, roughness: 0.8 });
-  const add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; g.add(o); return o; };
-  add(new THREE.BoxGeometry(0.06, 0.09, 0.42), black, 0, 0, 0.05);
-  add(new THREE.BoxGeometry(0.055, 0.07, 0.3), poly, 0, -0.005, 0.4);
-  const b = add(new THREE.CylinderGeometry(0.012, 0.012, 0.3, 6), black, 0, 0.01, 0.65); b.rotation.x = Math.PI / 2;
-  add(new THREE.BoxGeometry(0.05, 0.08, 0.26), poly, 0, -0.02, -0.28);
-  add(new THREE.BoxGeometry(0.045, 0.16, 0.07), black, 0, -0.11, 0.12).rotation.x = 0.25;
-  add(new THREE.BoxGeometry(0.04, 0.12, 0.05), poly, 0, -0.08, -0.07).rotation.x = -0.3;
-  add(new THREE.BoxGeometry(0.04, 0.05, 0.12), black, 0, 0.07, 0.05);
-  return g;
-}
-
 export class Actor {
   constructor(scene, { faction = 'rok', name = '', rank = '', variant = 0, scale = 1, weapon = true, hat = 'helmet' } = {}) {
     this.faction = faction; this.name = name; this.variant = variant;
     const L = LOOKS[faction] || LOOKS.rok;
-    this.root = new THREE.Group(); this.root.scale.setScalar(scale);
+    this.root = new THREE.Group(); this.root.scale.setScalar(scale); this.root.userData.dynamic = true; // never merged by the static batcher
     scene.add(this.root);
-    const CIV_COLORS = [0x3b4a6b, 0x6b3b3b, 0x5a5a5a, 0x2f4f3f, 0x7a6a4a, 0x2a2a35, 0x8a8478, 0x4a3a5a];
-    const civColor = CIV_COLORS[variant % CIV_COLORS.length], civPants = [0x24262c, 0x3a3f4a, 0x4a4036][variant % 3];
-    const uniform = L.civilian ? pbr('fabric', { color: civPants, repeat: [2, 2], key: 'civp' + variant % 3 }) : pbr(L.camo, { repeat: [2, 2] });
-    const vest = L.civilian ? pbr('fabric', { color: civColor, repeat: [2, 2], key: 'civ' + (variant % CIV_COLORS.length) }) : pbr('fabric', { color: L.vest, repeat: [2, 2] });
-    const gear = new THREE.MeshStandardMaterial({ color: L.gear, roughness: 0.85 });
-    const skin = new THREE.MeshStandardMaterial({ color: new THREE.Color(L.skin).offsetHSL(0, 0, (variant % 3 - 1) * 0.04), roughness: 0.65 });
-    const helmetMat = pbr('fabric', { color: L.helmet, repeat: [1, 1] });
-    const bootMat = new THREE.MeshStandardMaterial({ color: 0x1c1a17, roughness: 0.7 });
-    const glove = new THREE.MeshStandardMaterial({ color: 0x23241f, roughness: 0.9 });
-    this.materials = [uniform, vest, gear, skin, helmetMat];
-    const mesh = (geo, mat, parent, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; parent.add(m); return m; };
-    const joint = (parent, x, y, z) => { const j = new THREE.Group(); j.position.set(x, y, z); parent.add(j); return j; };
-
-    // hips & legs
-    this.hips = joint(this.root, 0, 0.95, 0);
-    mesh(new THREE.BoxGeometry(0.34, 0.2, 0.22), uniform, this.hips, 0, 0, 0);
-    mesh(new THREE.BoxGeometry(0.36, 0.06, 0.24), gear, this.hips, 0, 0.08, 0); // belt
-    this.legs = [];
-    for (const s of [-1, 1]) {
-      const thigh = joint(this.hips, s * 0.1, -0.05, 0);
-      mesh(new THREE.CapsuleGeometry(0.085, 0.32, 3, 8), uniform, thigh, 0, -0.22, 0);
-      const knee = joint(thigh, 0, -0.44, 0);
-      mesh(new THREE.CapsuleGeometry(0.07, 0.34, 3, 8), uniform, knee, 0, -0.21, 0);
-      mesh(new THREE.BoxGeometry(0.11, 0.1, 0.13), gear, knee, 0, -0.02, 0.06); // knee pad
-      const foot = mesh(new THREE.BoxGeometry(0.11, 0.1, 0.27), bootMat, knee, 0, -0.44, 0.05);
-      this.legs.push({ thigh, knee, foot, side: s });
-    }
-    // torso
-    this.spine = joint(this.hips, 0, 0.08, 0);
-    this.chest = joint(this.spine, 0, 0.28, 0);
-    mesh(new THREE.BoxGeometry(0.36, 0.5, 0.22), uniform, this.chest, 0, 0, 0);
-    mesh(new THREE.BoxGeometry(0.4, 0.42, 0.29), vest, this.chest, 0, 0.0, 0.0);
-    if (!L.civilian) {
-      for (let i = 0; i < 3; i++) mesh(new THREE.BoxGeometry(0.09, 0.12, 0.06), gear, this.chest, -0.12 + i * 0.12, -0.08, 0.17); // pouches
-      mesh(new THREE.BoxGeometry(0.3, 0.38, 0.16), gear, this.chest, 0, 0.0, -0.21); // pack
-    } else if (variant % 3 === 0) mesh(new THREE.BoxGeometry(0.26, 0.32, 0.12), new THREE.MeshStandardMaterial({ color: 0x1f2a3a, roughness: 0.8 }), this.chest, 0, 0.0, -0.19); // backpack
-    const patch = mesh(new THREE.PlaneGeometry(0.06, 0.04), new THREE.MeshStandardMaterial({ color: L.patch }), this.chest, 0.21, 0.14, 0); patch.rotation.y = Math.PI / 2;
-    this.neck = joint(this.chest, 0, 0.3, 0);
-    this.head = joint(this.neck, 0, 0.1, 0);
-    mesh(new THREE.SphereGeometry(0.105, 14, 12), skin, this.head, 0, 0.02, 0.01).scale.set(0.95, 1.12, 1);
-    mesh(new THREE.BoxGeometry(0.03, 0.04, 0.04), skin, this.head, 0, 0.0, 0.11); // nose
-    const eyeMat = new THREE.MeshStandardMaterial({ color: 0x15130f, roughness: 0.3 });
-    for (const s of [-1, 1]) mesh(new THREE.SphereGeometry(0.014, 6, 4), eyeMat, this.head, s * 0.038, 0.035, 0.096);
-    this.jaw = mesh(new THREE.BoxGeometry(0.11, 0.035, 0.06), skin, this.head, 0, -0.06, 0.07);
-    if (hat === 'helmet') {
-      const helm = mesh(new THREE.SphereGeometry(0.14, 16, 10, 0, Math.PI * 2, 0, Math.PI / 1.9), helmetMat, this.head, 0, 0.04, -0.005); helm.scale.set(1, 0.95, 1.08);
-      mesh(new THREE.BoxGeometry(0.06, 0.04, 0.03), gear, this.head, 0, 0.13, 0.12); // NVG mount
-      if (faction !== 'kpa') { const band = mesh(new THREE.TorusGeometry(0.135, 0.008, 4, 20), gear, this.head, 0, 0.07, 0); band.rotation.x = Math.PI / 2; }
-    } else if (hat === 'cap') { mesh(new THREE.CylinderGeometry(0.115, 0.12, 0.08, 14), helmetMat, this.head, 0, 0.1, 0); mesh(new THREE.BoxGeometry(0.16, 0.015, 0.1), helmetMat, this.head, 0, 0.07, 0.11); }
-    else if (hat === 'none') { const hair = mesh(new THREE.SphereGeometry(0.112, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2.2), new THREE.MeshStandardMaterial({ color: 0x141210, roughness: 0.9 }), this.head, 0, 0.035, -0.012); hair.scale.set(1, 0.9, 1.08); }
-    else if (hat === 'headset') { mesh(new THREE.TorusGeometry(0.11, 0.01, 4, 16, Math.PI), gear, this.head, 0, 0.04, 0); for (const s of [-1, 1]) mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.03, 10), gear, this.head, s * 0.11, 0.02, 0).rotation.z = Math.PI / 2; }
-    // arms
-    this.arms = [];
-    for (const s of [-1, 1]) {
-      const shoulder = joint(this.chest, s * 0.22, 0.17, 0);
-      mesh(new THREE.CapsuleGeometry(0.065, 0.24, 3, 8), uniform, shoulder, 0, -0.16, 0);
-      const elbow = joint(shoulder, 0, -0.32, 0);
-      mesh(new THREE.CapsuleGeometry(0.055, 0.22, 3, 8), uniform, elbow, 0, -0.14, 0);
-      const hand = mesh(new THREE.BoxGeometry(0.07, 0.1, 0.05), glove, elbow, 0, -0.31, 0);
-      this.arms.push({ shoulder, elbow, hand, side: s });
-    }
+    // skinned body (see HumanModel.js); bones are driven by the procedural animation below
+    const human = buildHuman({ faction: L.civilian ? 'civ' : faction, variant, hat });
+    this.root.add(human.root); this.human = human;
+    const Bn = human.bones;
+    this.hips = Bn.hips; this.spine = Bn.spine; this.chest = Bn.chest; this.neck = Bn.neck; this.head = Bn.head; this.jaw = Bn.jaw;
+    this.legs = [{ thigh: Bn.thighL, knee: Bn.kneeL, side: -1 }, { thigh: Bn.thighR, knee: Bn.kneeR, side: 1 }];
+    this.arms = [{ shoulder: Bn.shoulderL, elbow: Bn.elbowL, side: -1 }, { shoulder: Bn.shoulderR, elbow: Bn.elbowR, side: 1 }];
+    this.materials = human.meshes.map((m) => m.material);
     // weapon held in front of chest
     this.weapon = null;
     if (weapon) {
-      this.weaponPivot = joint(this.chest, 0.06, 0.02, 0.25);
-      this.weapon = rifleModel(); this.weaponPivot.add(this.weapon);
-      this.muzzle = new THREE.Object3D(); this.muzzle.position.set(0, 0.01, 0.82); this.weapon.add(this.muzzle);
+      this.weaponPivot = new THREE.Group(); this.weaponPivot.position.set(0.06, 0.02, 0.25); this.chest.add(this.weaponPivot);
+      this.weapon = buildNpcRifle(); this.weaponPivot.add(this.weapon);
+      this.muzzle = new THREE.Object3D(); this.muzzle.position.set(0, 0.005, 0.77); this.weapon.add(this.muzzle);
+      // IK targets: pistol grip (right palm) and handguard just ahead of the magazine (left palm), weapon-local
+      this.gripR = new THREE.Vector3(0.0, -0.06, -0.04); this.gripL = new THREE.Vector3(0.0, -0.035, 0.24);
+      this.poleR = new THREE.Vector3(0.7, -1, -0.35).normalize(); this.poleL = new THREE.Vector3(-0.5, -1, 0.1).normalize();
     }
 
     // animation state
@@ -225,6 +190,14 @@ export class Actor {
     L.shoulder.rotation.z = lerp(carryL.sz, aimL.sz, aim);
     L.elbow.rotation.x = lerp(carryL.el, aimL.el, aim);
     if (sw > 0.1 && aim < 0.3) { const k = Math.sin(ph) * 0.15 * sw; R.shoulder.rotation.x += k; L.shoulder.rotation.x += k * 0.5; }
+    // unarmed (civilians, or after the weapon is dropped): relaxed arms with a natural walk swing
+    if (!this.weapon || this.weapon.parent !== this.weaponPivot) {
+      for (const arm of [L, R]) {
+        const swing = Math.sin(ph + (arm.side > 0 ? 0 : Math.PI)) * 0.45 * sw;
+        arm.shoulder.rotation.set(-swing - cr * 0.3, 0, arm.side * 0.08);
+        arm.elbow.rotation.set(-0.18 - Math.max(0, swing) * 0.4 - cr * 0.6, 0, 0);
+      }
+    }
     // reload: left hand to belt and back
     if (a.reload > 0) { const r = Math.sin(a.reload * Math.PI); L.shoulder.rotation.x = lerp(L.shoulder.rotation.x, 0.1, r); L.elbow.rotation.x = lerp(L.elbow.rotation.x, -0.8, r); }
     // gestures
@@ -237,8 +210,21 @@ export class Actor {
     } else this.head.rotation.z = 0;
     if (a.talk > 0.1 && aim < 0.3 && a.gesture <= 0) { L.shoulder.rotation.x += Math.sin(a.breathe * 2.2) * 0.12 * a.talk; L.elbow.rotation.x -= Math.max(0, Math.sin(a.breathe * 1.7)) * 0.3 * a.talk; }
     if (this.weaponPivot) {
-      this.weaponPivot.position.set(lerp(0.12, 0.08, aim), lerp(-0.08, 0.12, aim), lerp(0.22, 0.32, aim));
-      this.weaponPivot.rotation.set(lerp(0.5, 0, aim) - a.lookPitch * aim * 0.6 - a.recoil * 0.08, lerp(-0.6, 0, aim), lerp(0.4, 0, aim));
+      this.weaponPivot.position.set(lerp(0.1, 0.12, aim), lerp(-0.1, 0.09, aim), lerp(0.24, 0.3, aim));
+      this.weaponPivot.rotation.set(lerp(0.45, 0, aim) - a.lookPitch * aim * 0.6 - a.recoil * 0.08, lerp(-0.7, -0.04, aim), lerp(0.35, 0, aim));
+      // hands on the weapon via IK (blended out while gesturing, reloading, wounded, sitting or dying)
+      if (this.weapon && this.weapon.parent === this.weaponPivot && !a.dying) {
+        const free = 1 - Math.max(a.wounded, a.sit);
+        const wR = free, wL = free * (a.reload > 0 ? 1 - Math.sin(a.reload * Math.PI) : 1) * (a.gesture > 0 ? 0 : 1);
+        this.weaponPivot.updateMatrix();
+        for (const [arm, local, w, pole] of [[R, this.gripR, wR, this.poleR], [L, this.gripL, wL, this.poleL]]) {
+          if (w <= 0.01) continue;
+          _p.copy(local).applyMatrix4(this.weaponPivot.matrix);
+          const ik = solveArm(arm.shoulder.position, _p, pole);
+          arm.shoulder.quaternion.slerp(ik.q, w);
+          arm.elbow.rotation.x = lerp(arm.elbow.rotation.x, ik.elbow, w); arm.elbow.rotation.y = 0; arm.elbow.rotation.z = 0;
+        }
+      }
     }
 
     // wounded: lying on back, propped on elbow

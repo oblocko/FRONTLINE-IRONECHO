@@ -85,8 +85,8 @@ export class CityKit {
   }
 
   // Sedan / SUV (original generic shapes). rotY in radians; collider is axis-aligned (approx).
-  car({ x, z, rotY = 0, color = 0x8a8f96, kind = 'sedan', wrecked = false, collide = true }) {
-    const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = rotY;
+  car({ x, z, rotY = 0, color = 0x8a8f96, kind = 'sedan', wrecked = false, collide = true, dynamic = false }) {
+    const g = new THREE.Group(); g.userData.dynamic = dynamic; g.position.set(x, 0, z); g.rotation.y = rotY;
     const paint = new THREE.MeshStandardMaterial({ color: wrecked ? 0x1e1c1a : color, metalness: wrecked ? 0.1 : 0.6, roughness: wrecked ? 0.95 : 0.35 });
     const glass = new THREE.MeshStandardMaterial({ color: 0x141c22, metalness: 0.4, roughness: 0.08 });
     const black = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
@@ -114,7 +114,7 @@ export class CityKit {
   }
 
   bus({ x, z, rotY = 0, color = 0x2f7a4a }) {
-    const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = rotY;
+    const g = new THREE.Group(); g.userData.dynamic = true; g.position.set(x, 0, z); g.rotation.y = rotY;
     const paint = new THREE.MeshStandardMaterial({ color, metalness: 0.4, roughness: 0.45 }), white = new THREE.MeshStandardMaterial({ color: 0xe8e8e2, metalness: 0.3, roughness: 0.5 });
     const glass = new THREE.MeshStandardMaterial({ color: 0x121a20, metalness: 0.5, roughness: 0.08 }), black = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
     const add = (geo, m, px, py, pz) => { const o = new THREE.Mesh(geo, m); o.position.set(px, py, pz); o.castShadow = true; g.add(o); return o; };
