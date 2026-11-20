@@ -300,8 +300,14 @@ export const SEGMENTS = [
       await m.say('jung', '부두 북쪽에서 차량! 크레인 아래로 지나간다!', { priority: 3 });
       const truck = new EnemyVehicle(game, { path: [V(-50, 0, 125), V(-50, 0, 40), V(-50, 0, -32)], speed: 6.5, hp: 600 });
       game.objectives.add('drop', '차량이 크레인 아래를 지날 때 컨테이너 투하', { marker: V(C.x + 2, P.quay + 2, C.z) });
-      game.ui.hint('차량이 노란 크레인 바로 아래에 들어오는 순간 콘솔에서 <b>투하</b>하십시오', 6);
-      await interact(game, { pos: lv.consolePos, prompt: '컨테이너 투하', radius: 2.2 });
+      // crane camera: looks down the quay road from the gantry; left click / F releases
+      const cam = game.renderer.camera; game.player.cameraOverride = true; game.weapons.hidden = true;
+      const ov = document.createElement('div'); ov.className = 'cctv-ov'; ov.innerHTML = '<div class="lbl">CRANE CAM 02 · 안벽 3번 · ● LIVE</div><div class="cross"></div><div class="key">좌클릭 / F — 컨테이너 투하</div>';
+      game.ui.hud.appendChild(ov);
+      const camOn = m.every(() => { cam.position.set(C.x + 7, P.quay + 24, C.z - 10); cam.lookAt(C.x + 2, P.quay, C.z + 12); cam.fov = 55; cam.updateProjectionMatrix(); });
+      game.ui.hint('차량이 화면 가운데 표시선(크레인 바로 아래)에 들어오는 순간 투하하십시오', 6);
+      await m.until(() => lv.dropNow || game.input.pressed('interact') || game.input.mouse.leftPressed || (!truck.dead && truck.position.z < C.z - 12), 120);
+      lv.dropNow = false;
       // release: the container falls onto the road
       const box = cp.box; const wp = box.getWorldPosition(new THREE.Vector3()); cp.spreader.remove(box); scene.add(box); box.position.copy(wp); box.rotation.set(0, 0, 0);
       let vy = 0; const floor = P.quay + 1.3; let hitTruck = false;
@@ -311,6 +317,8 @@ export const SEGMENTS = [
         if (box.position.y <= floor) { box.position.y = floor; game.effects.explosion(box.position.clone().add(V(0, -1, 0)), 0.6); game.audio.explosion(box.position, 0.8); game.player.addShake(0.4); res(); return false; }
       }));
       game.world.addBoxCentered(box.position.clone(), V(2.44, 2.6, 12.2), { surface: 'metal', cover: true });
+      await m.wait(1.8);
+      camOn(); ov.remove(); game.player.cameraOverride = false; game.weapons.hidden = false;
       game.objectives.complete('drop');
       if (hitTruck) await m.say('jung', '…깔렸다! 정통으로!', { priority: 3 });
       else {

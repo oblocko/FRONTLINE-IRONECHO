@@ -60,10 +60,10 @@ try {
     await ev(() => window.__game.player.teleport({ x: -30, y: 2.5, z: -30 }, Math.PI));
     for (let i = 0; i < 100 && !(await objDone('control')); i++) { await killAll(); await page.waitForTimeout(1500); }
     await waitInteract('크레인 조작'); await useInteract('크레인 조작'); log('console used');
-    await waitInteract('컨테이너 투하');
+    await page.waitForSelector('.cctv-ov', { timeout: 400000 });
     // wait for the truck to roll under the crane, then drop
     await page.waitForFunction(() => window.__game.director.vehicles.some((v) => !v.dead && Math.abs(v.position.z - 12) < 3), null, { timeout: 400000, polling: 100 });
-    await useInteract('컨테이너 투하', false); await ev(() => { window.__game.timeScale = 1; }); await page.waitForTimeout(1500); await shot('m04_e_crane_drop.png'); log('container dropped: ' + JSON.stringify(await ev(() => ({ trucksDead: window.__game.director.vehicles.filter((v) => v.dead).length })))); await ev(() => { window.__game.timeScale = 3; });
+    await ev(() => { window.__game.level.dropNow = true; }); await ev(() => { window.__game.timeScale = 1; }); await page.waitForTimeout(1500); await shot('m04_e_crane_drop.png'); log('container dropped: ' + JSON.stringify(await ev(() => ({ trucksDead: window.__game.director.vehicles.filter((v) => v.dead).length })))); await ev(() => { window.__game.timeScale = 3; });
   }
   await waitCP('lz'); log('lz');
   await ev(() => window.__game.player.teleport({ x: 26, y: 2.5, z: 92 }, Math.PI));
