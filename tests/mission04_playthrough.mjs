@@ -6,7 +6,30 @@ import { spawn, execSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { mkdirSync } from 'node:fs';
 const require = createRequire(import.meta.url);
-let pw; try {
+let pw; try { pw = require('playwright'); } catch { pw = require(execSync('npm root -g').toString().trim() + '/playwright'); }
+const OUT = new URL('./output/', import.meta.url).pathname; mkdirSync(OUT, { recursive: true });
+const PORT = 4199;
+const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], { stdio: 'pipe' });
+await new Promise((r) => { server.stdout.on('data', (d) => { if (String(d).includes('Local')) r(); }); setTimeout(r, 6000); });
+const errors = [];
+const browser = await pw.chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
+const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+page.on('pageerror', (e) => errors.push('pageerror: ' + e.message + '\n' + (e.stack || '').split('\n').slice(0, 3).join('\n')));
+page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
+const START = process.env.START || null;
+await page.addInitScript((start) => { if (sessionStorage.getItem('init')) return; sessionStorage.setItem('init', 1); localStorage.clear(); localStorage.setItem('fie.settings.v1', JSON.stringify({ graphics: { preset: 'low', shadows: 'off', textures: 'low', effects: 'low', post: false, renderScale: 0.5 } }));
+  if (start) localStorage.setItem('fie.save.v1', JSON.stringify({ version: 1, unlocked: ['m01', 'm02', 'm03', 'm04'], completed: {}, checkpoint: { missionId: 'm04', checkpointId: start, savedAt: Date.now() }, lastMission: 'm04', storyFlags: {} })); }, START);
+const order = ['insertion', 'batteries', 'descent', 'crane', 'lz']; const from = (id) => !START || order.indexOf(id) >= order.indexOf(START);
+const T0 = Date.now(); const log = (s) => console.log(`[${((Date.now() - T0) / 1000).toFixed(0)}s] ${s}`);
+const ev = (fn, arg) => page.evaluate(fn, arg);
+const waitCP = (id, timeout = 900000) => page.waitForFunction((id) => window.__game.checkpointId === id && window.__game.state === 'playing', id, { timeout, polling: 500 });
+const shot = (n) => page.screenshot({ path: OUT + n });
+const waitInteract = (m, timeout = 900000) => page.waitForFunction((m) => window.__game.player.interactables.some((i) => i.enabled && i.prompt.includes(m)), m, { timeout, polling: 500 });
+const useInteract = (m, tp = true) => ev(([m, tp]) => { const g = window.__game; const it = g.player.interactables.find((i) => i.enabled && i.prompt.includes(m)); if (!it) return false; const p = typeof it.pos === 'function' ? it.pos() : it.pos; if (tp) g.player.teleport(p.clone().add({ x: -1.0, y: 0, z: 0.6 })); it.onUse(it); return true; }, [m, tp]);
+const killAll = () => ev(() => { const g = window.__game; let n = 0; for (const a of g.director.agents) if (a.team === 'enemy' && !a.dead) { a.kill(g.player.position); n++; } for (const v of g.director.vehicles) if (!v.dead && !v.removed) { v.damage(99999); n++; } return n; });
+const stats = () => ev(() => { const g = window.__game; return { cp: g.checkpointId, t: Math.round(g.mission?.time || 0), obj: g.objectives.active().map((o) => o.text + (o.count ? ` ${o.progress}/${o.count}` : '')), enemies: g.director.enemies().length, veh: g.director.vehicles.filter((v) => !v.dead).length, hp: Math.round(g.player.health) }; });
+const objDone = (id) => ev((id) => !!window.__game.objectives.get(id)?.done, id);
+try {
   await page.goto(`http://localhost:${PORT}/?nolock&autostart`);
   await page.waitForSelector('#menu', { timeout: 120000 });
   if (START) { await page.click('#menu [data-a=continue]'); await page.waitForSelector('#briefing .deploy .btn.primary:not([disabled])', { timeout: 300000 }); await page.click('#briefing .deploy .btn.primary'); await page.waitForFunction(() => window.__game?.state === 'playing', null, { timeout: 300000 }); await ev(() => { const g = window.__game; g.player.godMode = true; g.timeScale = 3; }); log('resumed at ' + START); }
