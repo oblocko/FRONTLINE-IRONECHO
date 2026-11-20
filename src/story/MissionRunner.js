@@ -41,7 +41,8 @@ export class MissionRunner {
     const p = this.game.player;
     return this.until(() => Math.hypot(p.position.x - pos.x, p.position.z - pos.z) < radius && Math.abs(p.position.y - pos.y) < yTol);
   }
-  async say(speaker, text, opts) { this.check(); await Promise.race([this.game.dialogue.say(speaker, text, opts), this._wait(() => false).catch(() => {})]); this.check(); }
+  // resolves when the line finishes; rejects (unwinds the script) if the mission is aborted
+  async say(speaker, text, opts) { this.check(); let done = false; this.game.dialogue.say(speaker, text, opts).then(() => { done = true; }); await this._wait(() => done); }
   async talk(lines) { for (const l of lines) await this.say(l[0], l[1], l[2] || {}); }
   // fire-and-forget async task bound to mission lifetime
   spawn(fn) { const p = fn().catch((e) => { if (!e?.abort) console.error(e); }); this.tasks.push(p); return p; }

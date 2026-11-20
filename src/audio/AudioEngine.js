@@ -368,8 +368,32 @@ export class AudioEngine {
     this.prog = [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62], [57, 60, 64], [50, 53, 57], [53, 57, 60], [52, 56, 59]];
     this.musicTimer = setInterval(() => this.musicTick(), 50);
   }
+  // Pre-rendered track (MP3) played through the music bus; used for the menu theme.
+  playTrack(url, { loop = true, volume = 1 } = {}) {
+    if (!this.ready) return;
+    if (this.bgm?.url === url) { if (this.bgm.el.paused) this.bgm.el.play().catch(() => {}); this.bgm.g.gain.setTargetAtTime(volume, this.ctx.currentTime, 0.8); return; }
+    this.stopTrack(0.6);
+    const el = new Audio(url); el.loop = loop; el.preload = 'auto';
+    const src = this.ctx.createMediaElementSource(el); const g = this.ctx.createGain(); g.gain.value = 0.0001;
+    src.connect(g).connect(this.duckMusic);
+    g.gain.setTargetAtTime(volume, this.ctx.currentTime, 0.8);
+    const tr = { url, el, g, failed: false }; this.bgm = tr;
+    el.addEventListener('error', () => { tr.failed = true; if (this.bgm === tr) { this.bgm = null; this.bgmFallback?.(); } });
+    el.play().catch(() => {});
+  }
+  stopTrack(fade = 1.2) {
+    const tr = this.bgm; if (!tr) return; this.bgm = null;
+    tr.g.gain.setTargetAtTime(0.0001, this.ctx.currentTime, fade / 3);
+    setTimeout(() => { tr.el.pause(); tr.el.src = ''; }, fade * 1000 + 200);
+  }
   setMusic(state) {
     if (!this.ready) return;
+    // the menu uses the recorded theme when available; procedural score otherwise
+    if (state === 'menu' && this.menuTrackUrl && !this.menuTrackFailed) {
+      this.bgmFallback = () => { this.menuTrackFailed = true; this.musicState = null; this.setMusic('menu'); };
+      this.playTrack(this.menuTrackUrl, { volume: 1 });
+      state = 'silent';
+    } else this.stopTrack();  // any non-menu state ends the recorded theme
     if (state === this.musicState) return;
     this.musicState = state;
     const t = this.ctx.currentTime;

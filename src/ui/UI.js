@@ -39,7 +39,8 @@ export class UI {
   // ---------------- main menu ----------------
   mainMenu() {
     const hasCont = saves.hasContinue();
-    const cont = saves.data.checkpoint ? missionById(saves.data.checkpoint.missionId) : missionById(saves.data.lastMission);
+    const last = missionById(saves.data.lastMission);
+    const cont = saves.data.checkpoint ? missionById(saves.data.checkpoint.missionId) : last && last.status === 'playable' ? last : null;
     const el = this.mount('menu', h(`<div class="scanlines">
       <div class="left">
         <div class="tag">ROK ARMY · JOINT OPERATIONS NETWORK</div>
@@ -47,7 +48,7 @@ export class UI {
         <div class="subtitle">프론트라인 — 아이언 에코</div>
         <nav>
           <button class="btn" data-a="campaign"><span class="idx">01</span>CAMPAIGN<span class="sub">새 캠페인</span></button>
-          <button class="btn" data-a="continue" ${hasCont ? '' : 'disabled'}><span class="idx">02</span>CONTINUE<span class="sub">${hasCont && cont ? esc(cont.num + ' ' + cont.title) : '저장 없음'}</span></button>
+          <button class="btn" data-a="continue" ${hasCont ? '' : 'disabled'}><span class="idx">02</span>CONTINUE<span class="sub">${hasCont && cont ? esc(cont.num + ' ' + cont.title) : hasCont ? '임무 선택' : '저장 없음'}</span></button>
           <button class="btn" data-a="select"><span class="idx">03</span>MISSION SELECT<span class="sub">임무 선택</span></button>
           <button class="btn" data-a="settings"><span class="idx">04</span>SETTINGS<span class="sub">설정</span></button>
           <button class="btn" data-a="credits"><span class="idx">05</span>CREDITS<span class="sub">제작진</span></button>

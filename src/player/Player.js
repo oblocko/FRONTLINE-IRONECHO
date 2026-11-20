@@ -117,7 +117,7 @@ export class Player {
     // ---- movement ----
     const mv = ctl && this.moveEnabled ? inp.moveAxes() : { x: 0, z: 0 };
     const ads = this.weapons?.adsAmount ?? 0;
-    const wantSprint = ctl && this.moveEnabled && inp.down('sprint') && mv.z > 0.3 && !this.crouching && ads < 0.3 && !(this.weapons?.reloading && false);
+    const wantSprint = ctl && this.moveEnabled && inp.down('sprint') && mv.z > 0.3 && !this.crouching && ads < 0.3;
     this.sprinting = wantSprint && this.grounded;
     let maxSpeed = this.sprinting ? 6.6 : this.crouching ? 2.1 : 4.0;
     maxSpeed *= 1 - ads * 0.35;

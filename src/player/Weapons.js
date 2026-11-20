@@ -163,7 +163,6 @@ export class WeaponSystem {
     // reload progress
     if (this.reloading) {
       this.reloadT += dt;
-      if (p.sprinting && false) this.reloading = false;
       if (this.reloadT >= this.reloadDur) {
         const need = d.mag - s.mag; const take = Math.min(need, s.reserve); s.mag += take; s.reserve -= take; this.reloading = false; this.emitAmmo();
       }

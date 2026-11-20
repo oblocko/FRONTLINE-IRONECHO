@@ -49,6 +49,12 @@ export class Game {
       }
     });
     events.on('player:died', () => this.onPlayerDeath());
+    // if the browser refuses to re-lock the mouse (e.g. right after Esc), a click on the view retries
+    this.renderer.canvas.addEventListener('click', () => { if (this.state === 'playing' && !this.input.locked) this.lockPointer(); });
+    document.addEventListener('pointerlockerror', () => { if (this.state === 'playing') this.ui.hint('화면을 클릭하면 조작이 재개됩니다', 3); });
+    document.addEventListener('fullscreenchange', () => { const fs = !!document.fullscreenElement; if (settings.data.graphics.fullscreen !== fs) settings.set('graphics.fullscreen', fs); });
+    // sprinting footsteps are audible to nearby enemies
+    events.on('player:noise', ({ pos, radius }) => { if (this.director) for (const a of this.director.agents) if (a.team === 'enemy') a.hearNoise(pos, radius, 'steps'); });
     events.on('fx:blast', ({ intensity }) => { this.renderer.fx.flash = Math.max(this.renderer.fx.flash, intensity * 0.35); this.renderer.fx.aberration = intensity; this.renderer.fx.blur = intensity * 1.5; });
     events.on('settings:changed', () => { if (this.state !== 'playing') return; });
     this.loop = this.loop.bind(this);
@@ -67,6 +73,7 @@ export class Game {
     b.progress(1, 'SYSTEMS READY');
     if (!this.debug.has('autostart')) await b.ready();
     audio.init();
+    audio.menuTrackUrl = new URL('assets/audio/menu_theme.mp3', document.baseURI).href;
     this.enterMenu();
   }
 
@@ -213,7 +220,12 @@ export class Game {
   continueCampaign() {
     const cp = saves.data.checkpoint;
     if (cp) this.ui.briefing(cp.missionId, { checkpoint: cp.checkpointId });
-    else if (saves.data.lastMission) { const m = missionById(saves.data.lastMission); this.ui.briefing(m && m.status === 'playable' ? m.id : 'm01'); }
+    else if (saves.data.lastMission) {
+      // resume at the furthest mission that is actually playable; if the next one is
+      // still in production, open mission select instead of silently replaying M01
+      const m = missionById(saves.data.lastMission);
+      if (m && m.status === 'playable') this.ui.briefing(m.id); else this.ui.missionSelect();
+    }
   }
 
   // ---------------- pause ----------------

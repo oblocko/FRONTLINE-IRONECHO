@@ -330,7 +330,7 @@ export const SEGMENTS = [
       seatSquadInTruck(game, esc);
       const busHp = { hp: 1000, max: 1000 };
       const busTarget = { position: bus.position, aimHeight: 1.6, damage: (n) => { busHp.hp -= n; game.player.addShake(0.05); } };
-      m.every(() => { events.emit('hud:escort', { name: '대피 버스', frac: busHp.hp / busHp.max }); if (busHp.hp <= 0 && !lv.busLost) { lv.busLost = true; game.combat.explode(bus.position.clone().add(V(0, 1.5, 0)), { radius: 8, damage: 999, scale: 2 }); } });
+      m.every(() => { events.emit('hud:escort', { name: '대피 버스', frac: busHp.hp / busHp.max }); if (busHp.hp <= 0 && !lv.busLost) { lv.busLost = true; busRun.target = 0; game.combat.explode(bus.position.clone().add(V(0, 1.5, 0)), { radius: 8, damage: 999, scale: 2 }); m.spawn(async () => { await m.say('yoon', '버스가…! 안 돼!', { priority: 3 }); game.ui.hint('<b style="color:var(--danger)">임무 실패 — 대피 버스가 파괴되었습니다</b>', 4); await m.wait(1.5); game.player.godMode = false; game.player.takeDamage(999, null); }); } });
       game.objectives.add('escort', '대피 버스 호송 — 남쪽 검문소까지', { marker: V(0, 1, 200) });
       game.audio.setMusic('combat');
       const route = [[-6.5, 74], [-6, 100], [-5.5, 130], [-5, 160], [-4.5, 196]];

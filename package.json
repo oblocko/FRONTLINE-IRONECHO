@@ -13,7 +13,9 @@
     "test:ai": "vite build && node tests/ai_combat.mjs",
     "test:flow": "vite build && node tests/flow.mjs",
     "screens": "vite build && node tests/screens.mjs",
-    "test:m02": "vite build && node tests/mission02_playthrough.mjs"
+    "test:m02": "vite build && node tests/mission02_playthrough.mjs",
+    "test:sweep": "vite build && node tests/sweep.mjs",
+    "compose:menu": "python3 tools/compose_menu_theme.py menu_theme.wav && ffmpeg -y -i menu_theme.wav -codec:a libmp3lame -b:a 192k assets/audio/menu_theme.mp3"
   },
   "dependencies": {
     "three": "0.187.0"
