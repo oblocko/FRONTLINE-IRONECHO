@@ -15,7 +15,20 @@ export class Combat {
       const h = a.actor.rayTest(origin, dir, agentT);
       if (h && h.dist < agentT) { agentT = h.dist; agentHit = { agent: a, ...h }; }
     }
-    const wh = this.world.raycast(origin, dir, agentT, { ignore: (c) => c.passBullets });
+    // vehicles (armoured targets) block and absorb rounds
+    let vehHit = null;
+    for (const v of this.director.vehicles || []) {
+      if (v.dead) continue; const h = v.rayTest(origin, dir, agentT);
+      if (h && h.dist < agentT) { agentT = h.dist; vehHit = { v, ...h }; agentHit = null; }
+    }
+    const wh = this.world.raycast(origin, dir, agentT, { ignore: (c) => c.passBullets || c.owner?.isVehicle });
+    if (vehHit && !wh) {
+      this.effects.tracer(muzzle, vehHit.point, 500);
+      this.effects.impact(vehHit.point, dir.clone().negate(), 'metal'); this.audio.bulletImpact(vehHit.point, 'metal');
+      const killed = vehHit.v.damage(def.vehicleDamage ?? def.damage * 0.15, origin, this.player);
+      events.emit('hud:hitmarker', { kill: killed }); if (def.explosive) this.explode(vehHit.point, def.explosive);
+      return { hitVehicle: true, killed };
+    }
     const end = wh ? wh.point : agentHit ? agentHit.point : origin.clone().addScaledVector(dir, range);
     this.effects.tracer(muzzle, end, 500);
     // suppress enemies near the bullet path
@@ -28,11 +41,13 @@ export class Combat {
     this.director.noise(origin, 85, 'player');
     if (wh) {
       this.effects.impact(wh.point, wh.normal, wh.surface); this.audio.bulletImpact(wh.point, wh.surface);
+      if (def.explosive) this.explode(wh.point, def.explosive);
       if (wh.collider?.onHit) wh.collider.onHit(wh);
       return { hitWorld: true };
     }
     if (agentHit) {
       const a = agentHit.agent;
+      if (def.explosive) { this.effects.tracer(muzzle, agentHit.point, 500); this.explode(agentHit.point, def.explosive); return { hitAgent: true }; }
       if (a.team === 'friendly') { events.emit('player:friendlyFire', { agent: a }); this.effects.hitPuff(agentHit.point); a.actor.flinch(); return {}; }
       const dmg = def.damage * (agentHit.part === 'head' ? def.headMult : agentHit.mult);
       this.effects.hitPuff(agentHit.point);
@@ -67,6 +82,10 @@ export class Combat {
       if (!this.world.lineOfSight(pos.clone().setY(pos.y + 0.5), a.chestPos(new THREE.Vector3()))) continue;
       a.suppress(1);
       if (a.team === 'enemy') { const killed = a.takeDamage(damage * (1 - d / radius) * 1.3, pos, 'chest', owner === 'player' ? p : null); if (killed && owner === 'player') { this.stats.kills++; events.emit('player:kill', { agent: a }); events.emit('hud:hitmarker', { kill: true }); } }
+    }
+    for (const v of this.director.vehicles || []) {
+      if (v.dead) continue; const d = v.position.distanceTo(pos);
+      if (d < radius + v.radius) v.damage(damage * 0.8 * (1 - Math.max(0, d - v.radius) / radius), pos, owner === 'player' ? p : null);
     }
     this.director.noise(pos, 120, 'explosion');
   }

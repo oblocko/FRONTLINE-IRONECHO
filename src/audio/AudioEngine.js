@@ -326,6 +326,32 @@ export class AudioEngine {
       stop: () => { try { n.stop(); lfo.stop(); whine.stop(); } catch {} this.loops.delete(h); } };
     this.loops.add(h); return h;
   }
+  // small quadcopter: high rotor whine with flutter, positional
+  droneLoop() {
+    if (!this.ready) return null; const c = this.ctx;
+    const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 210 + Math.random() * 40;
+    const o2 = c.createOscillator(); o2.type = 'square'; o2.frequency.value = o.frequency.value * 1.98;
+    const lfo = c.createOscillator(); lfo.frequency.value = 23; const lg = c.createGain(); lg.gain.value = 12; lfo.connect(lg).connect(o.frequency);
+    const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 0.8;
+    const g = c.createGain(); g.gain.value = 0.05; const g2 = c.createGain(); g2.gain.value = 0.4;
+    o.connect(bp); o2.connect(g2).connect(bp); bp.connect(g);
+    const p = this.panner({ x: 0, y: 0, z: 0 }, 5, 1.4); g.connect(p).connect(this.duckSfx);
+    o.start(); o2.start(); lfo.start();
+    const h = { setPos: (v) => { if (p.positionX) { p.positionX.value = v.x; p.positionY.value = v.y; p.positionZ.value = v.z; } },
+      stop: () => { try { o.stop(); o2.stop(); lfo.stop(); } catch {} this.loops.delete(h); } };
+    this.loops.add(h); return h;
+  }
+  // distant civil-defence siren (rising/falling wail), non-positional ambience
+  sirenLoop(level = 0.05) {
+    if (!this.ready) return null; const c = this.ctx;
+    const o = c.createOscillator(); o.type = 'triangle'; o.frequency.value = 600;
+    const lfo = c.createOscillator(); lfo.frequency.value = 0.12; const lg = c.createGain(); lg.gain.value = 220; lfo.connect(lg).connect(o.frequency);
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400;
+    const g = c.createGain(); g.gain.value = level; o.connect(lp).connect(g).connect(this.duckAmb);
+    o.start(); lfo.start();
+    const h = { set: (v) => g.gain.setTargetAtTime(v, c.currentTime, 0.5), stop: () => { try { o.stop(); lfo.stop(); } catch {} this.loops.delete(h); } };
+    this.loops.add(h); return h;
+  }
   stopAllLoops() { for (const l of [...this.loops]) l.stop(); this.stopWind(); }
 
   // ---------- adaptive music ----------

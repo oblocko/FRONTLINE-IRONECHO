@@ -119,7 +119,7 @@ export class AIAgent {
       const s = this.script;
       const arrived = this.followPath(dt, s.kind === 'move' ? (s.run ? 4.2 : 1.7) : 2.2, s.tolerance ?? 0.6);
       desiredSpeed = this.moveSpeed; crouch = s.crouch ? 1 : 0;
-      if (arrived && s.kind === 'move') { const cb = s.onArrive; this.script = { kind: 'hold', pos: this.position.clone(), face: s.face }; cb?.(this); }
+      if (arrived && s.kind === 'move') { const cb = s.onArrive; this.script = { kind: 'hold', pos: this.position.clone(), face: s.face, crouch: s.crouch }; cb?.(this); }
       if (arrived && s.face) this.faceTowards(s.face, dt);
       // fight from position if enemies visible and not passive
       if (!this.passive && this.target && this.canSee(this.target)) { aim = 1; this.combatFire(dt, time); if (desiredSpeed < 0.2) crouch = this.cover ? 1 : crouch; }
@@ -127,6 +127,7 @@ export class AIAgent {
       ({ desiredSpeed, crouch, aim } = this.enemyBrain(dt, time));
     } else {
       ({ desiredSpeed, crouch, aim } = this.friendlyBrain(dt, time));
+      if (this.team === 'civilian' && d.recentFire(this.position)) { crouch = 1; desiredSpeed *= 0.6; }
     }
     if (this.passive) aim = 0;
     // look / aim direction
@@ -361,7 +362,7 @@ export class AIAgent {
 export class AIDirector {
   constructor({ scene, world, effects, audio, combat }) {
     this.scene = scene; this.world = world; this.effects = effects; this.audio = audio; this.combat = combat;
-    this.agents = []; this.covers = []; this.tokens = 0; this.visionRange = 45;
+    this.agents = []; this.vehicles = []; this.covers = []; this.tokens = 0; this.visionRange = 45;
     this.player = null; this.playerCampTime = 0; this.lastPlayerPos = new THREE.Vector3();
     this.grenades = [];
     this.time = 0;
@@ -388,7 +389,8 @@ export class AIDirector {
     const group = this.agents.filter((o) => o.team === 'enemy' && !o.dead && o.state === 'combat');
     if (group.length >= 3 && !group.some((g) => g.role === 'flanker')) group[Math.floor(Math.random() * group.length)].role = 'flanker';
   }
-  noise(pos, radius, source) { for (const a of this.agents) if (a.team === 'enemy') a.hearNoise(pos, radius, source); }
+  noise(pos, radius, source) { this.lastFire = { pos: pos.clone(), t: this.time }; for (const a of this.agents) if (a.team === 'enemy') a.hearNoise(pos, radius, source); }
+  recentFire(p, range = 35, within = 3) { return this.lastFire && this.time - this.lastFire.t < within && this.lastFire.pos.distanceTo(p) < range; }
 
   // ----- cover -----
   buildCovers() {
@@ -455,7 +457,7 @@ export class AIDirector {
     const muzzle = shooter.actor.muzzleWorld(new THREE.Vector3());
     const aimPt = target.chestPos(new THREE.Vector3());
     const dist = muzzle.distanceTo(aimPt);
-    shooter.actor.fireKick(); this.metrics.shots[shooter.team]++;
+    shooter.actor.fireKick(); this.metrics.shots[shooter.team]++; this.lastFire = { pos: muzzle.clone(), t: time };
     if (shooter.team === 'enemy') for (const f of this.agents) {
       if (f.team !== 'friendly' || f.dead || f.passive || (f.target && f.target.alive)) continue;
       if (f.position.distanceTo(shooter.position) < 90 && f.canSee(shooter, 120)) { f.target = shooter; f.lastSeenPos = shooter.position.clone(); f.lastSeenT = time; }
@@ -541,5 +543,5 @@ export class AIDirector {
     }
     this.updateGrenades(dt);
   }
-  clear() { for (const a of this.agents) a.actor.dispose(this.scene); this.agents = []; this.covers = []; this.tokens = 0; for (const g of this.grenades) this.scene.remove(g.mesh); this.grenades = []; }
+  clear() { for (const a of this.agents) a.actor.dispose(this.scene); this.agents = []; this.vehicles = []; this.covers = []; this.tokens = 0; for (const g of this.grenades) this.scene.remove(g.mesh); this.grenades = []; }
 }

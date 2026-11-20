@@ -28,6 +28,11 @@ export class Player {
     this.weapons = null; // set by Game
     this.lookLimits = null;
     this.cameraOverride = null; // cinematic
+    // weapon-mounted flashlight (toggle with the flashlight binding)
+    this.flashlight = new THREE.SpotLight(0xfff1dc, 0, 45, 0.42, 0.55, 1.6); // kept visible at 0 intensity to avoid shader recompiles
+    this.flashlight.position.set(0.15, -0.12, 0); this.flashlight.target.position.set(0.05, -0.08, -5);
+    camera.add(this.flashlight); camera.add(this.flashlight.target);
+    this.flashOn = false;
     this._v = new THREE.Vector3();
   }
 
@@ -41,6 +46,7 @@ export class Player {
   }
   reset() { this.health = this.maxHealth; this.alive = true; this.trauma = 0; this.seat = null; this.vault = null; this.crouching = false; }
 
+  setFlashlight(on) { this.flashOn = on; this.flashlight.visible = true; this.flashlight.intensity = on ? 40 : 0; this.audio.click(0.12, 2600, 0.02); }
   addShake(amount) { this.trauma = Math.min(1, this.trauma + amount); }
 
   takeDamage(amount, fromPos, source = null) {
@@ -60,8 +66,9 @@ export class Player {
   removeInteractable(o) { this.interactables = this.interactables.filter((x) => x !== o); }
 
   // ----- seats / vehicles -----
-  enterSeat(object3d, { offset = new THREE.Vector3(), yawRange = Math.PI * 0.75, pitchRange = [-0.6, 0.5], yawBase = 0 } = {}) {
-    this.seat = { object3d, offset: offset.clone(), yawRange, pitchRange, yawBase };
+  // yawFrom: object whose world yaw is the look origin (defaults to the seat object itself)
+  enterSeat(object3d, { offset = new THREE.Vector3(), yawRange = Math.PI * 0.75, pitchRange = [-0.6, 0.5], yawBase = 0, yawFrom = null } = {}) {
+    this.seat = { object3d, offset: offset.clone(), yawRange, pitchRange, yawBase, yawFrom };
     this.lookYawLocal = 0; this.pitch = 0;
     events.emit('player:seat', { seated: true });
   }
@@ -86,6 +93,7 @@ export class Player {
     // recoil recovery (abstract camera kick)
     if (this.recoilPitch > 0) { const r = Math.min(this.recoilPitch, dt * 0.6); this.pitch -= r * 0.6; this.recoilPitch -= r; }
 
+    if (ctl && this.input.pressed('flashlight')) this.setFlashlight(!this.flashOn);
     if (this.seat) { this.updateSeat(dt); this.updateCamera(dt, time); this.updateInteract(dt); return; }
 
     // ---- vault in progress ----
@@ -196,7 +204,7 @@ export class Player {
     const s = this.seat; s.object3d.updateMatrixWorld(true);
     const p = s.object3d.localToWorld(s.offset.clone());
     this.position.copy(p).setY(p.y - this.eye);
-    const q = new THREE.Quaternion(); s.object3d.getWorldQuaternion(q);
+    const q = new THREE.Quaternion(); (s.yawFrom || s.object3d).getWorldQuaternion(q);
     const e = new THREE.Euler().setFromQuaternion(q, 'YXZ');
     this.yaw = e.y + s.yawBase + (this.lookYawLocal || 0);
     this.crouchAmt = 0; this.eye = 1.62; this.speed = 0; this.grounded = true;
@@ -228,7 +236,7 @@ export class Player {
     cam.rotation.set(this.pitch + sy, this.yaw + sx, sr + roll - (this.leanRoll || 0));
     // FOV
     const base = settings.data.graphics.fov; const ads = this.weapons?.adsAmount ?? 0;
-    const target = base * (1 - ads * (this.weapons?.current?.adsZoom ?? 0.22)) + (this.sprinting ? 6 : 0) + this.fovKick;
+    const target = this.fovOverride ?? (base * (1 - ads * (this.weapons?.current?.adsZoom ?? 0.22)) + (this.sprinting ? 6 : 0) + this.fovKick);
     cam.fov = damp(cam.fov, target, 10, dt); this.fovKick = damp(this.fovKick, 0, 6, dt);
     cam.updateProjectionMatrix();
   }

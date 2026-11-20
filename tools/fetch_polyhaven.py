@@ -62,7 +62,7 @@ def fetch_texture(asset_id, res):
     files = json.loads(get(f'{API}/files/{asset_id}'))
     out = os.path.join(ROOT, 'textures', asset_id)
     n = 0
-    for key, name in (('Diffuse', 'diff'), ('nor_gl', 'nor_gl'), ('Rough', 'rough'), ('arm', 'arm')):
+    for key, name in (('Diffuse', 'diff'), ('nor_gl', 'nor_gl'), ('arm', 'arm')):  # arm = AO/rough/metal packed
         entry = files.get(key, {}).get(res, {}).get('jpg')
         if entry:
             n += save(entry['url'], os.path.join(out, f'{asset_id}_{name}_{res}.jpg'))

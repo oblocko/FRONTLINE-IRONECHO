@@ -139,7 +139,8 @@ export class UI {
   }
 
   // ---------------- briefing ----------------
-  briefing(id, { checkpoint = null } = {}) {
+  // autoDeploy: campaign flow — deploy automatically a few seconds after loading finishes
+  briefing(id, { checkpoint = null, autoDeploy = false } = {}) {
     const m = missionById(id);
     const el = this.mount('briefing', h(`<div class="scanlines">
       <div class="bl">
@@ -165,10 +166,15 @@ export class UI {
     this._type = setInterval(() => { if (i >= m.summary.length) return clearInterval(this._type); txt.textContent += m.summary[i++]; if (i % 3 === 0) audio.click(0.02, 4000, 0.008); }, 22);
     this.drawBriefingMap($('canvas.map', el), m);
     const deploy = $('.btn.primary', el); const ls = $('.loadstate', el);
-    $('[data-a=back]', el).onclick = () => { this.game.cancelLoad(); this.mainMenu(); };
+    $('[data-a=back]', el).onclick = () => { clearInterval(this._auto); this.game.cancelLoad(); this.mainMenu(); };
     this.game.prepareMission(id, (p, msg) => { ls.textContent = `${msg} ${Math.round(p * 100)}%`; }).then(() => {
       deploy.disabled = false; deploy.textContent = 'DEPLOY ▸  출격'; ls.textContent = 'READY';
-      deploy.onclick = () => { clearInterval(this._type); this.game.startMission(id, checkpoint); };
+      const go = () => { clearInterval(this._type); clearInterval(this._auto); this.game.startMission(id, checkpoint); };
+      deploy.onclick = go;
+      if (autoDeploy) {
+        let n = 8; deploy.textContent = `DEPLOY ▸  출격 ${n}`;
+        clearInterval(this._auto); this._auto = setInterval(() => { if (!document.body.contains(deploy)) return clearInterval(this._auto); n--; deploy.textContent = `DEPLOY ▸  출격 ${n}`; if (n <= 0) go(); }, 1000);
+      }
     }).catch((e) => { if (e?.cancelled) return; console.error(e); ls.textContent = '로딩 실패: ' + e.message; });
   }
   drawBriefingMap(cv, m) {
@@ -250,7 +256,7 @@ export class UI {
           seg('마우스 Y축 반전', 'controls.invertY', [[true, 'ON'], [false, 'OFF']]), seg('조준 방식', 'controls.adsToggle', [[false, 'HOLD'], [true, 'TOGGLE']]),
           seg('컨트롤러', 'controls.gamepadEnabled', [[true, 'ON'], [false, 'OFF']], `표준 게임패드 매핑 지원 · 현재 ${navigator.getGamepads ? ([...navigator.getGamepads()].filter(Boolean).length ? '연결됨' : '연결 안 됨') : '미지원'}`),
           slider('컨트롤러 감도', 'controls.gamepadSensitivity', 0.3, 2.5, 0.05, (v) => v.toFixed(2)));
-        const names = { forward: '전진', back: '후진', left: '좌측 이동', right: '우측 이동', sprint: '달리기', crouch: '앉기', jump: '점프 / 넘기', reload: '재장전', interact: '상호작용', grenade: '수류탄', weapon1: '주무기', weapon2: '보조무기', pause: '일시정지', objectives: '목표 보기' };
+        const names = { forward: '전진', back: '후진', left: '좌측 이동', right: '우측 이동', sprint: '달리기', crouch: '앉기', jump: '점프 / 넘기', reload: '재장전', interact: '상호작용', grenade: '수류탄', support: '쌍안경 / 화력 지원', flashlight: '손전등', weapon1: '주무기', weapon2: '보조무기', pause: '일시정지', objectives: '목표 보기' };
         for (const [act, label] of Object.entries(names)) {
           const row = h(`<div class="setrow"><label>${label}</label><div><button class="keybtn">${keyName(S.controls.bindings[act])}</button></div><span class="val"></span></div>`);
           const b = $('button', row);
@@ -310,10 +316,18 @@ export class UI {
       </div>
       <p style="color:#c3ccc6;line-height:1.8">${esc(stats.epilogue || '')}</p>
       ${next ? `<div class="panel" style="padding:14px 16px;margin-top:10px"><div class="tag">NEXT // 다음 임무</div><div style="font-weight:700;letter-spacing:.08em;margin:4px 0">MISSION ${next.num} · ${next.title} <span style="color:var(--muted);font-weight:400">${next.ko}</span></div><div style="font-size:13px;color:var(--muted)">${esc(next.summary)}</div>${playableNext ? '' : '<div style="color:var(--warn);font-size:12px;margin-top:6px">이 임무는 아직 제작 중입니다 (설계 문서: docs/CAMPAIGN.md).</div>'}</div>` : ''}
-      <div class="row-actions"><button class="btn small" data-a="replay">다시 하기</button><button class="btn small" data-a="menu" data-snd="back">메인 메뉴</button>${playableNext ? '<button class="btn small" data-a="next" style="border-color:var(--accent);color:var(--accent)">다음 임무 ▸</button>' : ''}</div></div></div>`));
-    $('[data-a=replay]', el).onclick = () => this.briefing(meta.id);
-    $('[data-a=menu]', el).onclick = () => this.game.quitToMenu();
-    $('[data-a=next]', el)?.addEventListener('click', () => this.briefing(next.id));
+      <div class="row-actions"><button class="btn small" data-a="replay">다시 하기</button><button class="btn small" data-a="menu" data-snd="back">메인 메뉴</button>${playableNext ? '<button class="btn small" data-a="next" style="border-color:var(--accent);color:var(--accent)">다음 작전 ▸</button>' : ''}</div></div></div>`));
+    const stop = () => clearInterval(this._next);
+    $('[data-a=replay]', el).onclick = () => { stop(); this.briefing(meta.id); };
+    $('[data-a=menu]', el).onclick = () => { stop(); this.game.quitToMenu(); };
+    const nextBtn = $('[data-a=next]', el);
+    if (nextBtn) {
+      // campaign flow: roll straight into the next operation unless the player chooses otherwise
+      const go = () => { stop(); this.briefing(next.id, { autoDeploy: true }); };
+      nextBtn.addEventListener('click', go);
+      let n = 10; nextBtn.textContent = `다음 작전 ▸ ${n}`;
+      stop(); this._next = setInterval(() => { if (!document.body.contains(nextBtn)) return stop(); n--; nextBtn.textContent = `다음 작전 ▸ ${n}`; if (n <= 0) go(); }, 1000);
+    }
     this.show('complete');
   }
 
@@ -354,6 +368,10 @@ export class UI {
       <div class="dmg"></div><div class="gwarn"></div>
       <div class="interact hidden"><span class="key"><svg width="0" height="0"></svg><span class="kt">F</span></span><span class="pt"></span></div>
       <div class="hint"></div>
+      <div class="escort hidden"><div class="en"></div><div class="bar"><i></i></div></div>
+      <div class="timer hidden"><span class="tl"></span> <b class="tv"></b></div>
+      <div class="mounted hidden"><div class="mn"></div><div class="heat"><i></i></div></div>
+      <div class="binos hidden"><div class="vig"></div><div class="tick h"></div><div class="tick v"></div><div class="info"><span class="rng">---</span> m · <span class="calls"></span></div><div class="lbl">LMB 좌표 지정 · RMB 취소</div></div>
       <div class="subs hidden"></div>
       <div class="health"><div class="lbl"><span>HAN M.J.</span><span class="hp">100</span></div><div class="bar"><i style="width:100%"></i></div><div class="squad"></div></div>
       <div class="ammo"><div class="wn"></div><div class="pips"></div><div class="num"></div><div class="gren"></div></div>
@@ -412,6 +430,12 @@ export class UI {
       clearTimeout(this._tt); this._tt = setTimeout(() => t.classList.remove('on'), dur * 1000);
     });
     events.on('ui:letterbox', (on) => this.cine.classList.toggle('lb', on));
+    events.on('hud:escort', (e) => { const el = $('.escort', hud); el.classList.toggle('hidden', !e); if (!e) return; $('.en', el).textContent = e.name; const i = $('.bar i', el); i.style.width = `${Math.max(0, Math.round(e.frac * 100))}%`; i.classList.toggle('low', e.frac < 0.35); });
+    events.on('hud:timer', (t) => { const el = $('.timer', hud); el.classList.toggle('hidden', !t); if (!t) return; $('.tl', el).textContent = t.label; const tv = $('.tv', el); tv.textContent = fmtTime(Math.max(0, t.seconds)); tv.classList.toggle('urgent', t.seconds < 20); });
+    events.on('hud:mounted', (m) => { this.mountedActive = !!m; const el = $('.mounted', hud); el.classList.toggle('hidden', !m); if (m) $('.mn', el).textContent = m.name; $('.ammo', hud).style.visibility = m ? 'hidden' : ''; });
+    events.on('hud:mountedHeat', ({ heat, over }) => { const i = $('.mounted .heat i', hud); i.style.width = `${Math.round(heat * 100)}%`; i.classList.toggle('over', over); });
+    events.on('hud:binoculars', (b) => { const el = $('.binos', hud); el.classList.toggle('hidden', !b); if (b) $('.calls', el).textContent = `화력 지원 ${b.calls}회`; });
+    events.on('hud:binocularsRange', (r) => { $('.binos .rng', hud).textContent = r ?? '---'; });
     events.on('player:friendlyFire', () => this.hint('<b style="color:var(--warn)">사격 중지! 아군입니다.</b>', 2));
   }
 
@@ -423,7 +447,7 @@ export class UI {
     const xh = $('.xhair', this.hud); const ads = w.adsAmount;
     const d = w.current; const spread = d ? (d.hipSpread + d.moveSpread * Math.min(1, p.speed / 4)) : 0.03;
     const px = 6 + spread * 420 + (p.sprinting ? 10 : 0);
-    xh.style.opacity = (ads > 0.6 || p.sprinting || !d || p.seat || w.reloading) ? 0 : 1;
+    xh.style.opacity = this.mountedActive ? 1 : (ads > 0.6 || p.sprinting || !d || p.seat || w.reloading || w.hidden) ? 0 : 1;
     const [t, b, l, r] = xh.querySelectorAll('i'); t.style.top = `${-px - 9}px`; b.style.top = `${px}px`; l.style.left = `${-px - 9}px`; r.style.left = `${px}px`;
     // health
     const hp = Math.max(0, Math.round(p.health)); $('.health .hp', this.hud).textContent = hp; const bar = $('.health .bar', this.hud); $('i', bar).style.width = `${hp}%`; bar.classList.toggle('low', hp < 35);

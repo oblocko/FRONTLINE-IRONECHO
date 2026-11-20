@@ -1,9 +1,9 @@
 # FRONTLINE — IRON ECHO
 
-1인칭 싱글플레이 현대전 FPS 캠페인. 2029년 한반도 전쟁과 해외 비밀 작전이 교차하는 16개 미션의 이야기 (현재 **Mission 01 플레이 가능**).
+1인칭 싱글플레이 현대전 FPS 캠페인. 2029년 한반도 전쟁과 해외 비밀 작전이 교차하는 16개 미션의 이야기 (현재 **Mission 01–02 플레이 가능**, 미션 완료 후 다음 미션으로 자동 연결).
 
 - 엔진: three.js r187 (WebGL 2) + Vite — 엔진 선택 사유는 [docs/ENGINE_DECISION.md](docs/ENGINE_DECISION.md)
-- 모든 텍스처, 3D 모델, 애니메이션, 효과음, 음악은 코드로 절차적 생성 (외부 에셋 없음)
+- 캐릭터·무기·건물·차량·애니메이션·효과음·음악은 코드로 절차적 생성. 일부 텍스처와 소품은 CC0 실사 에셋(Poly Haven, `assets/CREDITS.md`)
 - 진행 상황: [PROJECT_STATUS.md](PROJECT_STATUS.md)
 
 ## 실행
@@ -41,6 +41,7 @@ https://oblocko.github.io/Modern-Warfare-Iron-Storm-FPS/ — 빌드 없이 원�
 | 조준 · 사격 | 우클릭 · 좌클릭 | LT · RT |
 | 재장전 / 상호작용 (길게 누르기 지원) | R / F | X |
 | 수류탄 · 무기 교체 | G · 1, 2, 휠 | RB · Y |
+| 쌍안경(화력 지원) · 손전등 | B · L | — |
 | 일시정지 | Esc (또는 P) | Start |
 
 ## 테스트

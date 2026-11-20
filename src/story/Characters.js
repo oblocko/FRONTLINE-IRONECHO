@@ -14,6 +14,10 @@ export const CHARACTERS = {
   op: { name: 'OP 백두-3', en: 'OP Baekdu-3', rank: '', rankEn: '', unit: '', color: '#bbbbbb', pitch: 1.0, role: 'Radio' },
   driver: { name: '운전병', en: 'Driver', rank: '일병', rankEn: 'PFC', unit: '', color: '#cccccc', pitch: 1.0, role: '' },
   apc: { name: '장갑차 차장', en: 'IFV Commander', rank: '상사', rankEn: 'SFC', unit: '기계화보병', color: '#ffe0a0', pitch: 0.85, role: '' },
+  police: { name: '김정훈', en: 'Kim Jung-hoon', rank: '경위', rankEn: 'Insp.', unit: '연서경찰서', color: '#9fc4ff', pitch: 0.92, role: 'Police inspector' },
+  civilian: { name: '대피 주민', en: 'Evacuee', rank: '', rankEn: '', unit: '', color: '#e8d8b0', pitch: 1.25, role: '' },
+  pa: { name: '안내방송', en: 'PA system', rank: '', rankEn: '', unit: '', color: '#cfcfcf', pitch: 1.1, role: '' },
+  convoy: { name: '수송대장', en: 'Convoy lead', rank: '상사', rankEn: 'SFC', unit: '', color: '#ffe0a0', pitch: 0.88, role: '' },
   enemy: { name: '적군', en: 'Hostile', rank: '', rankEn: '', unit: '', color: '#ff7a6a', pitch: 0.9, role: '' },
   narrator: { name: '', en: '', rank: '', rankEn: '', unit: '', color: '#ffffff', pitch: 1, role: '' },
 };

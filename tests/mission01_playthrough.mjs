@@ -29,7 +29,7 @@ const useInteract = (match) => ev((match) => {
   it.onUse(it); return true;
 }, match);
 const waitInteract = (match, timeout = 240000) => page.waitForFunction((m) => window.__game.player.interactables.some((i) => i.enabled && i.prompt.includes(m)), match, { timeout, polling: 500 });
-const killAllEnemies = () => ev(() => { const g = window.__game; let n = 0; for (const a of g.director.agents) if (a.team === 'enemy' && !a.dead) { a.kill(g.player.position); n++; } return n; });
+const killAllEnemies = () => ev(() => { const g = window.__game; let n = 0; for (const a of g.director.agents) if (a.team === 'enemy' && !a.dead) { a.kill(g.player.position); n++; } for (const v of g.director.vehicles) if (!v.dead) { v.destroy(); n++; } return n; });
 const stats = () => ev(() => { const g = window.__game; const e = g.director.agents.filter((a) => a.team === 'enemy'); return { cp: g.checkpointId, hp: Math.round(g.player.health), enemies: e.length, alive: e.filter((a) => !a.dead).length, combat: e.filter((a) => a.state === 'combat' && !a.dead).length, kills: g.stats.kills, objectives: g.objectives.active().map((o) => o.text) }; });
 try {
   await page.goto(`http://localhost:${PORT}/?nolock&autostart`);
@@ -54,19 +54,41 @@ try {
   await waitInteract('무전기'); await useInteract('무전기');
   await page.waitForFunction(() => window.__game.director.agents.filter((a) => a.team === 'enemy' && !a.dead).length >= 4, null, { timeout: 120000 });
   await ev(() => { const g = window.__game; g.timeScale = 1; g.player.teleport({ x: 78, y: 0, z: -45 }, 0); });
+  // man the mounted MG and fire a burst
+  await waitInteract('기관총'); await useInteract('기관총');
+  await ev(() => { window.__game.input.mouse.left = true; }); await page.waitForTimeout(3000); await ev(() => { window.__game.input.mouse.left = false; });
+  const mgShots = await ev(() => ({ manned: window.__game.mounted[0]?.manned, shots: window.__game.weapons.shotsFired, heat: window.__game.mounted[0]?.heat.toFixed(2) }));
+  log('mounted MG: ' + JSON.stringify(mgShots)); if (!mgShots.manned || mgShots.shots === 0) errors.push('mounted MG did not fire');
   log('wave defense: AI fights 12s'); await page.waitForTimeout(12000); log(JSON.stringify(await stats())); await shot('m01_e_defense.png');
-  for (let i = 0; i < 12; i++) { const n = await killAllEnemies(); if (n) log('cleared ' + n); const cp = await ev(() => window.__game.checkpointId); if (cp === 'fallback') break; await page.waitForTimeout(4000); }
+  await ev(() => window.__game.mounted[0]?.dismount());
+  // mortar call once fire support becomes available
+  await ev(() => { window.__game.timeScale = 3; });
+  for (let i = 0; i < 200; i++) { const n = await killAllEnemies(); if (n) log('cleared ' + n); if (await ev(() => !!window.__game.support)) break; await page.waitForTimeout(3000); }
+  if (!(await ev(() => !!window.__game.support))) throw new Error('fire support never became available');
+  await ev(() => { window.__game.timeScale = 1; });
+  await ev(() => { const g = window.__game; const p = g.player.position.clone(); p.set(97, g.world.heightFn(97, -98), -98); g.support.call(p); });
+  await page.waitForTimeout(9000); await shot('m01_e2_mortar.png'); log('mortar called: ' + JSON.stringify(await stats()));
+  for (let i = 0; i < 40; i++) { const n = await killAllEnemies(); if (n) log('cleared ' + n); const cp = await ev(() => window.__game.checkpointId); if (cp === 'fallback') break; await page.waitForTimeout(4000); }
   await waitCP('fallback'); log('fallback through village'); await ev(() => { window.__game.timeScale = 3; window.__game.player.teleport({ x: 76, y: 0, z: 34 }, Math.PI); });
+  await page.waitForTimeout(8000); await shot('m01_f0_stealth.png'); log('stealth: ' + JSON.stringify(await stats()));
   await waitInteract('박도윤'); await ev(() => { window.__game.timeScale = 1; }); await page.waitForTimeout(6000); log(JSON.stringify(await stats())); await shot('m01_f_ambush.png');
-  await useInteract('박도윤'); log('Park rescued');
+  await useInteract('박도윤'); await page.waitForTimeout(1500);
+  await ev(() => window.__game.player.teleport({ x: 76.5, y: 0, z: 51.5 }, 0)); await page.waitForTimeout(800); await shot('m01_f2_drag.png');
+  await ev(() => window.__game.player.teleport({ x: 74, y: 0, z: 52.7 }, 0)); log('Park dragged to cover');
   await page.waitForTimeout(8000); await shot('m01_g_village.png');
   for (let i = 0; i < 10; i++) { await killAllEnemies(); const cp = await ev(() => window.__game.checkpointId); if (cp === 'extraction') break; await page.waitForTimeout(3000); }
   await waitCP('extraction'); log('extraction'); await ev(() => { window.__game.timeScale = 3; window.__game.player.teleport({ x: 100, y: 0, z: 110 }, 0); });
   await page.waitForFunction(() => window.__game.director.agents.filter((a) => a.team === 'enemy' && !a.dead).length >= 3, null, { timeout: 120000 });
   await ev(() => { window.__game.timeScale = 1; }); await page.waitForTimeout(9000); await shot('m01_h_rally.png'); log(JSON.stringify(await stats()));
   await ev(() => { window.__game.timeScale = 3; });
-  await waitInteract('장갑차 탑승', 180000); await useInteract('장갑차 탑승'); log('boarded APC');
-  await ev(() => { window.__game.timeScale = 2; }); await page.waitForTimeout(9000); await shot('m01_i_ending.png'); await page.waitForTimeout(9000); await shot('m01_i2_ending.png'); await ev(() => { window.__game.timeScale = 4; });
+  await waitInteract('장갑차 탑승', 180000); await useInteract('장갑차 탑승'); log('boarded APC → turret');
+  await page.waitForFunction(() => window.__game.director.vehicles.length >= 2, null, { timeout: 180000, polling: 1000 });
+  await ev(() => { window.__game.timeScale = 1; window.__game.input.mouse.left = true; }); await page.waitForTimeout(4000); await ev(() => { window.__game.input.mouse.left = false; });
+  await shot('m01_h2_turret.png'); log('turret ride: ' + JSON.stringify(await ev(() => ({ manned: window.__game.mounted.at(-1)?.manned, shots: window.__game.weapons.shotsFired, vehicles: window.__game.director.vehicles.map((v) => Math.round(v.hp)) }))));
+  for (let i = 0; i < 6; i++) { await killAllEnemies(); await page.waitForTimeout(3000); }
+  await ev(() => { window.__game.timeScale = 3; });
+  await page.waitForFunction(() => window.__game.objectives.get('turret')?.done, null, { timeout: 240000, polling: 1000 });
+  await ev(() => { window.__game.timeScale = 1; }); await page.waitForTimeout(9000); await shot('m01_i_ending.png'); await ev(() => { window.__game.timeScale = 4; });
   await page.waitForSelector('#complete', { timeout: 180000 }); await page.waitForTimeout(800); await shot('m01_j_complete.png');
   const save = await ev(() => JSON.parse(localStorage.getItem('fie.save.v1')));
   log('save: ' + JSON.stringify({ unlocked: save.unlocked, completed: Object.keys(save.completed), checkpoint: save.checkpoint }));

@@ -37,6 +37,31 @@ function makeNoiseSet(seed, base = 4, octaves = 6) {
 }
 
 const cache = new Map();
+
+// ---------- photographic CC0 textures (Poly Haven) ----------
+// Recipe name -> Poly Haven texture id in assets/textures/<id>/<id>_{diff,nor_gl,arm}_1k.jpg.
+// `arm` packs AO/roughness/metalness (glTF layout), matching how pbr() reads G=rough, B=metal.
+export const PHOTO = {
+  snowground: 'snow_02', asphalt: 'asphalt_snow', dirt: 'stony_dirt_path', concrete: 'concrete',
+  plaster: 'grey_plaster', brick: 'brick_wall_001', roofTiles: 'grey_roof_tiles', corrugated: 'corrugated_iron', wood: 'brown_planks_03', metal: 'metal_plate',
+};
+const photo = new Map();      // recipe -> {map, normalMap, roughnessMap}
+const photoFailed = new Set();
+function loadImage(url) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; }); }
+// Load all photo textures; resolves when done (failures fall back to procedural recipes).
+export async function preloadPhotoTextures(onProgress = () => {}) {
+  const names = Object.keys(PHOTO).filter((n) => !photo.has(n) && !photoFailed.has(n));
+  let done = 0;
+  await Promise.all(names.map(async (n) => {
+    const id = PHOTO[n]; const base = new URL(`assets/textures/${id}/${id}`, document.baseURI).href;
+    try {
+      const [d, nm, arm] = await Promise.all([loadImage(`${base}_diff_1k.jpg`), loadImage(`${base}_nor_gl_1k.jpg`), loadImage(`${base}_arm_1k.jpg`)]);
+      const mk = (img, srgb) => { const t = new THREE.Texture(img); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; return t; };
+      photo.set(n, { map: mk(d, true), normalMap: mk(nm, false), roughnessMap: mk(arm, false), photo: true });
+    } catch (e) { photoFailed.add(n); console.warn(`photo texture ${id} unavailable, using procedural ${n}`); }
+    onProgress(++done / names.length);
+  }));
+}
 export function texSize() {
   const q = settings.data.graphics.textures;
   return q === 'low' ? 256 : q === 'medium' ? 512 : 1024;
@@ -234,7 +259,10 @@ const RECIPES = {
   },
 };
 
+RECIPES.roofTiles = (size) => RECIPES.corrugated(size); // procedural fallback
+
 export function getTextures(name) {
+  if (photo.has(name)) return photo.get(name);
   const size = texSize();
   const key = `${name}@${size}`;
   if (!cache.has(key)) {

@@ -6,6 +6,9 @@ import { GopSector, LAYOUT } from '../world/levels/GopSector.js';
 import { buildAPC, buildHelicopter } from '../world/Props.js';
 import { events } from '../core/Events.js';
 import { keyName } from '../player/Player.js';
+import { MountedWeapon } from '../gameplay/MountedWeapon.js';
+import { FireSupport } from '../gameplay/FireSupport.js';
+import { EnemyVehicle } from '../gameplay/EnemyVehicle.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 export const TEXTURES = ['snowground', 'asphalt', 'dirt', 'concrete', 'plaster', 'brick', 'corrugated', 'paintedMetal', 'metal', 'wood', 'sandbag', 'rock', 'grassdead', 'camoROK', 'camoEnemy', 'fabric'];
@@ -249,6 +252,8 @@ export const SEGMENTS = [
         game.objectives.setMarker('op', trenchEntry);
         await m.say('jung', '포격이다! 북쪽 전체에서!', { priority: 3 });
         if (!m.flags.inTrench) await m.say('yoon', '참호로! 동쪽 교통호로 들어가! 머리 숙이고 뛰어!', { priority: 3 });
+        // a shell takes down the watchtower behind the squad
+        if (game.player.position.distanceTo(V(32, 0, -52)) > 10) { await artillery(game, m, V(33, 0, -53.5), { scale: 1.5, safeRadius: 6 }); lv.collapseTower(1, game.player.position.clone()); }
         for (let i = 0; i < 10; i++) {
           const p = game.player.position;
           await artillery(game, m, V(p.x + (Math.random() - 0.3) * 40, 0, p.z - 14 - Math.random() * 30), { delay: 1 + Math.random() * 1.6, scale: 1.3, safeRadius: 12 });
@@ -312,25 +317,46 @@ export const SEGMENTS = [
         ['yoon', '지휘통제실, OP 백두-3 적 침투. 아군 인원 확인 불가. 철책 동측 절단 흔적 있다.', { radio: true, priority: 3 }],
         ['seoyeon', '확인. 열상 장비에 적 보병 다수가 3구역 철책 쪽으로 이동 중입니다. 그 위치에서 버텨 주세요. 기계화 부대가 이동하고 있습니다.', { radio: true, priority: 3 }],
       ]);
-      // defend: two waves through the breach
+      // ---- DEFENCE: mounted MG, mortar support, three waves ----
+      const mg = new MountedWeapon(game, { kind: 'mg', pos: V(78, lv.hf(78, -47.3) + 0.42, -47.3), yaw: 0, yawRange: 1.15, pitchRange: [-0.3, 0.25], prompt: '거치 기관총 사용' });
+      game.mounted.push(mg);
       game.objectives.add('hold', '관측소 방어 — 철책 돌파 저지', { marker: V(87, lv.hf(87, -55), -55) });
+      game.objectives.add('mg', '거치 기관총으로 사격 (선택)', { marker: mg.seatWorld(), optional: true });
       game.audio.setMusic('combat');
-      game.ui.hint(`적이 철책 절단 지점으로 진입합니다. 참호 진지에서 방어하십시오. ${keyName(game.input.binding('crouch'))}: 엄폐`, 5);
-      const breachIn = (n, x0) => spawnEnemies(game, Array.from({ length: n }, (_, i) => [x0 + (i % 3) * 3 - 3, -80 - Math.floor(i / 3) * 4]), { state: 'combat' });
-      const w1 = breachIn(5, 87); attackOrder(game, w1, game.player);
+      await m.say('yoon', '민재! 교통호 기관총 잡아! 철책 구멍을 막아!', { priority: 3 });
+      m.spawn(async () => { await m.until(() => mg.manned, 60); game.objectives.complete('mg'); });
+      const breachIn = (n, x0, z0 = -80) => spawnEnemies(game, Array.from({ length: n }, (_, i) => [x0 + (i % 3) * 3 - 3, z0 - Math.floor(i / 3) * 4]), { state: 'combat' });
+      const w1 = breachIn(6, 87); attackOrder(game, w1, game.player);
       await m.say('jung', '철책 쪽! 움직임 다수!', { priority: 3 });
       const t0 = m.time;
       await m.until(() => w1.filter((e) => !e.dead).length <= 1 || m.time - t0 > 45);
+      // shell hits the eastern watchtower — it comes down
+      await artillery(game, m, V(131, 0, -54), { scale: 1.5, safeRadius: 4 });
+      lv.collapseTower(3, V(140, 0, -40));
+      await m.say('doyun', '감시탑이… 무너진다!', { priority: 2 });
       await m.say('yoon', '두 번째 무리 온다! 탄약 확인해!', { priority: 2 });
-      const w2 = breachIn(6, 88); attackOrder(game, w2, game.player);
-      // also a pair flanking from the west along the fence
+      const w2 = breachIn(7, 88); attackOrder(game, w2, game.player);
       const flank = spawnEnemies(game, [[40, -70], [43, -72]], { state: 'combat' }); attackOrder(game, flank, sq.doyun);
-      m.spawn(async () => { await m.wait(12); await artillery(game, m, V(70 + Math.random() * 30, 0, -75), { scale: 1.4 }); await artillery(game, m, V(55, 0, -68), { delay: 3, scale: 1.2 }); });
-      const all = [...w1, ...w2, ...flank]; const t1 = m.time;
-      await m.until(() => all.every((e) => e.dead) || (m.time - t1 > 75 && all.filter((e) => !e.dead).length <= 2));
+      const t1 = m.time;
+      await m.until(() => w2.filter((e) => !e.dead).length <= 2 || m.time - t1 > 40);
+      // third group masses at the DMZ treeline, out of rifle reach — call the mortars
+      const mass = spawnEnemies(game, [[92, -96], [96, -98], [100, -95], [94, -101], [99, -102], [103, -99]], { state: 'combat', accuracy: 0.6 });
+      for (const e of mass) { e.hold(e.position.clone()); attackOrder(game, [e], game.player); }
+      game.support = new FireSupport(game, { calls: 2, rounds: 6, spread: 7 });
+      await m.talk([
+        ['jung', '숲 가장자리! 또 모인다. 이 거리면 소총으론 안 닿는다!', { priority: 3 }],
+        ['seoyeon', '순찰조, 대대 박격포반 연결했습니다. 쌍안경으로 좌표 지정하세요.', { radio: true, priority: 3 }],
+      ]);
+      game.support.announce();
+      game.objectives.add('mortar', `쌍안경(${keyName(game.input.binding('support'))})으로 박격포 유도 — 숲 가장자리 적 집결지`, { marker: V(97, lv.hf(97, -98) + 1, -98) });
+      const t2 = m.time;
+      await m.until(() => mass.every((e) => e.dead) || m.time - t2 > 70);
+      if (mass.every((e) => e.dead)) game.objectives.complete('mortar'); else game.objectives.fail('mortar');
+      const all = [...w1, ...w2, ...flank, ...mass];
       // survivors retreat
       for (const e of all) if (!e.dead) { e.state = 'idle'; e.target = null; e.releaseToken(); e.setPath(V(87, 0, -110)); e.patrol = [V(87, 0, -120)]; }
       game.objectives.complete('hold');
+      mg.disable(); game.support.available = false; if (game.support.active) game.support.toggle(false);
       game.audio.setMusic('tension');
       await m.talk([
         ['seoyeon', '순찰조, 철수하십시오. 마을을 거쳐 남쪽 집결지 브라보로. 장갑차가 15분 후 도착합니다.', { radio: true, priority: 3 }],
@@ -360,6 +386,32 @@ export const SEGMENTS = [
       game.effects.fireEmitter(V(13, lv.hf(13, -33) + 0.5, -33), 1.2); // generator shed burning
       m.spawn(async () => { await m.wait(5); await m.talk([['doyun', '마을 사람들은 다 대피했겠지예?'], ['yoon', '어제 소개령 떨어졌다. …떨어졌어야 한다.']]); });
       m.spawn(async () => { for (let i = 0; i < 4; i++) await artillery(game, m, V(40 + Math.random() * 80, 0, -10 - Math.random() * 30), { delay: 3 + Math.random() * 4, scale: 1.2, safeRadius: 18 }); });
+      // ---- STEALTH: an enemy recon patrol walks past — let it go ----
+      await m.until(() => game.player.position.z > 18);
+      const hide = [V(70, 0, 34), V(72.5, 0, 33), V(68, 0, 35.5)];
+      ['yoon', 'jung', 'doyun'].forEach((k, i) => { const a = sq[k]; a.setPassive(true); a.moveTo(hide[i], { run: true, crouch: true, face: V(90, 0, 40) }); });
+      game.objectives.add('hide', '정찰조가 지나갈 때까지 숨어서 대기 — 사격 금지', { marker: hide[1] });
+      await m.say('yoon', '멈춰! 바위 뒤로, 앉아. 정찰조다. 그냥 보내.', { priority: 3 });
+      game.ui.hint(`${keyName(game.input.binding('crouch'))} 앉아서 움직이지 마십시오. 들키면 교전이 시작됩니다.`, 6);
+      const patrol = spawnEnemies(game, [[112, 46], [114, 48], [116, 46.5]], { state: 'idle', visionRange: 13 });
+      patrol.forEach((e, i) => { e.patrol = [V(92, 0, 44 + i), V(85, 0, 28 + i), V(86, 0, 4), V(92, 0, -30)]; });
+      const spotted = () => patrol.some((e) => e.state === 'combat') || game.player.firingRecently;
+      const tS = m.time;
+      await m.until(() => spotted() || patrol.every((e) => e.dead || e.position.z < 2) || m.time - tS > 50);
+      const stealthOk = !spotted();
+      if (stealthOk) {
+        game.objectives.complete('hide');
+        for (const e of patrol) if (!e.dead) game.director.remove(e);
+        await m.say('yoon', '…지나갔다. 조용히 마을로 들어간다.', { priority: 3 });
+      } else {
+        game.objectives.fail('hide'); game.audio.setMusic('combat');
+        attackOrder(game, patrol.filter((e) => !e.dead), game.player);
+        await m.say('jung', '들켰다! 정찰조 사격!', { priority: 3 });
+        await m.until(() => patrol.every((e) => e.dead), 60);
+        await m.say('yoon', '총소리 났다. 마을 쪽도 깨어났을 거다. 붙어서 가.', { priority: 3 });
+      }
+      for (const k of ['yoon', 'jung']) { sq[k].setPassive(false); sq[k].follow(game.player); }
+      sq.doyun.setPassive(false); sq.doyun.follow(game.player);
       await m.until(() => game.player.position.z > 30);
       // ---- AMBUSH ----
       const amb = spawnEnemies(game, [
@@ -376,15 +428,33 @@ export const SEGMENTS = [
       sq.doyun.actor.flinch(1); sq.doyun.pose('wounded'); sq.doyun.setPassive(true); setSquadStatus(game, 'doyun', 'wounded');
       game.effects.hitPuff(sq.doyun.chestPos(new THREE.Vector3()));
       await m.say('doyun', '윽—! 다리…! 다리 맞았다!', { priority: 3 });
-      await m.say('yoon', '매복이다! 도윤이 맞았다! 민재, 도윤이 끌어내! 내가 연막 깐다!', { priority: 3 });
+      await m.say('yoon', '매복이다! 도윤이 맞았다! 민재, 도윤이 담벼락 뒤로 끌어! 내가 연막 깐다!', { priority: 3 });
       // smoke screen between Park and the eastern houses
       game.effects.smokeGrenade(V(88, lv.hf(88, 49), 49)); game.effects.smokeGrenade(V(86, lv.hf(86, 54), 54));
       sq.yoon.moveTo(V(77.5, 0, 52), { run: true }); sq.jung.moveTo(V(73, 0, 50.5), { run: true });
-      game.objectives.add('rescue', '박도윤 상병 구조', { marker: sq.doyun.position.clone() });
+      game.objectives.add('rescue', '박도윤 상병을 엄폐물 뒤로 끌기', { marker: sq.doyun.position.clone() });
       await new Promise((resolve) => {
-        const it = game.player.addInteractable({ pos: () => sq.doyun.position.clone().setY(sq.doyun.position.y + 0.5), prompt: '박도윤 부축', hold: 2.4, radius: 2.0, onUse: () => { it.enabled = false; resolve(); } });
+        const it = game.player.addInteractable({ pos: () => sq.doyun.position.clone().setY(sq.doyun.position.y + 0.5), prompt: '박도윤 끌기', hold: 1.2, radius: 2.0, onUse: () => { it.enabled = false; resolve(); } });
       });
+      // DRAG: player moves slowly backwards-capable, weapon away; Park slides behind the player
+      const coverPt = V(74, 0, 52.7);
+      game.objectives.setMarker('rescue', coverPt.clone().setY(lv.hf(74, 52.7)));
+      game.weapons.lowered = true; game.player.speedScale = 0.38;
+      game.ui.hint('엄폐물(담벼락 뒤)까지 박도윤을 끌고 이동하십시오. 무기를 쓸 수 없습니다.', 4);
+      const drag = m.every(() => {
+        const p = game.player; const f = new THREE.Vector3(-Math.sin(p.yaw), 0, -Math.cos(p.yaw));
+        const at = p.position.clone().addScaledVector(f, -1.0);
+        const pr = sq.doyun.actor.root; pr.position.x += (at.x - pr.position.x) * 0.25; pr.position.z += (at.z - pr.position.z) * 0.25;
+        pr.position.y = game.world.groundHeight(pr.position.x, pr.position.z, pr.position.y + 0.5);
+        sq.doyun.yaw = Math.atan2(p.position.x - pr.position.x, p.position.z - pr.position.z) + Math.PI; pr.rotation.y = sq.doyun.yaw;
+      });
+      m.spawn(async () => { await m.wait(1.5); await m.say('doyun', '아악— 천천히… 천천히 해라…', { priority: 2 }); });
+      await m.reach(coverPt, 2.2);
+      drag(); game.weapons.lowered = false; game.player.speedScale = 1;
       game.objectives.complete('rescue');
+      sq.yoon.moveTo(coverPt.clone().add(V(0.8, 0, 0.6)), { run: true, onArrive: (a) => { a.actor.gesture('point', 2); } });
+      await m.say('yoon', '지혈대 감는다. 민재, 엄호해!', { priority: 3 });
+      await m.wait(5);
       sq.doyun.unpose(); sq.doyun.limp = true; sq.doyun.follow(game.player, V(-1.0, 0, 1.6)); sq.doyun.setPassive(true);
       m.spawn(() => m.talk([
         ['doyun', '괜찮다… 괜찮다 캤제… 아, 씨. 커피 못 내리면 우짜노.', { priority: 2 }],
@@ -441,7 +511,7 @@ export const SEGMENTS = [
         if (remaining < 0.05) { arrived = true; eng?.set(0.15, 0.4); }
       });
       await m.until(() => arrived);
-      game.world.addBoxCentered(apc.position.clone().add(V(0, 1.2, 0)), V(3.6, 2.4, 7.2), { surface: 'metal' });
+      const apcCol = game.world.addBoxCentered(apc.position.clone().add(V(0, 1.2, 0)), V(3.6, 2.4, 7.2), { surface: 'metal' });
       // turret support fire on remaining enemies
       await m.say('apc', '2-1, 북쪽 위협 제압한다. 고개 숙여!', { radio: true, priority: 3 });
       const turret = apc.userData.turret;
@@ -474,19 +544,59 @@ export const SEGMENTS = [
       await new Promise((resolve) => { const it = game.player.addInteractable({ pos: rampPos, prompt: '장갑차 탑승', radius: 3, onUse: () => { it.enabled = false; resolve(); } }); });
       game.objectives.complete('board');
 
-      // ---------------- ENDING CINEMATIC ----------------
-      events.emit('ui:fade', { to: 1, dur: 0.5 }); await m.wait(0.6);
-      game.weapons.lowered = true; game.cine.letterbox(true);
-      const seatAnchor = new THREE.Object3D(); apc.add(seatAnchor);
+      // ---------------- APC TURRET RIDE ----------------
+      events.emit('ui:fade', { to: 1, dur: 0.4 }); await m.wait(0.5);
       const seatAgent = (a, x, z, yaw) => { scene.remove(a.actor.root); apc.add(a.actor.root); a.actor.root.position.set(x, 0.62, z); a.yaw = yaw; a.actor.root.rotation.y = yaw; a.pose('sit'); a.actor.target.sit = 1; };
       seatAgent(sq.yoon, 0.75, -0.6, -Math.PI / 2); seatAgent(sq.doyun, -0.75, -1.2, Math.PI / 2); seatAgent(sq.jung, 0.75, -1.9, -Math.PI / 2);
-      sq.doyun.limp = false;
-      game.player.enterSeat(apc, { offset: V(-0.7, 1.72, -1.6), yawBase: 0, yawRange: 1.2, pitchRange: [-0.3, 0.3] });
-      game.player.lookYawLocal = 0;
-      events.emit('ui:fade', { to: 0, dur: 1.5 });
-      // helicopters fly north overhead
+      sq.doyun.limp = false; game.world.removeCollider(apcCol); ramp.rotation.x = 0;
+      const gun = new MountedWeapon(game, { kind: 'apc', vehicle: apc, interactable: false, yawRange: Math.PI, pitchRange: [-0.2, 0.35] });
+      game.mounted.push(gun); gun.mount();
+      events.emit('ui:fade', { to: 0, dur: 0.8 });
+      game.audio.setMusic('combat');
+      game.objectives.add('turret', '장갑차 포탑 사수 — 동쪽 철수로 확보');
+      await m.say('apc', '포수가 부상이다! 민재, 포탑 잡아! 동쪽 도로로 빠진다!', { radio: true, priority: 3 });
+      const route = new THREE.CatmullRomCurve3([[100, 127], [104, 124.5], [116, 121.5], [134, 122.5], [155, 125.5], [178, 127], [196, 128]].map(([x, z]) => V(x, lv.hf(x, z), z)));
+      const routeLen = route.getLength(); let u = 0, speed = 0; m.flags.apcHold = false;
+      const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+      m.every((dt, t) => {
+        speed += ((m.flags.apcHold ? 0 : 6.5) - speed) * Math.min(1, dt * 0.7);
+        u = Math.min(1, u + speed * dt / routeLen);
+        const p = route.getPoint(u), q = route.getPoint(Math.min(1, u + 0.01));
+        apc.position.set(p.x, p.y + Math.sin(t * 9) * 0.012, p.z);
+        apc.rotation.y += wrap(Math.atan2(q.x - p.x, q.z - p.z) - apc.rotation.y) * Math.min(1, dt * 1.6);
+        apc.rotation.x = Math.sin(t * 2.7) * 0.008 * (speed / 6.5);
+        eng?.setPos(apc.position); eng?.set(0.25 + speed / 8, 0.6);
+        if (u >= 1) return false;
+      });
+      // roadside ambush: infantry in the treeline + two armed trucks
+      await m.until(() => u > 0.12);
+      const roadside = spawnEnemies(game, [[132, 108], [138, 106], [146, 109], [158, 107], [166, 110], [174, 108]], { state: 'combat' });
+      attackOrder(game, roadside, game.player);
+      await m.say('jung', '도로 북쪽 숲! 매복이다!', { priority: 3 });
+      const techA = new EnemyVehicle(game, { path: [V(150, 0, 62), V(147, 0, 92), V(144, 0, 111)], speed: 8 });
+      const techB = new EnemyVehicle(game, { path: [V(196, 0, 70), V(190, 0, 98), V(184, 0, 114)], speed: 7 });
+      game.objectives.add('technicals', '적 기관총 트럭 파괴', { count: 2 });
+      const offV = m.bind(events.on('vehicle:destroyed', () => game.objectives.progress('technicals')));
+      await m.say('apc', '기관총 트럭 두 대! 기관포로 날려버려!', { radio: true, priority: 3 });
+      await m.until(() => u > 0.32);
+      m.flags.apcHold = true;
+      await m.say('apc', '길에 잔해다 — 정지! 트럭부터 잡아!', { radio: true, priority: 3 });
+      const tH = m.time;
+      await m.until(() => (techA.dead && techB.dead) || m.time - tH > 60);
+      for (const v of [techA, techB]) if (!v.dead) v.destroy();
+      offV(); game.objectives.complete('technicals');
+      m.flags.apcHold = false;
+      await m.say('apc', '통로 열렸다, 전진!', { radio: true, priority: 3 });
+      await m.until(() => u >= 1 || roadside.every((e) => e.dead), 50);
+      for (const e of roadside) if (!e.dead) e.kill(apc.position);
+      await m.until(() => u >= 1, 40);
+      game.objectives.complete('turret');
+
+      // ---------------- ENDING (from the turret hatch) ----------------
+      game.audio.setMusic('cinematic'); game.cine.letterbox(true);
+      gun.fireT = 999; // weapon safe
       const helos = [buildHelicopter(), buildHelicopter()];
-      helos.forEach((h, i) => { h.position.set(100 + (i ? 14 : -6), 45 + i * 6, 260 + i * 25); h.rotation.y = Math.PI; scene.add(h); });
+      helos.forEach((h, i) => { h.position.set(apc.position.x - 30 + i * 18, 42 + i * 6, apc.position.z + 120 + i * 25); h.rotation.y = Math.PI; scene.add(h); });
       const rotor = game.audio.rotorLoop(); rotor?.set(0.9);
       m.every((dt, t) => {
         helos.forEach((h, i) => { h.position.z -= (38 + i * 4) * dt; h.position.y += Math.sin(t + i) * 0.02; h.rotation.x = -0.12; h.userData.rotor.rotation.y += dt * 30; h.userData.tail.rotation.x += dt * 40; h.userData.beacon.visible = Math.sin(t * 8) > 0; });
@@ -494,13 +604,9 @@ export const SEGMENTS = [
         if (helos[1].position.z < -300) return false;
       });
       await m.talk([
-        ['apc', '램프 닫는다. 출발!', { priority: 3 }],
+        ['apc', '포수, 잘했다. 이제 숨 돌려.', { priority: 3 }],
         ['jung', '…D-38이었는데.', { priority: 3 }],
         ['yoon', '전역은 미뤄졌다, 정경수.', { priority: 3 }],
-      ]);
-      const ramp2 = apc.userData.ramp; let rc = 1;
-      m.every((dt) => { rc = Math.max(0, rc - dt * 0.18); ramp2.rotation.x = -rc * 1.35; if (rc <= 0) return false; });
-      await m.talk([
         ['seoyeon', '전 부대에 알린다. 현 시각부로 데프콘 1 발령. 전 전선 교전 중.', { radio: true, priority: 3 }],
         ['seoyeon', '…연서시 방면, 통신 두절. 반복한다. 연서시 방면 통신 두절.', { radio: true, priority: 3 }],
         ['doyun', '…민재야. 연서시면… 니 집…', { priority: 3 }],

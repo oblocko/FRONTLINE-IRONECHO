@@ -147,7 +147,7 @@ export class GopSector {
     this.hf = hf;
     // ----- render mesh (chunked, 1 m) -----
     progress(0.25, 'TERRAIN MESH');
-    const mat = pbr('snowground', { repeat: [1, 1] });
+    const mat = pbr('snowground', { repeat: [1, 1], color: 0xc4c9d2 }); // slightly grey the photo snow so it isn't blown out at night
     const CH = 4, sx = (L.bounds.maxX - L.bounds.minX + 40) / CH, sz = (L.bounds.maxZ - L.bounds.minZ + 40) / CH;
     const ox = L.bounds.minX - 20, oz = L.bounds.minZ - 20;
     for (let cj = 0; cj < CH; cj++) for (let ci = 0; ci < CH; ci++) {
@@ -258,6 +258,7 @@ export class GopSector {
     p.jerseyBarrier(-12, -16, 0); p.jerseyBarrier(-12, -19.5, 0);
     for (const [x, z] of [[18, -20], [19, -18.8], [17.6, -18.4]]) p.barrel(x, z);
     p.crate(-8, -36); p.crate(-8, -37.2, 0.8); p.ammoBox(-7, -38);
+    this.game.propLib?.place('utility_box_01', 9.5, -28.6, { rotQ: 3 }); this.game.propLib?.place('metal_jerrycan_green', 11, -31, { yawJitter: 1, collide: false });
     this.ammoCrateGP = V(-8, this.hf(-8, -36) + 0.9, -36);
     // lights (switch off at blackout)
     for (const [x, z] of [[-10, -18], [12, -18], [0, -40], [-18, -38]]) { const l = p.streetLamp(x, z); this.lampLights.push(l); }
@@ -291,6 +292,13 @@ export class GopSector {
     p.sandbagWall(70, -32, 3, 2, 1); p.sandbagWall(84, -31, 4, 2, 0);
     p.crate(72.5, -33); p.ammoBox(73.2, -34.2);
     this.ammoCrateOP = V(72.5, this.hf(72.5, -33) + 0.9, -33);
+    const lib = this.game.propLib;
+    if (lib) {
+      lib.place('metal_jerrycan_green', 73.6, -32.4, { yawJitter: 1, collide: false }); lib.place('metal_jerrycan_green', 74.1, -32.2, { yawJitter: 1, collide: false });
+      lib.place('medical_box', 79.5, -34.3, { y: this.opBunker.userData.floorY, collide: false });
+      lib.place('ammo_box', 77.4, -45.7, { yawJitter: 0.6, collide: false }); lib.place('ammo_box', 80.8, -45.9, { yawJitter: 0.6, collide: false });
+      lib.place('old_military_crate', 86, -33, { rotQ: 1 });
+    }
     // camo net
     const net = new THREE.Mesh(new THREE.PlaneGeometry(8, 6, 8, 6), new THREE.MeshStandardMaterial({ color: 0x4a4f3a, roughness: 1, side: THREE.DoubleSide, transparent: true, opacity: 0.85, alphaTest: 0.2 }));
     const np = net.geometry.attributes.position; for (let i = 0; i < np.count; i++) np.setZ(i, Math.sin(i * 1.7) * 0.15);
@@ -343,6 +351,13 @@ export class GopSector {
     this.game.world.addBoxCentered(V(88, this.hf(88, 60) + 1, 60), V(2.2, 2, 4.4), { surface: 'metal' });
     for (const [x, z] of [[70, 58], [71, 58.8], [92, 82]]) p.barrel(x, z, { color: 0x2f5a8a });
     p.crate(58, 60); p.crate(103, 62); p.crate(83, 76); p.crate(84.2, 76.3, 0.8);
+    const lib = this.game.propLib;
+    if (lib) {
+      for (const [x, z] of [[67.5, 51.2], [101.5, 67], [94, 51.5], [63.5, 73.5]]) lib.place('propane_tank', x, z, { yawJitter: 2 });
+      lib.place('utility_box_02', 77.5, 81, { rotQ: 2, surface: 'metal' }); lib.place('utility_box_01', 71, 58.6, { rotQ: 0 });
+      for (const [x, z] of [[73, 92.5], [86.5, 92], [92.5, 59.5]]) lib.place('metal_trash_can', x, z, { scale: 0.55, yawJitter: 0.4 });
+      lib.place('plastic_jerrycan', 89.6, 57.8, { yawJitter: 2, collide: false }); lib.place('plastic_jerrycan', 102.5, 73.5, { yawJitter: 2, collide: false });
+    }
     // kimchi pots (jangdokdae) — clay jars cluster
     const clay = new THREE.MeshStandardMaterial({ color: 0x5a3626, roughness: 0.45, metalness: 0.05 });
     for (let i = 0; i < 7; i++) { const jar = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 10), clay); const x = 56 + (i % 4) * 0.75, z = 74 + Math.floor(i / 4) * 0.75; jar.scale.set(1, 1.15, 1); jar.position.set(x, this.hf(x, z) + 0.34, z); jar.castShadow = true; scene.add(jar); }
@@ -354,6 +369,7 @@ export class GopSector {
     p.sandbagWall(94, 112, 4, 3); p.sandbagWall(106, 112, 4, 3); p.jerseyBarrier(100, 108, 0);
     p.sign(108, 122, '집결지 B', { sub: 'RALLY POINT BRAVO', bg: '#2f4a33', rotY: -Math.PI / 2 });
     p.crate(92, 120); p.ammoBox(92.6, 121.2);
+    this.game.propLib?.place('medical_box', 93.2, 118.6, { collide: false }); p.crate(108, 116); this.game.propLib?.place('metal_jerrycan_green', 107.2, 117.4, { yawJitter: 1, collide: false });
     this.ammoCrateRally = V(92, this.hf(92, 120) + 0.9, 120);
   }
 
@@ -383,6 +399,30 @@ export class GopSector {
     this.scene().traverse((o) => { if (o.isMesh && o.material?.emissive && o.material.emissiveIntensity > 0 && o.material.transparent && o.material.opacity < 0.9) { o.material.emissiveIntensity = 0; o.material.color.setHex(0x1c2730); } });
   }
   scene() { return this.game.renderer.scene; }
+  // Set piece: a shell hit topples a watchtower (falls away from `fromDir`)
+  collapseTower(i, fromPos = null) {
+    const t = this.towers[i]; if (!t || t.collapsed) return; t.collapsed = true;
+    const g = this.game, base = t.base;
+    for (const c of t.colliders) g.world.removeCollider(c);
+    if (t.spot) { t.spot.intensity = 0; const st = t.spot.userData.state; st.on = false; st.beam.visible = false; }
+    g.combat.explode(base.clone().add(V(0, 0.3, 0)), { radius: 5, damage: 80, scale: 1.3, playerSafe: g.player.position.distanceTo(base) > 12, snow: true });
+    // pivot about the base edge on the far side
+    const away = fromPos ? base.clone().sub(fromPos).setY(0).normalize() : V(0, 0, -1);
+    const pivot = new THREE.Group(); pivot.position.copy(base).addScaledVector(away, 1.1); this.scene().add(pivot);
+    this.scene().remove(t.grp); pivot.add(t.grp); t.grp.position.copy(base).sub(pivot.position);
+    const axis = V(away.z, 0, -away.x); let a = 0, w = 0.05; const q0 = pivot.quaternion.clone();
+    const landed = () => {
+      const tip = base.clone().addScaledVector(away, 6.5);
+      g.effects.explosion(V(tip.x, this.hf(tip.x, tip.z), tip.z), 0.9, { snow: true }); g.audio.explosion(tip, 0.8); g.player.addShake(0.3);
+      g.world.addBoxCentered(base.clone().addScaledVector(away, 4).setY(this.hf(base.x, base.z) + 0.8), V(2.6, 1.6, 2.6), { surface: 'metal', cover: true });
+    };
+    g.mission.every((dt) => {
+      w += dt * 2.6; a = Math.min(Math.PI / 2 - 0.05, a + w * dt);
+      pivot.quaternion.copy(q0).multiply(new THREE.Quaternion().setFromAxisAngle(axis, a));
+      if (a >= Math.PI / 2 - 0.05) { landed(); return false; }
+    });
+    g.audio.click(0.4, 600, 0.4); // metal groan
+  }
   startWar() { this.war = true; this.flashT = 1; }
   update(dt, t) {
     const g = this.game;

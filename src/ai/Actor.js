@@ -12,6 +12,7 @@ const LOOKS = {
   rok: { camo: 'camoROK', vest: 0x3f4632, helmet: 0x4b5338, skin: 0xc89f7f, gear: 0x2b2e24, patch: 0x2050a0 },
   kpa: { camo: 'camoEnemy', vest: 0x4a4934, helmet: 0x55573c, skin: 0xc29a78, gear: 0x30301f, patch: 0x9a2020 },
   us:  { camo: 'camoROK', vest: 0x6b6450, helmet: 0x6b6450, skin: 0xa77f62, gear: 0x3e3a2e, patch: 0x405070 },
+  civ: { camo: 'fabric', vest: 0x2d3440, helmet: 0x1c1a18, skin: 0xd1a685, gear: 0x24262a, patch: 0x2d3440, civilian: true },
 };
 
 function rifleModel() {
@@ -35,8 +36,10 @@ export class Actor {
     const L = LOOKS[faction] || LOOKS.rok;
     this.root = new THREE.Group(); this.root.scale.setScalar(scale);
     scene.add(this.root);
-    const uniform = pbr(L.camo, { repeat: [2, 2] });
-    const vest = pbr('fabric', { color: L.vest, repeat: [2, 2] });
+    const CIV_COLORS = [0x3b4a6b, 0x6b3b3b, 0x5a5a5a, 0x2f4f3f, 0x7a6a4a, 0x2a2a35, 0x8a8478, 0x4a3a5a];
+    const civColor = CIV_COLORS[variant % CIV_COLORS.length], civPants = [0x24262c, 0x3a3f4a, 0x4a4036][variant % 3];
+    const uniform = L.civilian ? pbr('fabric', { color: civPants, repeat: [2, 2], key: 'civp' + variant % 3 }) : pbr(L.camo, { repeat: [2, 2] });
+    const vest = L.civilian ? pbr('fabric', { color: civColor, repeat: [2, 2], key: 'civ' + (variant % CIV_COLORS.length) }) : pbr('fabric', { color: L.vest, repeat: [2, 2] });
     const gear = new THREE.MeshStandardMaterial({ color: L.gear, roughness: 0.85 });
     const skin = new THREE.MeshStandardMaterial({ color: new THREE.Color(L.skin).offsetHSL(0, 0, (variant % 3 - 1) * 0.04), roughness: 0.65 });
     const helmetMat = pbr('fabric', { color: L.helmet, repeat: [1, 1] });
@@ -65,8 +68,10 @@ export class Actor {
     this.chest = joint(this.spine, 0, 0.28, 0);
     mesh(new THREE.BoxGeometry(0.36, 0.5, 0.22), uniform, this.chest, 0, 0, 0);
     mesh(new THREE.BoxGeometry(0.4, 0.42, 0.29), vest, this.chest, 0, 0.0, 0.0);
-    for (let i = 0; i < 3; i++) mesh(new THREE.BoxGeometry(0.09, 0.12, 0.06), gear, this.chest, -0.12 + i * 0.12, -0.08, 0.17); // pouches
-    mesh(new THREE.BoxGeometry(0.3, 0.38, 0.16), gear, this.chest, 0, 0.0, -0.21); // pack
+    if (!L.civilian) {
+      for (let i = 0; i < 3; i++) mesh(new THREE.BoxGeometry(0.09, 0.12, 0.06), gear, this.chest, -0.12 + i * 0.12, -0.08, 0.17); // pouches
+      mesh(new THREE.BoxGeometry(0.3, 0.38, 0.16), gear, this.chest, 0, 0.0, -0.21); // pack
+    } else if (variant % 3 === 0) mesh(new THREE.BoxGeometry(0.26, 0.32, 0.12), new THREE.MeshStandardMaterial({ color: 0x1f2a3a, roughness: 0.8 }), this.chest, 0, 0.0, -0.19); // backpack
     const patch = mesh(new THREE.PlaneGeometry(0.06, 0.04), new THREE.MeshStandardMaterial({ color: L.patch }), this.chest, 0.21, 0.14, 0); patch.rotation.y = Math.PI / 2;
     this.neck = joint(this.chest, 0, 0.3, 0);
     this.head = joint(this.neck, 0, 0.1, 0);
@@ -80,6 +85,7 @@ export class Actor {
       mesh(new THREE.BoxGeometry(0.06, 0.04, 0.03), gear, this.head, 0, 0.13, 0.12); // NVG mount
       if (faction !== 'kpa') { const band = mesh(new THREE.TorusGeometry(0.135, 0.008, 4, 20), gear, this.head, 0, 0.07, 0); band.rotation.x = Math.PI / 2; }
     } else if (hat === 'cap') { mesh(new THREE.CylinderGeometry(0.115, 0.12, 0.08, 14), helmetMat, this.head, 0, 0.1, 0); mesh(new THREE.BoxGeometry(0.16, 0.015, 0.1), helmetMat, this.head, 0, 0.07, 0.11); }
+    else if (hat === 'none') { const hair = mesh(new THREE.SphereGeometry(0.112, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2.2), new THREE.MeshStandardMaterial({ color: 0x141210, roughness: 0.9 }), this.head, 0, 0.035, -0.012); hair.scale.set(1, 0.9, 1.08); }
     else if (hat === 'headset') { mesh(new THREE.TorusGeometry(0.11, 0.01, 4, 16, Math.PI), gear, this.head, 0, 0.04, 0); for (const s of [-1, 1]) mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.03, 10), gear, this.head, s * 0.11, 0.02, 0).rotation.z = Math.PI / 2; }
     // arms
     this.arms = [];

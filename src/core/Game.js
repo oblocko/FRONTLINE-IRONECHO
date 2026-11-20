@@ -21,6 +21,9 @@ import { MissionRunner, Cinematics } from '../story/MissionRunner.js';
 import { missionById, nextMission } from '../missions/index.js';
 import { UI } from '../ui/UI.js';
 import { buildMenuScene } from '../world/MenuScene.js';
+import { PropLibrary, PROP_IDS } from '../world/PropLibrary.js';
+import { preloadPhotoTextures } from '../render/TextureFactory.js';
+import { loadGLTF } from './Assets.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
@@ -52,13 +55,15 @@ export class Game {
     requestAnimationFrame(this.loop);
     this.perfEl = document.createElement('div'); this.perfEl.id = 'perf'; document.body.appendChild(this.perfEl);
     this.fpsAcc = 0; this.fpsN = 0;
+    this.missions = { byId: missionById, next: nextMission };
     window.__game = this; // debug / automated test hook
   }
 
   async boot() {
     const b = this.ui.boot();
     const names = ['concrete', 'snowground', 'asphalt', 'dirt', 'metal', 'paintedMetal', 'sandbag', 'camoROK', 'camoEnemy', 'fabric', 'wood', 'plaster'];
-    for (let i = 0; i < names.length; i++) { b.progress(i / names.length, `GENERATING MATERIALS · ${names[i].toUpperCase()}`); await nextFrame(); getTextures(names[i]); }
+    await preloadPhotoTextures((p) => b.progress(p * 0.4, 'LOADING PHOTO TEXTURES'));
+    for (let i = 0; i < names.length; i++) { b.progress(0.4 + 0.6 * i / names.length, `GENERATING MATERIALS · ${names[i].toUpperCase()}`); await nextFrame(); getTextures(names[i]); }
     b.progress(1, 'SYSTEMS READY');
     if (!this.debug.has('autostart')) await b.ready();
     audio.init();
@@ -87,9 +92,13 @@ export class Game {
     const mod = await meta.load();
     if (this.loadToken !== token) throw Object.assign(new Error('cancelled'), { cancelled: true });
     this.pending = { id, meta, mod };
+    // photographic textures + scanned props (CC0) — failures fall back to procedural assets
+    await preloadPhotoTextures((p) => progress(0.05 + 0.25 * p, 'LOADING TEXTURES'));
+    let n = 0; const ids = mod.PROPS || PROP_IDS;
+    await Promise.all(ids.map((pid) => loadGLTF(`models/${pid}/${pid}.gltf`).catch(() => null).then(() => progress(0.3 + 0.3 * (++n / ids.length), 'LOADING MODELS'))));
     // pre-generate textures used by the level while the briefing is shown
     const tex = mod.TEXTURES || [];
-    for (let i = 0; i < tex.length; i++) { if (this.loadToken !== token) throw Object.assign(new Error('cancelled'), { cancelled: true }); progress(0.1 + 0.85 * i / tex.length, 'PREPARING ASSETS'); await nextFrame(); getTextures(tex[i]); }
+    for (let i = 0; i < tex.length; i++) { if (this.loadToken !== token) throw Object.assign(new Error('cancelled'), { cancelled: true }); progress(0.6 + 0.38 * i / tex.length, 'PREPARING ASSETS'); await nextFrame(); getTextures(tex[i]); }
     progress(1, 'READY');
   }
 
@@ -109,6 +118,7 @@ export class Game {
     this.effects = new Effects(scene, this.renderer.camera);
     this.effects.groundFn = (x, z) => this.world.heightFn(x, z);
     this.props = new Props(scene, this.world);
+    this.propLib = await new PropLibrary(this).load(p.mod.PROPS || PROP_IDS); this.props.lib = this.propLib;
     this.combat = new Combat({ world: this.world, effects: this.effects, audio });
     this.director = new AIDirector({ scene, world: this.world, effects: this.effects, audio, combat: this.combat });
     this.combat.director = this.director;
@@ -119,7 +129,7 @@ export class Game {
     this.dialogue.clear(); this.dialogue = new Dialogue(audio);
     this.objectives.clear();
     this.mission = new MissionRunner(this); this.cine = new Cinematics(this);
-    this.squadList = [];
+    this.squadList = []; this.mounted = []; this.support = null;
     this.stats = stats || { time: 0, deaths: 0, kills: 0, headshots: 0, shotsFired: 0, shotsHit: 0 };
     this.killOff = events.on('player:kill', (e) => { this.stats.kills++; if (e.head) this.stats.headshots++; });
     // build level
@@ -162,7 +172,9 @@ export class Game {
     if (this.mission) this.mission.abort();
     this.mission = null;
     this.killOff?.(); this.killOff = null;
-    if (this.director) this.director.clear();
+    if (this.director) { for (const v of this.director.vehicles) v.remove(); this.director.clear(); }
+    if (this.player) this.player.fovOverride = null;
+    events.emit('hud:mounted', null); events.emit('hud:binoculars', null); events.emit('hud:escort', null); events.emit('hud:timer', null);
     this.dialogue?.clear();
     audio.stopAllLoops();
     this.renderer.fx.damage = 0; this.renderer.fx.desat = 0;
@@ -254,9 +266,10 @@ export class Game {
   updateWorld(dt) {
     this.time += dt; if (this.state === 'playing') this.stats.time += dt;
     const t = this.time;
-    if (this.state === 'playing') { this.player.update(dt, t); this.weapons.update(dt, t); }
+    if (this.state === 'playing') { this.player.update(dt, t); for (const m of this.mounted) m.update(dt, t); this.support?.update(dt); this.weapons.update(dt, t); }
     else { this.player.updateCamera(dt, t); this.weapons.updateViewmodel(dt, t); }
     this.director.update(dt, t);
+    for (const v of this.director.vehicles) v.update(dt);
     this.mission?.update(dt);
     this.dialogue.update(dt);
     this.effects.update(dt);

@@ -53,6 +53,7 @@ export class Props {
     return grp;
   }
   jerseyBarrier(x, z, rotQ = 0) {
+    if (this.lib?.has('concrete_road_barrier_02')) return this.lib.place('concrete_road_barrier_02', x, z, { rotQ: rotQ + 1, surface: 'concrete', cover: true });
     const gy = this.world.heightFn(x, z);
     const shape = new THREE.Shape(); shape.moveTo(-0.3, 0); shape.lineTo(0.3, 0); shape.lineTo(0.3, 0.08); shape.lineTo(0.12, 0.3); shape.lineTo(0.08, 0.8); shape.lineTo(-0.08, 0.8); shape.lineTo(-0.12, 0.3); shape.lineTo(-0.3, 0.08);
     const g = new THREE.ExtrudeGeometry(shape, { depth: 2.4, bevelEnabled: false }); g.translate(0, 0, -1.2);
@@ -208,7 +209,7 @@ export class Props {
     for (const t of tris) for (const p of [t[0], t[2], t[1]]) { pos.push(...p); uv.push(p[0] * 0.5, p[2] * 0.5 + p[1]); }
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.computeVertexNormals();
     // tiled roof texture: corrugated recipe tinted to slate tile
-    const m = new THREE.Mesh(geo, pbr('corrugated', { repeat: [3, 3], color, metalness: 0.2 }));
+    const m = new THREE.Mesh(geo, pbr('roofTiles', { repeat: [3, 3], color, metalness: 0.2 }));
     m.material.side = THREE.DoubleSide;
     m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; parent.add(m);
     return m;
@@ -218,9 +219,10 @@ export class Props {
   watchtower(x, z, { light = true } = {}) {
     const gy = this.world.heightFn(x, z); const grp = new THREE.Group(); grp.position.set(x, gy, z); this.scene.add(grp);
     const metal = pbr('paintedMetal', { color: 0x9aa088 });
+    const colliders = [];
     for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
       const leg = new THREE.Mesh(new THREE.BoxGeometry(0.16, 6, 0.16), metal); leg.position.set(sx * 1.1, 3, sz * 1.1); leg.castShadow = true; grp.add(leg);
-      this.world.addBoxCentered(V(x + sx * 1.1, gy + 3, z + sz * 1.1), V(0.2, 6, 0.2), { surface: 'metal', cover: false });
+      colliders.push(this.world.addBoxCentered(V(x + sx * 1.1, gy + 3, z + sz * 1.1), V(0.2, 6, 0.2), { surface: 'metal', cover: false }));
     }
     for (let k = 1; k < 3; k++) for (let s = 0; s < 4; s++) {
       const br = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.06, 0.06), metal); br.position.set(0, k * 2, 0); br.rotation.y = s * Math.PI / 2; br.translateZ(1.1); grp.add(br);
@@ -247,8 +249,8 @@ export class Props {
       } });
       spot.userData.state = st;
     }
-    this.world.addBoxCentered(V(x, gy + 6, z), V(3, 0.2, 3), { surface: 'metal' });
-    return { grp, spot };
+    colliders.push(this.world.addBoxCentered(V(x, gy + 6, z), V(3, 0.2, 3), { surface: 'metal' }));
+    return { grp, spot, colliders, base: V(x, gy, z) };
   }
 
   // ---------------- vegetation & nature ----------------
@@ -328,14 +330,17 @@ export class Props {
 
   // ---------------- small props ----------------
   crate(x, z, s = 1, y = null, rot = 0) {
+    if (this.lib) { const ids = ['wooden_crate_02', 'old_military_crate', 'wooden_crate_01'].filter((i) => this.lib.has(i)); if (ids.length) { const id = ids[Math.abs(Math.round(x * 7 + z * 3)) % ids.length]; return this.lib.place(id, x, z, { y, scale: s, rotQ: Math.round(rot / (Math.PI / 2)), surface: 'wood', yawJitter: 0.1 }); } }
     const gy = y ?? this.world.heightFn(x, z);
     return this.box(V(1.0 * s, 0.8 * s, 0.8 * s), V(x, gy + 0.4 * s, z), pbr('wood', { color: 0x7d7055 }), { surface: 'wood', rotY: rot });
   }
   ammoBox(x, z, y = null) {
+    if (this.lib?.has('ammo_box')) return this.lib.place('ammo_box', x, z, { y, rotQ: 1, yawJitter: 0.3, collide: false });
     const gy = y ?? this.world.heightFn(x, z);
     return this.box(V(0.5, 0.28, 0.25), V(x, gy + 0.14, z), pbr('paintedMetal', { color: 0x8a9070 }), { surface: 'metal' });
   }
   barrel(x, z, { color = 0x3d4a3a, burning = false } = {}) {
+    if (this.lib) { const ids = ['Barrel_01', 'Barrel_02', 'barrel_03'].filter((i) => this.lib.has(i)); if (ids.length) return this.lib.place(ids[Math.abs(Math.round(x * 5 + z)) % ids.length], x, z, { yawJitter: 3, surface: 'metal', cover: true }); }
     const gy = this.world.heightFn(x, z);
     const m = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.9, 14), pbr('paintedMetal', { color })); m.position.set(x, gy + 0.45, z); m.castShadow = m.receiveShadow = true; this.scene.add(m);
     for (const yy of [0.2, 0.7]) { const r = new THREE.Mesh(new THREE.TorusGeometry(0.305, 0.015, 4, 16), pbr('metal')); r.rotation.x = Math.PI / 2; r.position.set(x, gy + yy, z); this.scene.add(r); }
@@ -409,7 +414,7 @@ export class Props {
 
 // ======================= VEHICLE MODELS =======================
 // All vehicles are original designs (generic modern military silhouettes).
-export function buildTruck() {
+export function buildTruck({ canopy = true } = {}) {
   const g = new THREE.Group();
   const paint = pbr('paintedMetal', { color: 0x8a9478, repeat: [1, 1] });
   const dark = new THREE.MeshStandardMaterial({ color: 0x1b1d1a, roughness: 0.9 });
@@ -434,9 +439,9 @@ export function buildTruck() {
   // canvas canopy (arched)
   // canvas roof with rolled-up sides (open sides give passengers a view out)
   const canGeo = new THREE.CylinderGeometry(1.22, 1.22, 4.6, 16, 1, true, Math.PI * 0.26, Math.PI * 0.48); canGeo.rotateX(Math.PI / 2); canGeo.rotateZ(Math.PI / 2);
-  const can = new THREE.Mesh(canGeo, canvasMat); can.position.set(0, 1.9, -1.3); can.scale.set(1, 1.1, 1);
-  for (const s of [-1, 1]) { const roll = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 4.6, 8), canvasMat); roll.rotation.x = Math.PI / 2; roll.position.set(s * 0.82, 2.88, -1.3); g.add(roll); }
-  for (let i = 0; i < 4; i++) { const hoop = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.025, 4, 18, Math.PI), new THREE.MeshStandardMaterial({ color: 0x2a2c26, roughness: 0.6, metalness: 0.5 })); hoop.position.set(0, 1.9, -3.4 + i * 1.4); hoop.scale.set(1, 1.1, 1); g.add(hoop); }
+  const can = new THREE.Mesh(canGeo, canvasMat); can.position.set(0, 1.9, -1.3); can.scale.set(1, 1.1, 1); can.visible = canopy;
+  for (const s of [-1, 1]) { const roll = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 4.6, 8), canvasMat); roll.rotation.x = Math.PI / 2; roll.position.set(s * 0.82, 2.88, -1.3); roll.visible = canopy; g.add(roll); }
+  for (let i = 0; i < 4; i++) { const hoop = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.025, 4, 18, Math.PI), new THREE.MeshStandardMaterial({ color: 0x2a2c26, roughness: 0.6, metalness: 0.5 })); hoop.position.set(0, 1.9, -3.4 + i * 1.4); hoop.scale.set(1, 1.1, 1); hoop.visible = canopy; g.add(hoop); }
   can.material.side = THREE.DoubleSide; can.castShadow = true; g.add(can);
   // wheels
   g.userData.wheels = [];

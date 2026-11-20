@@ -10,7 +10,7 @@ export const DEFAULT_BINDINGS = {
   sprint: 'ShiftLeft', crouch: 'KeyC', jump: 'Space',
   reload: 'KeyR', interact: 'KeyF', grenade: 'KeyG',
   weapon1: 'Digit1', weapon2: 'Digit2', melee: 'KeyV',
-  pause: 'Escape', objectives: 'Tab',
+  pause: 'Escape', objectives: 'Tab', support: 'KeyB', flashlight: 'KeyL',
 };
 
 export const QUALITY_PRESETS = {

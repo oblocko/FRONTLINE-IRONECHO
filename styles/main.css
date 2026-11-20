@@ -237,3 +237,20 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 18px; background: var
 
 /* hide gameplay HUD during letterboxed cinematics (subtitles stay) */
 #cine.lb ~ #hud .ammo, #cine.lb ~ #hud .health, #cine.lb ~ #hud .obj, #cine.lb ~ #hud .compass, #cine.lb ~ #hud .xhair, #cine.lb ~ #hud .markers { opacity: 0; transition: opacity .6s; }
+
+/* mounted weapon heat + binoculars overlay */
+#hud .mounted { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%); width: 240px; text-align: center; font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em; color: #d8e0da; text-shadow: 0 1px 2px #000; }
+#hud .mounted .heat { height: 4px; background: rgba(255,255,255,0.15); margin-top: 6px; }
+#hud .mounted .heat i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .1s; }
+#hud .mounted .heat i.over { background: var(--danger); }
+#hud .binos { position: absolute; inset: 0; }
+#hud .binos .vig { position: absolute; inset: 0; background: #000; -webkit-mask: radial-gradient(circle 33vh at 39% 50%, transparent 97%, #000 100%), radial-gradient(circle 33vh at 61% 50%, transparent 97%, #000 100%); -webkit-mask-composite: source-in; mask: radial-gradient(circle 33vh at 39% 50%, transparent 97%, #000 100%), radial-gradient(circle 33vh at 61% 50%, transparent 97%, #000 100%); mask-composite: intersect; }
+#hud .binos .tick { position: absolute; left: 50%; top: 50%; background: rgba(200,240,106,0.8); }
+#hud .binos .tick.h { width: 120px; height: 1px; margin-left: -60px; } #hud .binos .tick.v { height: 120px; width: 1px; margin-top: -60px; }
+#hud .binos .info { position: absolute; left: 50%; top: calc(50% + 80px); transform: translateX(-50%); font-family: var(--mono); color: var(--accent); font-size: 13px; letter-spacing: .15em; }
+#hud .binos .lbl { position: absolute; left: 50%; bottom: 14vh; transform: translateX(-50%); font-family: var(--mono); color: #9aa49e; font-size: 11px; letter-spacing: .15em; }
+
+#hud .escort { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); width: 300px; text-align: center; font-family: var(--mono); font-size: 11px; letter-spacing: .18em; color: #d8e0da; text-shadow: 0 1px 2px #000; }
+#hud .escort .bar { height: 5px; background: rgba(255,255,255,.15); margin-top: 5px; } #hud .escort .bar i { display: block; height: 100%; background: #7fd3ff; transition: width .3s; } #hud .escort .bar i.low { background: var(--danger); }
+#hud .timer { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); font-family: var(--mono); font-size: 13px; letter-spacing: .15em; color: #e8e0d0; text-shadow: 0 1px 3px #000; }
+#hud .timer b { font-size: 22px; color: var(--warn); margin-left: 6px; } #hud .timer b.urgent { color: var(--danger); animation: blink 0.6s steps(2) infinite; }
