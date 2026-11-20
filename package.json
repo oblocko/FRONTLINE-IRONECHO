@@ -1,0 +1,23 @@
+{
+  "name": "frontline-iron-echo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FRONTLINE — IRON ECHO: single-player modern military FPS campaign (Three.js / WebGL)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host --port 4173",
+    "test": "vite build && node tests/smoke.mjs",
+    "test:mission": "vite build && node tests/mission01_playthrough.mjs",
+    "test:ai": "vite build && node tests/ai_combat.mjs",
+    "test:flow": "vite build && node tests/flow.mjs",
+    "screens": "vite build && node tests/screens.mjs"
+  },
+  "dependencies": {
+    "three": "0.187.0"
+  },
+  "devDependencies": {
+    "vite": "8.3.8"
+  }
+}

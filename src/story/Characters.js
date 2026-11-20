@@ -1,0 +1,24 @@
+// Cast data. Shared by dialogue (subtitle colours, voice timbre), briefing
+// screens and the codex. Full bios live in docs/STORY_BIBLE.md.
+export const CHARACTERS = {
+  minjae: { name: '한민재', en: 'Han Min-jae', rank: '이병', rankEn: 'PVT', unit: '제7보병사단 3대대 GOP 분대', color: '#9fd3ff', pitch: 1.05, role: 'Player (Korea front)' },
+  yoon: { name: '윤태호', en: 'Yoon Tae-ho', rank: '중사', rankEn: 'SSG', unit: '분대장', color: '#ffd27a', pitch: 0.82, role: 'Squad leader' },
+  doyun: { name: '박도윤', en: 'Park Do-yun', rank: '상병', rankEn: 'CPL', unit: '분대원', color: '#a8f0a0', pitch: 1.0, role: 'Squadmate' },
+  seoyeon: { name: '이서연', en: 'Lee Seo-yeon', rank: '중위', rankEn: '1LT', unit: '대대 지휘통제실 통신정보장교', color: '#ff9ec7', pitch: 1.45, role: 'Comms & intelligence' },
+  jung: { name: '정경수', en: 'Jung Kyung-su', rank: '병장', rankEn: 'SGT', unit: '분대 기관총 사수', color: '#c8b6ff', pitch: 0.9, role: 'Squad gunner' },
+  daniel: { name: '다니엘 보스', en: 'Daniel Voss', rank: '', rankEn: '', unit: '前 다국적 특수작전 TU-LANTERN', color: '#9fd3ff', pitch: 0.85, role: 'Player (abroad)' },
+  maya: { name: '마야 첸', en: 'Maya Chen', rank: '', rankEn: '', unit: '前 정보분석관', color: '#7ef0e0', pitch: 1.4, role: 'Analyst' },
+  nadia: { name: '나디아 라만', en: 'Nadia Rahman', rank: '', rankEn: '', unit: '前 민간보안책임자', color: '#ffb38a', pitch: 1.3, role: 'Uneasy ally' },
+  morrow: { name: '빅터 모로', en: 'Victor Morrow', rank: '', rankEn: '', unit: 'Halvard Meridian 대표', color: '#e0e0e0', pitch: 0.8, role: 'Defense-tech broker' },
+  tac: { name: '대대 지휘통제실', en: 'Battalion TOC', rank: '', rankEn: '', unit: '', color: '#ff9ec7', pitch: 1.1, role: 'Radio' },
+  op: { name: 'OP 백두-3', en: 'OP Baekdu-3', rank: '', rankEn: '', unit: '', color: '#bbbbbb', pitch: 1.0, role: 'Radio' },
+  driver: { name: '운전병', en: 'Driver', rank: '일병', rankEn: 'PFC', unit: '', color: '#cccccc', pitch: 1.0, role: '' },
+  apc: { name: '장갑차 차장', en: 'IFV Commander', rank: '상사', rankEn: 'SFC', unit: '기계화보병', color: '#ffe0a0', pitch: 0.85, role: '' },
+  enemy: { name: '적군', en: 'Hostile', rank: '', rankEn: '', unit: '', color: '#ff7a6a', pitch: 0.9, role: '' },
+  narrator: { name: '', en: '', rank: '', rankEn: '', unit: '', color: '#ffffff', pitch: 1, role: '' },
+};
+
+export function speakerLabel(id) {
+  const c = CHARACTERS[id]; if (!c) return id;
+  return c.rank ? `${c.rank} ${c.name}` : c.name;
+}
