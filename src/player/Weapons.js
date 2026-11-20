@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { events } from '../core/Events.js';
 import { pbr } from '../render/TextureFactory.js';
 import { softSprite } from '../render/TextureFactory.js';
+import { buildRifle, buildPistol } from './WeaponModels.js';
 
 const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
 
@@ -91,10 +92,10 @@ export class WeaponSystem {
     const amb = new THREE.HemisphereLight(0xb0b8c8, 0x30302a, 0.9); vmScene.add(amb);
     this.vmKey = new THREE.DirectionalLight(0xdde4ff, 1.4); this.vmKey.position.set(1, 2, 1); vmScene.add(this.vmKey);
     this.vmFlashLight = new THREE.PointLight(0xffaa55, 0, 2, 2); this.vmFlashLight.position.set(0.1, 0, -0.7); vmScene.add(this.vmFlashLight);
-    this.models = { rifle: buildRifleVM(), pistol: buildPistolVM() };
-    this.arms = buildArms();
+    // weapons carry their own hands; the legacy separate arm rig is kept hidden
+    this.models = { rifle: buildRifle(), pistol: buildPistol() };
+    this.arms = buildArms(); this.arms.visible = false;
     this.holder = new THREE.Group(); this.vmRoot.add(this.holder);
-    this.holder.add(this.arms);
     for (const m of Object.values(this.models)) { m.visible = false; this.holder.add(m); }
     this.flash = new THREE.Sprite(new THREE.SpriteMaterial({ map: softSprite('flash'), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, toneMapped: false }));
     this.flash.scale.setScalar(0.22); this.flash.visible = false; this.holder.add(this.flash);
@@ -109,11 +110,11 @@ export class WeaponSystem {
     if (!this.currentId) this.equip(id, true);
     this.emitAmmo();
   }
-  clear() { this.inventory = {}; this.order = []; this.currentId = null; for (const m of Object.values(this.models)) m.visible = false; this.arms.visible = false; this.grenades = 0; }
+  clear() { this.inventory = {}; this.order = []; this.currentId = null; for (const m of Object.values(this.models)) m.visible = false; this.grenades = 0; }
   equip(id, instant = false) {
     if (!this.inventory[id] || (id === this.currentId && !instant)) return;
     this.reloading = false;
-    const doSwap = () => { for (const [k, m] of Object.entries(this.models)) m.visible = k === id; this.currentId = id; this.arms.visible = true; this.emitAmmo(); };
+    const doSwap = () => { for (const [k, m] of Object.entries(this.models)) m.visible = k === id; this.currentId = id; this.emitAmmo(); };
     if (instant) { doSwap(); this.switching = 0; }
     else { this.switching = 1; this.pendingSwap = doSwap; this.audio.switchWeapon(); }
   }
@@ -226,8 +227,10 @@ export class WeaponSystem {
     this.lowerAmt = damp(this.lowerAmt, this.lowered || p.seat ? 1 : 0, 6, dt);
     const ads = this.adsAmount; const sprint = damp(this._sprint || 0, p.sprinting ? 1 : 0, 8, dt); this._sprint = sprint;
     // positions in camera space
-    const hip = new THREE.Vector3(0.16, -0.17, -0.38), adsPos = new THREE.Vector3(0, -m.userData.sightY, -0.28 + (m.userData.sightZ ?? 0) * -0.5);
-    if (this.currentId === 'pistol') { hip.set(0.13, -0.15, -0.36); adsPos.set(0, -m.userData.sightY, -0.3); }
+    // ADS: put the sight's reticle on the camera axis, `eyeRelief` metres in front of the eye
+    const u = m.userData; const eyeRelief = this.currentId === 'pistol' ? 0.42 : 0.26;
+    const hip = this.currentId === 'pistol' ? new THREE.Vector3(0.12, -0.1, -0.4) : new THREE.Vector3(0.145, -0.165, -0.46);
+    const adsPos = new THREE.Vector3(0, -u.sightY, -eyeRelief - (u.sightZ ?? 0));
     const pos = hip.clone().lerp(adsPos, ads);
     // bob
     const bt = p.bobT; const bobAmp = (p.speed > 0.5 && p.grounded ? 1 : 0) * (1 - ads * 0.85);
@@ -250,23 +253,24 @@ export class WeaponSystem {
       const t = this.reloadT / this.reloadDur;
       const tilt = Math.sin(Math.min(1, t * 1.15) * Math.PI);
       rot.z += tilt * 0.55; rot.x += tilt * 0.18; pos.y -= tilt * 0.04; pos.x -= tilt * 0.03;
-      const mag = m.userData.mag;
-      if (mag) { const base = this.currentId === 'pistol' ? -0.07 : -0.1; const mt = t < 0.3 ? t / 0.3 : t < 0.55 ? 1 : 1 - (t - 0.55) / 0.3; mag.position.y = base - Math.max(0, Math.min(1, mt)) * 0.25; mag.visible = !(t > 0.3 && t < 0.42); }
-    } else if (m.userData.mag) { m.userData.mag.position.y = this.currentId === 'pistol' ? -0.07 : -0.1; m.userData.mag.visible = true; }
-    if (this.currentId === 'pistol' && m.userData.slide) m.userData.slide.position.z = -0.05 + this.kick * 0.03;
+      const mag = u.mag;
+      if (mag) { const mt = t < 0.3 ? t / 0.3 : t < 0.55 ? 1 : 1 - (t - 0.55) / 0.3; mag.position.y = (u.magBaseY ?? 0) - Math.max(0, Math.min(1, mt)) * 0.25; mag.visible = !(t > 0.3 && t < 0.42); }
+    } else if (u.mag) { u.mag.position.y = u.magBaseY ?? 0; u.mag.visible = true; }
+    if (u.slide && u.slideAxis === 'z') u.slide.position.z = u.slideBase + this.kick * 0.024;
+    // support hand: off the handguard to fetch a fresh magazine during reloads
+    if (u.leftHand && u.leftHandBase) {
+      const k = this.reloading ? Math.sin(Math.min(1, (this.reloadT / this.reloadDur) * 1.1) * Math.PI) : 0;
+      const reach = this.currentId === 'pistol' ? new THREE.Vector3(-0.03, -0.08, 0.04) : new THREE.Vector3(-0.04, -0.12, 0.28);
+      u.leftHand.position.copy(u.leftHandBase).addScaledVector(reach, k);
+    }
     if (this.throwing > 0) { const t = 1 - this.throwing / 0.6; pos.y -= Math.sin(t * Math.PI) * 0.25; rot.x -= Math.sin(t * Math.PI) * 0.5; }
     this.holder.position.copy(pos); this.holder.rotation.copy(rot);
     m.position.set(0, 0, 0);
-    // arms placement relative to weapon
-    const { R, L } = this.arms.userData;
-    if (this.currentId === 'pistol') { R.position.set(0.0, -0.06, 0.06); R.rotation.set(0.2, 0, 0); L.position.set(-0.025, -0.07, 0.04); L.rotation.set(0.25, 0.4, 0.3); }
-    else { R.position.set(0.0, -0.075, 0.08); R.rotation.set(0.25, 0, 0); L.position.set(-0.01, -0.05, -0.36); L.rotation.set(0.15, 0.25, 0.2);
-      if (this.reloading) { const t = this.reloadT / this.reloadDur; const k = Math.sin(Math.min(1, t * 1.1) * Math.PI); L.position.set(-0.01 - k * 0.05, -0.05 - k * 0.14, -0.36 + k * 0.22); } }
     // muzzle flash
     const mz = m.userData.muzzle; this.flash.position.copy(mz);
     if (this.flashT > 0) { this.flashT -= dt; this.flash.scale.setScalar(0.18 + Math.random() * 0.1); } else this.flash.visible = false;
     this.vmFlashLight.intensity = damp(this.vmFlashLight.intensity, 0, 30, dt);
-    if (m.userData.dot) m.userData.dot.visible = ads > 0.5;
+    if (u.dot) { u.dot.visible = ads > 0.35; if (u.ring) u.ring.visible = ads > 0.35; }
     this.vmCamera.fov = 60 - ads * 8; this.vmCamera.updateProjectionMatrix();
   }
 }
