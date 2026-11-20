@@ -261,10 +261,12 @@ export class CoastalPort {
 
   // allied fleet on the horizon: hidden by the fog until it lifts
   fleet() {
-    const scene = this.game.renderer.scene; const grey = new THREE.MeshStandardMaterial({ color: 0x3c4248, roughness: 0.75, metalness: 0.2 });
+    const scene = this.game.renderer.scene; const grey = new THREE.MeshStandardMaterial({ color: 0x23272b, roughness: 0.9, metalness: 0.1, envMapIntensity: 0.2 });
+    const band = new THREE.MeshStandardMaterial({ color: 0x121416, roughness: 0.95 });
     const ship = (x, z, L, H) => {
       const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = 0.15 + Math.random() * 0.2; g.userData.dynamic = true;
       const hull = new THREE.Mesh(new THREE.BoxGeometry(L * 0.14, H * 0.5, L), grey); hull.position.y = H * 0.2; g.add(hull);
+      const wl = new THREE.Mesh(new THREE.BoxGeometry(L * 0.142, H * 0.12, L * 1.002), band); wl.position.y = H * 0.02; g.add(wl);
       const bow = new THREE.Mesh(new THREE.ConeGeometry(L * 0.07, L * 0.18, 4), grey); bow.rotation.x = Math.PI / 2; bow.rotation.y = Math.PI / 4; bow.scale.set(1, 1, 0.6); bow.position.set(0, H * 0.25, L * 0.58); g.add(bow);
       const sup = new THREE.Mesh(new THREE.BoxGeometry(L * 0.1, H * 0.7, L * 0.2), grey); sup.position.set(0, H * 0.75, -L * 0.05); g.add(sup);
       const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.5, H * 0.8, 6), grey); mast.position.set(0, H * 1.45, -L * 0.05); g.add(mast);

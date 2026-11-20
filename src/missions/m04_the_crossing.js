@@ -304,7 +304,7 @@ export const SEGMENTS = [
       const cam = game.renderer.camera; game.player.cameraOverride = true; game.weapons.hidden = true;
       const ov = document.createElement('div'); ov.className = 'cctv-ov'; ov.innerHTML = '<div class="lbl">CRANE CAM 02 · 안벽 3번 · ● LIVE</div><div class="cross"></div><div class="key">좌클릭 / F — 컨테이너 투하</div>';
       game.ui.hud.appendChild(ov);
-      const camOn = m.every(() => { cam.position.set(C.x + 7, P.quay + 24, C.z - 10); cam.lookAt(C.x + 2, P.quay, C.z + 12); cam.fov = 55; cam.updateProjectionMatrix(); });
+      const camOn = m.every(() => { cam.position.set(C.x + 0.5, P.quay + 27, C.z - 5); cam.lookAt(C.x + 2, P.quay, C.z + 15); cam.fov = 55; cam.updateProjectionMatrix(); });
       game.ui.hint('차량이 화면 가운데 표시선(크레인 바로 아래)에 들어오는 순간 투하하십시오', 6);
       await m.until(() => lv.dropNow || game.input.pressed('interact') || game.input.mouse.leftPressed || (!truck.dead && truck.position.z < C.z - 12), 120);
       lv.dropNow = false;
