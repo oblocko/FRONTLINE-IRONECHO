@@ -5,7 +5,7 @@
 - 엔진: three.js r187 (WebGL 2) + Vite — 엔진 선택 사유는 [docs/ENGINE_DECISION.md](docs/ENGINE_DECISION.md)
 - 캐릭터·무기·건물·차량·애니메이션·효과음·음악은 코드로 절차적 생성. 일부 텍스처와 소품은 CC0 실사 에셋(Poly Haven, `assets/CREDITS.md`)
 - 진행 상황: [PROJECT_STATUS.md](PROJECT_STATUS.md)
-- **바로 플레이**: https://oblocko.github.io/Modern-Warfare-Iron-Storm-FPS/ (JavaScript와 WebGL 2가 켜진 데스크톱 브라우저). 텍스트만 읽는 도구로 열면 게임 대신 소개 페이지가 보입니다.
+- **바로 플레이**: https://oblocko.github.io/FRONTLINE-IRONECHO/ (JavaScript와 WebGL 2가 켜진 데스크톱 브라우저). 텍스트만 읽는 도구로 열면 게임 대신 소개 페이지가 보입니다.
 
 ## 스크린샷
 
@@ -45,7 +45,7 @@ npm run preview
 
 ### 웹에서 바로 플레이 (GitHub Pages)
 
-https://oblocko.github.io/Modern-Warfare-Iron-Storm-FPS/ — 빌드 없이 원본 소스를 그대로 제공합니다. `index.html`의 import map이 `vendor/three`(three.js r187, MIT)를 가리킵니다. three.js 버전을 올리면 `vendor/three`도 함께 갱신해야 합니다.
+https://oblocko.github.io/FRONTLINE-IRONECHO/ — 빌드 없이 원본 소스를 그대로 제공합니다. `index.html`의 import map이 `vendor/three`(three.js r187, MIT)를 가리킵니다. three.js 버전을 올리면 `vendor/three`도 함께 갱신해야 합니다.
 
 ## 조작 (기본값, 설정에서 변경 가능)
 
