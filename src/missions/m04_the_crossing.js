@@ -391,7 +391,7 @@ export const SEGMENTS = [
       more.forEach((a, i) => a.moveTo(V(14 + i * 4, 0, 76), { run: true }));
       // ---------------- ENDING ----------------
       await m.say('reyes', '착륙지대 확보. …한국군. 서쪽 봐라. 바다.', { priority: 3 });
-      lv.liftFog(12);
+      lv.liftFog(8);
       game.objectives.add('look', '부두 끝에서 서쪽 바다 확인', { marker: V(-56, P.quay + 1, 60) });
       await m.until(() => game.player.position.x < -48 && Math.abs(game.player.position.z - 60) < 30, 45);
       game.objectives.complete('look');

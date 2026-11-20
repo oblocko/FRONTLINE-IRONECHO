@@ -17,7 +17,8 @@
 | ![M02 연서시 대로](docs/screenshots/06_m02_avenue.jpg) | ![M02 지하 역사](docs/screenshots/07_m02_station.jpg) |
 | ![M02 버스 호송](docs/screenshots/08_m02_bus.jpg) | ![M02 역사의 시민](docs/screenshots/10_m02_station_civilians.jpg) |
 | ![M03 한탄강 기관총 진지](docs/screenshots/11_m03_river_mg.jpg) | ![M03 선택](docs/screenshots/12_m03_choice_rain.jpg) |
-| ![M03 열상 관측장비](docs/screenshots/13_m03_thermal.jpg) | |
+| ![M03 열상 관측장비](docs/screenshots/13_m03_thermal.jpg) | ![M04 헬기 도어건](docs/screenshots/14_m04_doorgun.jpg) |
+| ![M04 해무가 걷힌 뒤 연합 함대](docs/screenshots/15_m04_fleet.jpg) | |
 
 ![캐릭터 라인업](docs/screenshots/09_characters.jpg)
 
