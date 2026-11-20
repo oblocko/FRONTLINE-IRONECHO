@@ -261,7 +261,7 @@ export class CoastalPort {
 
   // allied fleet on the horizon: hidden by the fog until it lifts
   fleet() {
-    const scene = this.game.renderer.scene; const grey = new THREE.MeshStandardMaterial({ color: 0x6a7076, roughness: 0.7, metalness: 0.2 });
+    const scene = this.game.renderer.scene; const grey = new THREE.MeshStandardMaterial({ color: 0x3c4248, roughness: 0.75, metalness: 0.2 });
     const ship = (x, z, L, H) => {
       const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = 0.15 + Math.random() * 0.2; g.userData.dynamic = true;
       const hull = new THREE.Mesh(new THREE.BoxGeometry(L * 0.14, H * 0.5, L), grey); hull.position.y = H * 0.2; g.add(hull);
@@ -271,8 +271,8 @@ export class CoastalPort {
       scene.add(g); return g;
     };
     this.ships = [];
-    for (let i = 0; i < 14; i++) { const x = -450 - Math.random() * 700, z = -500 + i * 75 + (Math.random() - 0.5) * 40; this.ships.push(ship(x, z, 90 + Math.random() * 120, 14 + Math.random() * 14)); }
-    this.ships.push(ship(-380, -40, 240, 30));                                    // big amphibious ship
+    for (let i = 0; i < 14; i++) { const x = -280 - Math.random() * 420, z = -500 + i * 75 + (Math.random() - 0.5) * 40; this.ships.push(ship(x, z, 90 + Math.random() * 120, 14 + Math.random() * 14)); }
+    this.ships.push(ship(-240, -40, 240, 30));                                    // big amphibious ship
     // landing craft for the ending
     this.craft = [];
     const cm = new THREE.MeshStandardMaterial({ color: 0x55605a, roughness: 0.7 });
@@ -292,7 +292,7 @@ export class CoastalPort {
 
   // ---- dynamic ----
   helicopter(pos) { const h = buildHelicopter(); h.position.copy(pos); this.game.renderer.scene.add(h); this.helos.push(h); return h; }
-  liftFog(seconds = 10) { this.fogTarget = 0.0016; this.fogRate = (this.fog - this.fogTarget) / seconds; this.landingCraft = true; for (const c of this.craft) c.visible = true; }
+  liftFog(seconds = 10) { this.fogTarget = 0.0006; this.fogRate = (this.fog - this.fogTarget) / seconds; this.landingCraft = true; for (const c of this.craft) c.visible = true; }
   update(dt, t) {
     const g = this.game, scene = g.renderer.scene;
     this.sky.update(dt, g.renderer.camera);

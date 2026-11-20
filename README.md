@@ -1,6 +1,6 @@
 # FRONTLINE — IRON ECHO
 
-1인칭 싱글플레이 현대전 FPS 캠페인. 2029년 한반도 전쟁과 해외 비밀 작전이 교차하는 16개 미션의 이야기 (현재 **Mission 01–03 플레이 가능**, 미션 완료 후 다음 미션으로 자동 연결).
+1인칭 싱글플레이 현대전 FPS 캠페인. 2029년 한반도 전쟁과 해외 비밀 작전이 교차하는 16개 미션의 이야기 (현재 **Mission 01–04 (ACT 1 전체) 플레이 가능**, 미션 완료 후 다음 미션으로 자동 연결).
 
 - 엔진: three.js r187 (WebGL 2) + Vite — 엔진 선택 사유는 [docs/ENGINE_DECISION.md](docs/ENGINE_DECISION.md)
 - 캐릭터·무기·건물·차량·애니메이션·효과음·음악은 코드로 절차적 생성. 일부 텍스처와 소품은 CC0 실사 에셋(Poly Haven, `assets/CREDITS.md`)
