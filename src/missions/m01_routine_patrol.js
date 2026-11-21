@@ -2,6 +2,7 @@
 // POV: PVT Han Min-jae. 2029-03-14 04:52 KST, central-front GOP sector.
 // Segments (checkpoints): truck → gp → op_move → op_radio → fallback → village → extraction
 import * as THREE from 'three';
+import { pbr } from '../render/TextureFactory.js';
 import { GopSector, LAYOUT } from '../world/levels/GopSector.js';
 import { buildAPC, buildHelicopter } from '../world/Props.js';
 import { events } from '../core/Events.js';
@@ -75,6 +76,109 @@ async function artillery(game, m, pos, { delay = 0, scale = 1.3, safeRadius = 9 
 // ------------------------------------------------------------------
 // SEGMENTS
 // ------------------------------------------------------------------
+
+// Recon patrol stealth sequence. The patrol (leader with a sweeping flashlight)
+// walks the road past the stone wall where the squad hides, one soldier comes
+// over to check the wall, and the player can throw a tin to pull them away.
+// A suspicion meter fills while any patrol member has line of sight to the
+// player (faster when standing, moving, close, or caught in the flashlight).
+async function stealthPatrol(game, m) {
+  const lv = game.level, sq = game.squad, scene = game.renderer.scene, p = game.player, k = (a) => keyName(game.input.binding(a));
+  const wallX = 74.6, hide = [V(72.2, 0, 31.5), V(72.4, 0, 34.5), V(72.1, 0, 37)];
+  // the stone wall the squad crouches behind
+  const wy = lv.hf(wallX, 34);
+  game.props.box(V(0.45, 1.35, 9), V(wallX, wy + 0.67, 34), pbrBlk(), { surface: 'concrete' });
+  ['yoon', 'jung', 'doyun'].forEach((key, i) => { const a = sq[key]; a.setPassive(true); a.moveTo(hide[i === 0 ? 0 : i === 1 ? 2 : 1].clone().add(V(-0.6, 0, i - 1)), { run: true, crouch: true, face: V(90, 0, 34) }); });
+  game.objectives.add('hide', `돌담 뒤에 숨기 — ${k('crouch')} 앉기`, { marker: hide[1] });
+  await m.say('yoon', '멈춰! 돌담 뒤로, 앉아. 정찰조다. 그냥 보내.', { priority: 3 });
+  await m.until(() => (p.position.distanceTo(V(hide[1].x, p.position.y, hide[1].z)) < 3.5 && p.crouching), 12);
+  game.objectives.complete('hide');
+  game.objectives.add('stealth', '정찰조가 지나갈 때까지 들키지 않기 — 사격 금지');
+  // HUD meter
+  const meterEl = document.createElement('div'); meterEl.className = 'stealth-meter';
+  meterEl.innerHTML = '<div class="lbl">발각 위험</div><div class="bar"><i></i></div><div class="st"></div>';
+  game.ui.hud.appendChild(meterEl);
+  // the patrol
+  const patrol = spawnEnemies(game, [[83, 76], [84.5, 79], [82, 81.5], [83.5, 84]], { state: 'idle', visionRange: 1, yaw: Math.PI });
+  m.flags.patrol = patrol;
+  for (const e of patrol) { e.setPassive(true); }
+  const leader = patrol[0];
+  const torch = new THREE.Group(); torch.position.set(0, 1.45, 0.25); leader.actor.root.add(torch);
+  const spot = new THREE.SpotLight(0xfff0d0, 40, 28, 0.32, 0.45, 1.6); spot.position.set(0, 0, 0); torch.add(spot);
+  const tgt = new THREE.Object3D(); tgt.position.set(0, -0.5, 8); torch.add(tgt); spot.target = tgt;
+  const beam = new THREE.Mesh(new THREE.ConeGeometry(2.6, 9, 20, 1, true), new THREE.MeshBasicMaterial({ color: 0xfff4d8, transparent: true, opacity: 0.07, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+  beam.rotation.x = -Math.PI / 2; beam.position.z = 4.5; torch.add(beam);
+  const walk = (e, pts, { run = false } = {}) => (async () => { for (const pt of pts) { e.moveTo(pt, { run }); await m.until(() => e.dead || e.position.distanceTo(V(pt.x, e.position.y, pt.z)) < 1.2, 30); } })();
+  // detection
+  let meter = 0, spotted = false, gone = false; const wiped = () => patrol.every((e) => e.dead); const eye = new THREE.Vector3(), tp = new THREE.Vector3(), fwd = new THREE.Vector3();
+  const tick = m.every((dt, t) => {
+    if (spotted || gone) return false;
+    torch.rotation.y = Math.sin(t * 0.9) * 0.55; torch.rotation.x = 0.12 + Math.sin(t * 0.6) * 0.05;
+    let rate = 0; const moving = p.speed > 0.6;
+    p.chestPos(tp);
+    for (const e of patrol) {
+      if (e.dead) continue;
+      e.eyePos(eye); const d = eye.distanceTo(tp); if (d > 26) continue;
+      fwd.set(Math.sin(e.yaw), 0, Math.cos(e.yaw)); const to = tp.clone().sub(eye); const flat = Math.hypot(to.x, to.z);
+      const cosA = (to.x * fwd.x + to.z * fwd.z) / Math.max(0.01, flat);
+      let lit = false;
+      if (e === leader) { const ld = new THREE.Vector3(0, 0, 1).applyQuaternion(torch.getWorldQuaternion(new THREE.Quaternion())); lit = to.clone().normalize().dot(ld) > Math.cos(0.36) && d < 24; }
+      if (cosA < 0.55 && !lit && d > 3) continue;                       // outside the field of view
+      if (!game.world.lineOfSight(eye, tp)) continue;
+      let v = (1 - d / 26) * (p.crouching ? 0.35 : 1) * (moving ? 1.8 : 1) * (lit ? 3 : 1) * (d < 6 ? 2.2 : 1);
+      rate += v * 0.85;
+    }
+    if (p.firingRecently) { meter = 1; }
+    meter = rate > 0 ? Math.min(1, meter + rate * dt) : Math.max(0, meter - dt * 0.22);
+    const bar = meterEl.querySelector('i'); bar.style.width = `${Math.round(meter * 100)}%`;
+    meterEl.classList.toggle('warn', meter > 0.35); meterEl.classList.toggle('danger', meter > 0.75);
+    meterEl.querySelector('.st').textContent = rate > 0 ? (meter > 0.75 ? '발각 직전!' : '정찰조가 이쪽을 보고 있다') : meter > 0.05 ? '의심이 가라앉는 중' : '숨어 있음';
+    if (meter >= 1 || wiped()) spotted = true;
+  });
+  // patrol route: up the road, a search halt, one soldier checks the wall
+  const road = [V(81, 0, 60), V(79.5, 0, 46)];
+  const all = patrol.map((e, i) => walk(e, road.map((r) => r.clone().add(V((i % 2) * 1.5, 0, i * 1.9)))));
+  await Promise.race([Promise.all(all), m.until(() => spotted, 60)]);
+  // a tin pile to throw for a distraction
+  const tinPos = V(71.2, lv.hf(71.2, 39.5) + 0.5, 39.5);
+  const tins = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.12, 8), new THREE.MeshStandardMaterial({ color: 0x8a8a80, metalness: 0.6, roughness: 0.5 }));
+  tins.position.copy(tinPos).setY(tinPos.y - 0.4); scene.add(tins);
+  let distracted = false;
+  const throwIt = game.player.addInteractable({ pos: tinPos, prompt: '깡통 던지기 — 정찰조 유인', radius: 2.4, onUse: () => {
+    throwIt.enabled = false; distracted = true; game.audio.click(0.4, 900, 0.15);
+    setTimeout(() => { game.audio.click(0.5, 1600, 0.08); game.audio.click(0.4, 1300, 0.08, 0.15); }, 900);
+  } });
+  m.spawn(async () => { if (!spotted) { await m.say('jung', '(속삭임) …뒤에 깡통 더미 있다. 저쪽으로 던지면 끌려갈 거다.', { priority: 2 }); game.ui.hint(`<b>${k('interact')}</b> 깡통을 던져 정찰조를 다른 곳으로 유인할 수 있습니다`, 6); } });
+  // the leader sweeps; one soldier walks over to check the wall
+  const checker = patrol[2];
+  if (!spotted && !checker.dead) {
+    m.spawn(() => m.say('yoon', '(속삭임) 움직이지 마. 한 놈 온다.', { priority: 2 }));
+    const near = walk(checker, [V(79.5, 0, 38), V(77.4, 0, 34)]);
+    await Promise.race([near, m.until(() => spotted || distracted, 20)]);
+    if (!distracted && !spotted) await m.until(() => spotted || distracted, 5);
+  }
+  if (distracted && !spotted) {
+    await m.say('enemy', '…저쪽이다! 확인해!', { priority: 2 });
+    await Promise.race([Promise.all(patrol.map((e, i) => walk(e, [V(92 + i, 0, 26 + i * 1.5), V(96 + i, 0, 2)], { run: true }))), m.until(() => spotted, 25)]);
+  } else if (!spotted) {
+    await Promise.race([Promise.all(patrol.map((e, i) => walk(e, [V(82 + i, 0, 24 + i), V(86 + i, 0, 2 + i)]))), m.until(() => spotted, 40)]);
+  }
+  gone = !spotted; tick();
+  throwIt.enabled = false; game.player.removeInteractable(throwIt);
+  meterEl.remove(); torch.parent?.remove(torch);
+  for (const key of ['yoon', 'jung', 'doyun']) sq[key].unpose?.();
+  if (spotted) {
+    game.objectives.fail('stealth');
+    for (const e of patrol) { if (!e.dead) { e.setPassive(false); e.visionRange = 45; } }
+    attackOrder(game, patrol.filter((e) => !e.dead), game.player);
+    return 'spotted';
+  }
+  game.objectives.complete('stealth');
+  for (const e of patrol) if (!e.dead) game.director.remove(e);
+  return 'clear';
+}
+const pbrBlk = () => pbr('concrete', { color: 0xa09c90, key: 'stealthwall' });
+
 export const SEGMENTS = [
   // ============ 0. TRUCK RIDE (opening cinematic, player keeps free look) ============
   {
@@ -386,30 +490,16 @@ export const SEGMENTS = [
       game.effects.fireEmitter(V(13, lv.hf(13, -33) + 0.5, -33), 1.2); // generator shed burning
       m.spawn(async () => { await m.wait(5); await m.talk([['doyun', '마을 사람들은 다 대피했겠지예?'], ['yoon', '어제 소개령 떨어졌다. …떨어졌어야 한다.']]); });
       m.spawn(async () => { for (let i = 0; i < 4; i++) await artillery(game, m, V(40 + Math.random() * 80, 0, -10 - Math.random() * 30), { delay: 3 + Math.random() * 4, scale: 1.2, safeRadius: 18 }); });
-      // ---- STEALTH: an enemy recon patrol walks past — let it go ----
+      // ---- STEALTH: an enemy recon patrol sweeps the village edge — let it pass ----
       await m.until(() => game.player.position.z > 18);
-      const hide = [V(70, 0, 34), V(72.5, 0, 33), V(68, 0, 35.5)];
-      ['yoon', 'jung', 'doyun'].forEach((k, i) => { const a = sq[k]; a.setPassive(true); a.moveTo(hide[i], { run: true, crouch: true, face: V(90, 0, 40) }); });
-      game.objectives.add('hide', '정찰조가 지나갈 때까지 숨어서 대기 — 사격 금지', { marker: hide[1] });
-      await m.say('yoon', '멈춰! 바위 뒤로, 앉아. 정찰조다. 그냥 보내.', { priority: 3 });
-      game.ui.hint(`${keyName(game.input.binding('crouch'))} 앉아서 움직이지 마십시오. 들키면 교전이 시작됩니다.`, 6);
-      const patrol = spawnEnemies(game, [[112, 46], [114, 48], [116, 46.5]], { state: 'idle', visionRange: 13 });
-      patrol.forEach((e, i) => { e.patrol = [V(92, 0, 44 + i), V(85, 0, 28 + i), V(86, 0, 4), V(92, 0, -30)]; });
-      const spotted = () => patrol.some((e) => e.state === 'combat') || game.player.firingRecently;
-      const tS = m.time;
-      await m.until(() => spotted() || patrol.every((e) => e.dead || e.position.z < 2) || m.time - tS > 50);
-      const stealthOk = !spotted();
-      if (stealthOk) {
-        game.objectives.complete('hide');
-        for (const e of patrol) if (!e.dead) game.director.remove(e);
-        await m.say('yoon', '…지나갔다. 조용히 마을로 들어간다.', { priority: 3 });
-      } else {
-        game.objectives.fail('hide'); game.audio.setMusic('combat');
-        attackOrder(game, patrol.filter((e) => !e.dead), game.player);
+      const outcome = await stealthPatrol(game, m);
+      if (outcome === 'spotted') {
+        game.audio.setMusic('combat');
         await m.say('jung', '들켰다! 정찰조 사격!', { priority: 3 });
-        await m.until(() => patrol.every((e) => e.dead), 60);
+        await m.until(() => m.flags.patrol.every((e) => e.dead), 60);
+        for (const e of m.flags.patrol) if (!e.dead) e.kill(game.player.position);
         await m.say('yoon', '총소리 났다. 마을 쪽도 깨어났을 거다. 붙어서 가.', { priority: 3 });
-      }
+      } else await m.say('yoon', '…지나갔다. 숨 쉬어라, 민재. 조용히 마을로 들어간다.', { priority: 3 });
       for (const k of ['yoon', 'jung']) { sq[k].setPassive(false); sq[k].follow(game.player); }
       sq.doyun.setPassive(false); sq.doyun.follow(game.player);
       await m.until(() => game.player.position.z > 30);

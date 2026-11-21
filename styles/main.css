@@ -347,3 +347,12 @@ html.js #about { display: none; }
 @keyframes cardIn { from { opacity: 0; transform: translate(-50%, -40%); } to { opacity: 1; transform: translate(-50%, -50%); } }
 @keyframes cardOut { to { opacity: 0; transform: translate(-50%, -60%); } }
 .jammer-hud .bat .st { font-size: 12px; }
+
+.stealth-meter { position: absolute; left: 50%; top: 92px; transform: translateX(-50%); width: 300px; text-align: center; pointer-events: none; }
+.stealth-meter .lbl { font: 600 11px var(--mono); letter-spacing: 0.3em; color: #cfd8d2; }
+.stealth-meter .bar { height: 7px; background: rgba(255,255,255,0.12); margin: 5px 0 4px; border: 1px solid rgba(255,255,255,0.15); }
+.stealth-meter .bar i { display: block; height: 100%; width: 0; background: #9fd3ff; transition: width 0.1s linear; }
+.stealth-meter.warn .bar i { background: #ffd65a; } .stealth-meter.danger .bar i { background: #ff5a46; }
+.stealth-meter.danger { animation: pulse 0.4s infinite; }
+.stealth-meter .st { font-size: 13px; color: #e8eee8; text-shadow: 0 1px 2px #000; }
+#hud .obj .o.failed { color: #ff8a78; text-decoration: line-through; opacity: 0.8; }

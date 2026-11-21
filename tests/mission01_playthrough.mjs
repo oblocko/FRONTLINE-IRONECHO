@@ -69,8 +69,13 @@ try {
   await ev(() => { const g = window.__game; const p = g.player.position.clone(); p.set(97, g.world.heightFn(97, -98), -98); g.support.call(p); });
   await page.waitForTimeout(9000); await shot('m01_e2_mortar.png'); log('mortar called: ' + JSON.stringify(await stats()));
   for (let i = 0; i < 40; i++) { const n = await killAllEnemies(); if (n) log('cleared ' + n); const cp = await ev(() => window.__game.checkpointId); if (cp === 'fallback') break; await page.waitForTimeout(4000); }
-  await waitCP('fallback'); log('fallback through village'); await ev(() => { window.__game.timeScale = 3; window.__game.player.teleport({ x: 76, y: 0, z: 34 }, Math.PI); });
-  await page.waitForTimeout(8000); await shot('m01_f0_stealth.png'); log('stealth: ' + JSON.stringify(await stats()));
+  await waitCP('fallback'); log('fallback through village'); await ev(() => { window.__game.timeScale = 3; window.__game.player.teleport({ x: 72.4, y: 0, z: 34.5 }, -Math.PI / 2); window.__game.player.crouching = true; });
+  await page.waitForFunction(() => window.__game.objectives.get('stealth'), null, { timeout: 400000, polling: 500 });
+  await ev(() => { window.__game.timeScale = 1; }); await page.waitForTimeout(7000); await shot('m01_f0_stealth.png'); log('stealth: ' + JSON.stringify(await stats()));
+  await ev(() => { window.__game.timeScale = 3; });
+  await waitInteract('깡통'); await useInteract('깡통', false); log('tin thrown');
+  await page.waitForFunction(() => { const o = window.__game.objectives.get('stealth'); return o && (o.done || o.failed); }, null, { timeout: 400000, polling: 500 });
+  log('stealth result: ' + JSON.stringify(await ev(() => { const o = window.__game.objectives.get('stealth'); return { done: o.done, failed: o.failed, active: window.__game.objectives.active().map((x) => x.text) }; })));
   await waitInteract('박도윤'); await ev(() => { window.__game.timeScale = 1; }); await page.waitForTimeout(6000); log(JSON.stringify(await stats())); await shot('m01_f_ambush.png');
   await useInteract('박도윤'); await page.waitForTimeout(1500);
   await ev(() => window.__game.player.teleport({ x: 76.5, y: 0, z: 51.5 }, 0)); await page.waitForTimeout(800); await shot('m01_f2_drag.png');

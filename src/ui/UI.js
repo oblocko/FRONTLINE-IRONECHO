@@ -432,12 +432,12 @@ export class UI {
     });
     events.on('radio:active', (r) => { const el = $('.radio', hud); el.classList.toggle('hidden', !r); if (r) $('.who', el).textContent = `RADIO · ${r.speaker}`; });
     events.on('objectives:changed', (list) => {
-      const vis = list.filter((o) => !o.done || (performance.now() - (o._doneAt || 0)) < 4000).slice(-4);
+      const vis = list.filter((o) => (!o.done && !o.failed) || (performance.now() - (o._doneAt || 0)) < 4000).slice(-4);
       $('.obj', hud).style.display = vis.length ? '' : 'none';
-      $('.obj .list', hud).innerHTML = vis.map((o) => `<div class="o ${o.done ? 'done' : ''}">${esc(o.text)}${o.count ? `<span class="cnt">${o.progress}/${o.count}</span>` : ''}</div>`).join('');
+      $('.obj .list', hud).innerHTML = vis.map((o) => `<div class="o ${o.done ? 'done' : ''} ${o.failed ? 'failed' : ''}">${esc(o.text)}${o.count ? `<span class="cnt">${o.progress}/${o.count}</span>` : ''}</div>`).join('');
     });
     events.on('objective:new', (o) => { const el = $('.objpop', hud); $('.h', el).textContent = 'NEW OBJECTIVE // 새 목표'; $('.t', el).textContent = o.text; el.classList.add('on'); audio.ui('objective'); clearTimeout(this._op); this._op = setTimeout(() => el.classList.remove('on'), 3200); });
-    events.on('objective:complete', (o) => { o._doneAt = performance.now(); const el = $('.objpop', hud); $('.h', el).textContent = 'OBJECTIVE COMPLETE // 목표 달성'; $('.t', el).textContent = o.text; el.classList.add('on'); audio.ui('complete'); clearTimeout(this._op); this._op = setTimeout(() => { el.classList.remove('on'); events.emit('objectives:changed', this.game.objectives.list); }, 3000); });
+    events.on('objective:complete', (o) => { o._doneAt = performance.now(); const el = $('.objpop', hud); $('.h', el).textContent = 'OBJECTIVE COMPLETE // 목표 달성'; $('.t', el).textContent = o.text; el.classList.add('on'); audio.ui('complete'); clearTimeout(this._op); this._op = setTimeout(() => { el.classList.remove('on'); events.emit('objectives:changed', this.game.objectives.list); }, 3000); setTimeout(() => events.emit('objectives:changed', this.game.objectives.list), 4200); });
     events.on('hud:checkpoint', () => { const el = $('.toast', hud); el.classList.add('on'); audio.ui('checkpoint'); setTimeout(() => el.classList.remove('on'), 2600); });
     events.on('player:damaged', (d) => {
       const box = $('.dmg', hud); const i = document.createElement('i'); i.style.transform = `rotate(${-d.angle}rad)`; box.appendChild(i);

@@ -14,7 +14,8 @@ export class Objectives {
   setMarker(id, pos) { const o = this.get(id); if (o) { o.marker = pos ? pos.clone() : null; this.changed(); } }
   setMarkers(id, list) { const o = this.get(id); if (o) { o.markers = list.map((p) => p.clone()); this.changed(); } }
   complete(id) { const o = this.get(id); if (!o || o.done) return; o.done = true; o.marker = null; o.markers = null; events.emit('objective:complete', o); this.changed(); }
-  fail(id) { const o = this.get(id); if (!o) return; o.failed = true; this.changed(); }
+  // failed objectives show struck-through for a few seconds, then leave the list
+  fail(id) { const o = this.get(id); if (!o || o.failed || o.done) return; o.failed = true; o._doneAt = performance.now(); this.changed(); setTimeout(() => this.changed(), 4100); }
   active() { return this.list.filter((o) => !o.done && !o.failed); }
   clear() { this.list = []; this.changed(); }
   changed() { events.emit('objectives:changed', this.list); }
