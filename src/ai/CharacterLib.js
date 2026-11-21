@@ -120,7 +120,9 @@ function prepBody(gltf) {
     sm.bind(body.skeleton, body.bindMatrix); sm.frustumCulled = false; sm.castShadow = true; sm.receiveShadow = true;
     body.parent.add(sm); sm.position.copy(body.position); sm.quaternion.copy(body.quaternion); sm.scale.copy(body.scale);
   }
-  return { scene, body, rest };
+  // face front at eye level (for eyewear placement)
+  let faceZ = -1; for (let i = 0; i < n; i++) if (za[i * 4] > 0.5 && Math.abs(pos.getY(i) - eyeY) < 0.02 && Math.abs(pos.getX(i)) < 0.05) faceZ = Math.max(faceZ, pos.getZ(i));
+  return { scene, body, rest, eyeY, faceZ };
 }
 
 export function loadCharacters() {
@@ -263,9 +265,46 @@ const gearMats = (key) => GM[key] ||= {
   camo: pbr({ rok_sf: 'camoROKSF', rok_707: 'fabric', rok: 'camoROK', kpa: 'camoKPA', kpa_sf: 'camoKPASF', kpa_sfb: 'camoKPABrown', us: 'camoUS' }[key] || 'fabric', { repeat: [1.5, 1.5], color: key === 'kpa_officer' ? 0x6a6246 : key === 'rok_707' ? 0x2a2b2e : key === 'police' ? 0x1f2a44 : 0xffffff, key: `gcamo_${key}` }),
   dark: std(0x1c1d1e, 0.55, 0.3), sole: std(0x111111, 0.9), boot: std(LOOKS[key]?.boot ?? 0x1c1a17, 0.7),
   leather: std(0x5a3418, 0.55, 0.05), red: std(0x8a1c1c, 0.6), gold: std(0xc8a040, 0.35, 0.8), fur: pbr('fabric', { color: 0x5a5236, repeat: [8, 8], key: 'fur' }),
-  cap: std(key === 'police' ? 0x1c2436 : 0x3a3d32, 0.8), lens: std(0x101418, 0.2, 0.6), tint: std(0xc86a20, 0.15, 0.7), subdued: std(0x3a3b34, 0.85), subdued2: std(0x2a2b26, 0.85),
+  cap: std(key === 'police' ? 0x1c2436 : 0x3a3d32, 0.8), lens: std(0x101418, 0.2, 0.6), tint: new THREE.MeshStandardMaterial({ color: 0xd8701e, metalness: 1, roughness: 0.08, transparent: true, opacity: 0.92, side: THREE.DoubleSide }), smoke: new THREE.MeshStandardMaterial({ color: 0x3a4a52, metalness: 0.85, roughness: 0.04, transparent: true, opacity: 0.6, envMapIntensity: 1.5, side: THREE.DoubleSide }), clear: new THREE.MeshStandardMaterial({ color: 0x9ab0b8, metalness: 0.6, roughness: 0.05, transparent: true, opacity: 0.45, side: THREE.DoubleSide }), frame: std(0x141516, 0.6, 0.1), subdued: std(0x3a3b34, 0.85), subdued2: std(0x2a2b26, 0.85),
   coat: (() => { const m = pbr('fabric', { color: 0x7e7652, repeat: [3, 3], key: 'greatcoat' }).clone(); m.side = THREE.DoubleSide; return m; })(),
 };
+
+
+// eyewear built around the face: curved lens band with rims and a strap
+function goggles(P, M, lensMat, x, y, cz, R, strapBack) {
+  P('Head', lensMat, new THREE.CylinderGeometry(R, R, 0.046, 24, 1, true, -0.78, 1.56).translate(x, y, cz));
+  for (const dy of [-0.025, 0.025]) P('Head', M.frame, new THREE.CylinderGeometry(R + 0.003, R + 0.003, 0.008, 24, 1, true, -0.8, 1.6).translate(x, y + dy, cz));
+  for (const sx of [-1, 1]) P('Head', M.frame, T(roundedBox(0.012, 0.054, 0.022, 0.004), x + sx * Math.sin(0.8) * R, y, cz + Math.cos(0.8) * R, 0, sx * 0.8, 0));
+  P('Head', M.frame, new THREE.CylinderGeometry(R + 0.006, R + 0.006, 0.02, 28, 1, true, strapBack ? 0.8 : 0.85, Math.PI * 2 - (strapBack ? 1.6 : 1.7)).translate(x, y, cz));
+}
+// shooting glasses: two rounded lenses bent onto the face curve, thin brow bar, bridge, temples
+function bentShape(shape, R, cz, y, wrapStart, mir = 1) {
+  const g = new THREE.ShapeGeometry(shape, 6), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) { const a = wrapStart + mir * p.getX(i) / R, yy = p.getY(i); p.setXYZ(i, Math.sin(a) * R, y + yy, cz + Math.cos(a) * R); }
+  g.computeVertexNormals(); return g;
+}
+function lensOutline(w, h, sx) {
+  // eye-shaped lens: flat top, rounded outer-bottom, nose cut on the inner side
+  const s = new THREE.Shape(), x0 = 0, x1 = w * sx;
+  s.moveTo(x0 + 0.004 * sx, h * 0.5);
+  s.lineTo(x1 - 0.004 * sx, h * 0.5);
+  s.quadraticCurveTo(x1, h * 0.5, x1, h * 0.2);
+  s.quadraticCurveTo(x1, -h * 0.5, x1 - w * 0.45 * sx, -h * 0.5);
+  s.quadraticCurveTo(x0 + w * 0.12 * sx, -h * 0.5, x0, -h * 0.05);
+  s.lineTo(x0, h * 0.3);
+  s.quadraticCurveTo(x0, h * 0.5, x0 + 0.004 * sx, h * 0.5);
+  return s;
+}
+function glasses(P, M, lensMat, y, faceZ) {
+  const R = 0.1, cz = faceZ + 0.014 - R, w = 0.052, h = 0.034;
+  for (const sx of [-1, 1]) {
+    const g = bentShape(lensOutline(w, h, 1), R, cz, y, sx * 0.07, sx);
+    P('Head', lensMat, g);
+    P('Head', M.frame, new THREE.CylinderGeometry(R + 0.002, R + 0.002, 0.005, 10, 1, true, sx > 0 ? 0.06 : -0.07 - w / R, w / R + 0.01).translate(0, y + h * 0.5, cz));
+    P('Head', M.frame, T(roundedBox(0.004, 0.005, 0.11, 0.002), sx * Math.sin(0.07 + w / R) * (R + 0.002), y + h * 0.42, cz + Math.cos(0.07 + w / R) * R - 0.054, 0, sx * 0.22, 0));
+  }
+  P('Head', M.frame, T(roundedBox(0.016, 0.006, 0.006, 0.002), 0, y + h * 0.42, faceZ + 0.015));
+}
 
 // returns [{ bone, geometry, material }] (geometry in the bone's local space)
 export function gearFor(kind, key, hat, variant, sex = 'm') {
@@ -289,7 +328,7 @@ export function gearFor(kind, key, hat, variant, sex = 'm') {
     P('Head', M.shell, T(sphere(0.142, 1, 0.92, 1.1, 24, 12, Math.PI * 0.6), hc.x, hc.y + 0.015, hc.z - 0.01));
     P('Head', M.shell, T(new THREE.TorusGeometry(0.142, 0.008, 4, 28).scale(1, 1.1, 1), hc.x, hc.y + 0.015 - 0.04, hc.z - 0.01, Math.PI / 2));
     for (const sx of [-1, 1]) P('Head', M.dark, T(roundedBox(0.008, 0.09, 0.012, 0.003), hc.x + sx * 0.1, hc.y - 0.085, hc.z + 0.03, 0.25));
-    if (variant % 3 === 2) { P('Head', M.dark, T(new THREE.TorusGeometry(0.143, 0.01, 4, 24), hc.x, hc.y + 0.06, hc.z - 0.01, Math.PI / 2)); P('Head', M.lens, T(roundedBox(0.15, 0.04, 0.03, 0.012), hc.x, hc.y + 0.075, hc.z + 0.13)); }
+    if (variant % 3 === 2) goggles(P, M, M.clear, 0, hc.y + 0.07, hc.z - 0.01, 0.146, true);   // goggles pushed up on the helmet
   } else if (hat === 'helmet') {
     // modern ballistic helmet (high cut) with cover, rails, shroud
     P('Head', M.shell, T(sphere(0.134, 1, 0.94, 1.1, 22, 10, Math.PI * 0.5), hc.x, hc.y + 0.02, hc.z - 0.008));
@@ -297,7 +336,9 @@ export function gearFor(kind, key, hat, variant, sex = 'm') {
     P('Head', M.dark, T(roundedBox(0.05, 0.034, 0.022, 0.006), hc.x, hc.y + 0.1, hc.z + 0.135, -0.4));
     const headset = key === 'kpa' || key === 'kpa_sfb' || key === 'rok_sf' || key === 'rok_707' || key === 'us';
     // eye protection: shooting glasses / goggles (707: tinted lenses)
-    if (key === 'rok_sf' || key === 'rok_707') P('Head', key === 'rok_707' ? M.tint : M.lens, T(roundedBox(0.15, 0.036, 0.026, 0.012), hc.x, hc.y - 0.006, hc.z + 0.124));
+    const ey = LIB[sex].eyeY, fz = LIB[sex].faceZ;
+    if (key === 'rok_707') goggles(P, M, M.tint, 0, ey + 0.004, fz + 0.016 - 0.105, 0.105, false);
+    else if (key === 'rok_sf') glasses(P, M, M.smoke, ey + 0.002, fz + 0.012);
     if (headset) for (const sx of [-1, 1]) { P('Head', M.dark, T(cyl(0.045, 0.045, 0.04, 14), hc.x + sx * 0.125, hc.y - 0.035, hc.z, 0, 0, Math.PI / 2)); }
     const nvg = key === 'kpa_sf' || key === 'kpa_sfb' || (key === 'us' && variant % 3 === 1);
     if (nvg) { for (const sx of [-1, 1]) P('Head', M.lens, T(cyl(0.017, 0.02, 0.07, 10), hc.x + sx * 0.032, hc.y + 0.085, hc.z + 0.17, Math.PI / 2)); P('Head', M.dark, T(roundedBox(0.09, 0.03, 0.04, 0.008), hc.x, hc.y + 0.1, hc.z + 0.15)); }
