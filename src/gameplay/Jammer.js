@@ -52,8 +52,15 @@ export class Jammer {
     (game.ui.hud || document.body).appendChild(this.el);
     this.hum = null;
   }
-  get key() { return `${keyName(this.game.input.binding('support'))} 또는 ${keyName(this.game.input.binding('weapon3'))}`; }
-  announce() { this.game.ui.hint(`${this.key} 재밍건 들기/내리기 · <b>좌클릭 유지</b>로 드론을 원 안에 붙잡아 두면 통제 신호가 끊깁니다`, 8); }
+  get key() { return keyName(this.game.input.binding('support')); }
+  announce() {
+    // big centred key card so the player can't miss how to raise the jammer
+    const card = document.createElement('div'); card.className = 'gadget-card';
+    card.innerHTML = `<div class="tag">새 장비 지급 // EW JAMMER</div><div class="row"><kbd class="big">${this.key}</kbd><div><b>재밍건 들기 / 내리기</b><span>들고 있는 동안 <b>좌클릭을 누르고 있으면</b> 원 안의 드론 통제 신호가 끊깁니다</span></div></div><div class="foot">총으로 바꾼 뒤에도 언제든 <b>${this.key}</b> 키로 다시 들 수 있습니다</div>`;
+    (this.game.ui.hud || document.body).appendChild(card);
+    const t0 = performance.now(); const tick = () => { if (this.active || performance.now() - t0 > 9000) { card.classList.add('out'); setTimeout(() => card.remove(), 500); } else requestAnimationFrame(tick); }; requestAnimationFrame(tick);
+    this.game.audio.click(0.25, 1200, 0.08);
+  }
   toggle(on = !this.active) {
     const g = this.game, p = g.player;
     if (on && (p.seat || !p.alive)) return;
@@ -77,7 +84,6 @@ export class Jammer {
   update(dt) {
     const g = this.game, inp = g.input, p = g.player, cam = g.renderer.camera;
     if (inp.pressed('support')) this.toggle();
-    else if (inp.pressed('weapon3') && !this.active) this.toggle(true);
     if (this.active && (!p.alive || p.seat || g.state !== 'playing')) this.toggle(false);
     if (this.active && (inp.pressed('weapon1') || inp.pressed('weapon2') || inp.mouse.wheel !== 0 || inp.pressed('reload'))) this.toggle(false);
     this.raise += ((this.active ? 1 : 0) - this.raise) * Math.min(1, dt * 10);
@@ -115,7 +121,7 @@ export class Jammer {
     el.querySelector('.bat').classList.toggle('hidden', !!this.game.player.seat);
     el.querySelector('.bat i').style.width = `${Math.round(this.battery * 100)}%`;
     el.querySelector('.bat').classList.toggle('low', this.battery < 0.2);
-    el.querySelector('.bat .st').textContent = firing ? '교란 중' : this.empty ? '방전 — 충전 중' : this.active ? '대기 · 좌클릭 유지로 교란' : `재밍건 들기: ${this.key}`;
+    el.querySelector('.bat .st').textContent = firing ? '교란 중' : this.empty ? '방전 — 충전 중' : this.active ? '대기 · 좌클릭 유지로 교란' : `재밍건 들기: [${this.key}] 키`;
     // cone ring sized to the jamming angle at the current FOV
     const px = Math.tan(CONE) / Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * H / 2;
     const ring = el.querySelector('.ring'); ring.style.width = ring.style.height = `${px * 2}px`;

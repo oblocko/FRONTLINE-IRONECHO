@@ -9,7 +9,7 @@ export const DEFAULT_BINDINGS = {
   forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD',
   sprint: 'ShiftLeft', crouch: 'KeyC', jump: 'Space',
   reload: 'KeyR', interact: 'KeyF', grenade: 'KeyG',
-  weapon1: 'Digit1', weapon2: 'Digit2', weapon3: 'Digit3', melee: 'KeyV',
+  weapon1: 'Digit1', weapon2: 'Digit2', melee: 'KeyV',
   pause: 'Escape', objectives: 'Tab', support: 'KeyB', flashlight: 'KeyL',
 };
 

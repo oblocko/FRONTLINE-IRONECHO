@@ -257,7 +257,7 @@ export class UI {
           seg('마우스 Y축 반전', 'controls.invertY', [[true, 'ON'], [false, 'OFF']]), seg('조준 방식', 'controls.adsToggle', [[false, 'HOLD'], [true, 'TOGGLE']]),
           seg('컨트롤러', 'controls.gamepadEnabled', [[true, 'ON'], [false, 'OFF']], `표준 게임패드 매핑 지원 · 현재 ${navigator.getGamepads ? ([...navigator.getGamepads()].filter(Boolean).length ? '연결됨' : '연결 안 됨') : '미지원'}`),
           slider('컨트롤러 감도', 'controls.gamepadSensitivity', 0.3, 2.5, 0.05, (v) => v.toFixed(2)));
-        const names = { forward: '전진', back: '후진', left: '좌측 이동', right: '우측 이동', sprint: '달리기', crouch: '앉기', jump: '점프 / 넘기', reload: '재장전', interact: '상호작용', grenade: '수류탄', support: '쌍안경 / 화력 지원', flashlight: '손전등', weapon1: '주무기', weapon2: '보조무기', weapon3: '장비 (재밍건)', pause: '일시정지', objectives: '목표 보기' };
+        const names = { forward: '전진', back: '후진', left: '좌측 이동', right: '우측 이동', sprint: '달리기', crouch: '앉기', jump: '점프 / 넘기', reload: '재장전', interact: '상호작용', grenade: '수류탄', support: '쌍안경 / 화력 지원 / 재밍건', flashlight: '손전등', weapon1: '주무기', weapon2: '보조무기', pause: '일시정지', objectives: '목표 보기' };
         for (const [act, label] of Object.entries(names)) {
           const row = h(`<div class="setrow"><label>${label}</label><div><button class="keybtn">${keyName(S.controls.bindings[act])}</button></div><span class="val"></span></div>`);
           const b = $('button', row);
