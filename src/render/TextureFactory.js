@@ -107,6 +107,33 @@ const clamp01 = (x) => Math.min(1, Math.max(0, x));
 const mix = (a, b, t) => a + (b - a) * t;
 const hex = (h) => [((h >> 16) & 255) / 255, ((h >> 8) & 255) / 255, (h & 255) / 255];
 
+
+// digital camo: square pixels whose colour comes from two layered noise fields
+function digitalCamo(size, seed, pal, cells) {
+  const A = makeNoiseSet(seed, 4, 4), B = makeNoiseSet(seed + 10, 8, 4), C = makeNoiseSet(seed + 20, 64, 1);
+  const P = pal.map(hex);
+  return buildTextures(size, (u, v, x, y) => {
+    const cu = (Math.floor(u * cells) + 0.5) / cells, cv = (Math.floor(v * cells) + 0.5) / cells;
+    const a = fbm(A, cu, cv, 4, 4), b = fbm(B, cu, cv, 3, 8);
+    let c = P[0]; if (a > 0.53) c = P[1]; if (b > 0.58) c = P[2]; if (a > 0.63 && b < 0.47) c = P[3];
+    if (P[4] && a < 0.42 && b > 0.5) c = P[4];
+    const fab = C[0].at(x * 0.5, y * 0.5) * 0.05;
+    return { r: c[0] + fab, g: c[1] + fab, b: c[2] + fab, h: fab * 8, rough: 0.95 };
+  }, { normalStrength: 0.8 });
+}
+// organic blotch camo: base colour with layered shapes and a few light flecks
+function blotchCamo(size, seed, base, layers, fleck) {
+  const N = layers.map((_, i) => makeNoiseSet(seed + i * 7, 3 + i, 4)), F = makeNoiseSet(seed + 50, 16, 2), C = makeNoiseSet(seed + 60, 64, 1);
+  const B0 = hex(base), L = layers.map(([c, t]) => [hex(c), t]), FL = hex(fleck);
+  return buildTextures(size, (u, v, x, y) => {
+    let c = B0;
+    L.forEach(([col, t], i) => { if (fbm(N[i], u, v, 4, 3 + i) > t) c = col; });
+    if (fbm(F, u, v, 2, 16) > 0.79) c = FL;
+    const fab = C[0].at(x * 0.5, y * 0.5) * 0.05;
+    return { r: c[0] + fab, g: c[1] + fab, b: c[2] + fab, h: fab * 8, rough: 0.95 };
+  }, { normalStrength: 0.8 });
+}
+
 // ---------- material recipes ----------
 const RECIPES = {
   concrete(size) {
@@ -212,28 +239,20 @@ const RECIPES = {
       return { r: base * 1.25, g: base * 0.62, b: base * 0.5, h: 0.6 + n * 0.3, rough: 0.88 };
     }, { normalStrength: 3.0 });
   },
-  camoROK(size) {
-    // Original digital-style woodland camouflage (stylised, not an official pattern copy)
-    const A = makeNoiseSet(221, 4, 4), B = makeNoiseSet(231, 4, 4), C = makeNoiseSet(241, 64, 1);
-    const pal = [hex(0x4a5236), hex(0x2f3524), hex(0x6b6447), hex(0x1d1f17)];
-    return buildTextures(size, (u, v, x, y) => {
-      const px = Math.floor(x / (size / 128)), py = Math.floor(y / (size / 128));
-      const a = fbm(A, px / 128, py / 128, 4, 4), b = fbm(B, px / 128, py / 128, 4, 4);
-      let c = pal[0]; if (a > 0.56) c = pal[1]; if (b > 0.6) c = pal[2]; if (a > 0.66 && b < 0.4) c = pal[3];
-      const fab = C[0].at(x * 0.5, y * 0.5) * 0.06;
-      return { r: c[0] + fab, g: c[1] + fab, b: c[2] + fab, h: fab * 8, rough: 0.95 };
-    }, { normalStrength: 0.8 });
-  },
-  camoUS(size) {
-    // Original arid multi-tone pattern for allied US troops (stylised, not an official pattern copy)
-    const A = makeNoiseSet(291, 3, 4), B = makeNoiseSet(301, 6, 4), C = makeNoiseSet(311, 64, 1);
-    const pal = [hex(0x8a7a5c), hex(0x6e6347), hex(0xa2916c), hex(0x585a3e)];
-    return buildTextures(size, (u, v, x, y) => {
-      const a = fbm(A, u, v, 4, 3), b = fbm(B, u, v, 4, 6); let c = pal[0]; if (a > 0.58) c = pal[1]; if (b > 0.62) c = pal[2]; if (a < 0.36 && b < 0.45) c = pal[3];
-      const fab = C[0].at(x * 0.5, y * 0.5) * 0.05;
-      return { r: c[0] + fab, g: c[1] + fab, b: c[2] + fab, h: fab * 8, rough: 0.95 };
-    }, { normalStrength: 0.8 });
-  },
+  // ---- uniform camouflage (original patterns in the style of each army's issue) ----
+  // ROK: small-pixel digital woodland (light olive / olive / brown / black)
+  // ROK Army "granite" digital: light grey-brown, dark (conifer) green, light (grass) green, brown, black
+  camoROK(size) { return digitalCamo(size, 221, [0x66694a, 0x37422c, 0x857e6a, 0x221e19, 0x56452f], 56); },
+  // ROK special warfare pixel: finer, darker, more green/brown/black
+  camoROKSF(size) { return digitalCamo(size, 231, [0x5e5a46, 0x313b26, 0x4a3a28, 0x16171a, 0x4a5636], 96); },
+  // KPA special forces (brown variant): coarse brown digital on tan
+  camoKPABrown(size) { return digitalCamo(size, 341, [0x86775a, 0x5c4a32, 0x2e2820, 0x6c6648], 40); },
+  // KPA regular army: multi-tone blotches on khaki (tan / olive / brown / dark, small light flecks)
+  camoKPA(size) { return blotchCamo(size, 351, 0x87765a, [[0x5a5a3a, 0.55], [0x5c4430, 0.6], [0x302a20, 0.68]], 0xa49674); },
+  // KPA special forces (blue): slate / lavender grey blotches
+  camoKPASF(size) { return blotchCamo(size, 361, 0x6a6b74, [[0x4a4c58, 0.54], [0x6c6474, 0.62], [0x2c2d34, 0.68]], 0x8e909a); },
+  // US: OCP-style (tan base, olive and brown shapes, dark specks)
+  camoUS(size) { return blotchCamo(size, 291, 0x8e8466, [[0x5c6244, 0.57], [0x6a5440, 0.62], [0x34302a, 0.72]], 0xa49c7e); },
   camoEnemy(size) {
     const A = makeNoiseSet(251, 3, 4), C = makeNoiseSet(261, 64, 1);
     const pal = [hex(0x5a5a3c), hex(0x3d3f2a), hex(0x6f6a4c)];

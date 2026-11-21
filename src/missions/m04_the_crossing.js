@@ -8,6 +8,7 @@
 // on the LZ and a timed hold against the counter-attack · the fog lifts on the
 // allied fleet; a US comms officer tells Lee Seo-yeon about forged intercepts.
 import * as THREE from 'three';
+import { setEnemyMix } from '../ai/CharacterLib.js';
 import { CoastalPort, PORT } from '../world/levels/CoastalPort.js';
 import { buildAPC } from '../world/Props.js';
 import { events } from '../core/Events.js';
@@ -76,6 +77,7 @@ function followAll(game) { for (const a of allies(game)) { a.unpose(); a.setPass
 function ensureSupport(game, calls = 2) { if (!game.support) game.support = new FireSupport(game, { calls, rounds: 5, spread: 8, delay: 5.5, caller: 'reyes' }); else game.support.calls = Math.max(game.support.calls, calls); }
 
 export async function build(game) {
+  setEnemyMix({ kpa: 0.7, kpa_sf: 0.2, kpa_officer: 0.1 });   // enemy unit types for this mission (uniform / gear)
   const lv = new CoastalPort(game); game.level = lv; await lv.build();
   const d = game.director; d.visionRange = 60;
   game.squad = {

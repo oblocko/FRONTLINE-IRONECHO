@@ -7,7 +7,7 @@
 //            pointing / halt gestures, head look-at.
 // Same public interface as the procedural Actor (target / anim / rayTest / die …).
 import * as THREE from 'three';
-import { characterLib, cloneBody, bodyMaterial, gearFor } from './CharacterLib.js';
+import { characterLib, cloneBody, bodyMaterial, garmentMaterial, maskMaterial, gearFor, lookKey, lookFor, LOOKS, buildNpcWeapon, weaponTypeFor, vhash } from './CharacterLib.js';
 import { buildNpcRifle } from './HumanModel.js';
 
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -49,17 +49,25 @@ const ONESHOT = new Set(['Death01', 'Hit_Chest', 'Hit_Head', 'OverhandThrow']);
 const FINGERS = ['index', 'middle', 'ring', 'pinky'];
 
 export class ModelActor {
-  constructor(scene, { faction = 'rok', name = '', variant = 0, scale = 1, weapon = true, hat = 'helmet' } = {}) {
+  constructor(scene, { faction = 'rok', name = '', variant = 0, scale = 1, weapon = true, hat = 'helmet', look: lookOverride = null } = {}) {
     const lib = characterLib();
     this.faction = faction; this.name = name; this.variant = variant; this.isModel = true;
     const civ = faction === 'civ';
-    const sex = civ && lib.f && variant % 3 === 1 ? 'f' : 'm'; this.sex = sex;
+    const look = lookOverride || lookKey(faction, variant, weapon, hat); this.look = look;
+    const sex = lib.f && ((civ && variant % 3 === 1) || (look === 'us' && variant % 4 === 3)) ? 'f' : 'm'; this.sex = sex;
+    if (look === 'kpa_officer') hat = 'officer';
     this.root = new THREE.Group(); this.root.scale.setScalar(scale); this.root.userData.dynamic = true; scene.add(this.root);
     this.model = cloneBody(sex); this.root.add(this.model);
-    const look = civ ? 'civ' : (!weapon && hat === 'cap') ? 'police' : faction;
     this.bones = {}; let body = null;
     this.model.traverse((o) => { if (o.isBone) this.bones[o.name] = o; if (o.isSkinnedMesh && (!body || o.geometry.attributes.position.count > body.geometry.attributes.position.count)) body = o; });
     body.material = bodyMaterial(body.material, look, variant);
+    // garments: real cloth shells (long or short sleeves), balaclava / neck gaiter
+    const lk = lookFor(look, variant); const shells = {}; this.model.traverse((o) => { if (o.name?.startsWith('shell_')) shells[o.name.slice(6)] = o; });
+    const sleeve = (lk.sleeve ?? 1) ? 'long' : 'short';
+    if (shells[sleeve]) { shells[sleeve].visible = true; shells[sleeve].material = garmentMaterial(look, variant); }
+    if (lk.mask && shells.mask) { shells.mask.visible = true; shells.mask.material = maskMaterial(lk.mask, look); this.model.traverse((o) => { if (o.isSkinnedMesh && /hair/i.test(o.material?.name || '')) o.visible = false; }); }
+    else if (lk.gaiter && vhash(variant * 13 + 5) < lk.gaiter && shells.gaiter) { shells.gaiter.visible = true; shells.gaiter.material = maskMaterial('camo', look); }
+    for (const [k, o] of Object.entries(shells)) if (!o.visible) o.parent.remove(o);
     const B = this.bones;
     // hair / eyebrows (rest-space meshes re-parented to the head bone)
     const rest = lib[sex].restMatrix || (lib[sex].restMatrix = (() => { const o = {}; lib[sex].scene.updateMatrixWorld(true); lib[sex].scene.traverse((n) => { if (n.isBone) o[n.name] = n.matrixWorld.clone(); }); return o; })());
@@ -70,22 +78,28 @@ export class ModelActor {
       const m = new THREE.Mesh(src.geometry, mat); m.matrixAutoUpdate = false; m.matrix.multiplyMatrices(headInv, src.matrixWorld); m.castShadow = true; B.Head.add(m);
     };
     const HAIRC = [0x1a1410, 0x2a1d14, 0x0f0d0b, 0x3a2a1c, 0x55463a];
-    addHair(sex === 'f' ? 'eyebrows_female' : 'eyebrows_regular', 0x1a1410);
+    // individual variation: head proportions, build and height
+    const r = (k) => { const x = Math.sin((variant + 1) * 12.9898 + k * 78.233) * 43758.5453; return x - Math.floor(x); };
+    B.Head.scale.set(0.95 + r(1) * 0.09, 0.96 + r(2) * 0.08, 0.96 + r(3) * 0.07);
+    B.spine_03.scale.set(0.94 + r(4) * 0.1, 1, 0.95 + r(5) * 0.08);
+    this.model.scale.setScalar((sex === 'f' ? 0.94 : 0.97) + r(6) * 0.07);
+    if (!LOOKS[look]?.mask) addHair(sex === 'f' ? 'eyebrows_female' : 'eyebrows_regular', [0x1a1410, 0x2a1d14, 0x0f0d0b, 0x3a2a1c][variant % 4]);
     if (hat === 'none' || hat === 'headset') {
       const pick = sex === 'f' ? ['hair_long', 'hair_buns', 'hair_buzzedfemale'][variant % 3] : ['hair_simpleparted', 'hair_buzzed', 'hair_simpleparted'][variant % 3];
       addHair(pick, HAIRC[variant % HAIRC.length]);
       if (sex === 'm' && civ && variant % 5 === 3) addHair('hair_beard', HAIRC[variant % HAIRC.length]);
+    } else if (look === 'us' && sex === 'm' && variant % 5 === 4) { addHair('hair_beard', HAIRC[variant % HAIRC.length]);
     } else if (hat === 'cap') addHair('hair_buzzed', HAIRC[variant % HAIRC.length]);
     // rigid gear
-    for (const g of gearFor(civ ? 'civ' : weapon ? 'soldier' : 'unarmed', look === 'police' ? 'police' : faction, hat, variant, sex)) {
+    for (const g of gearFor(civ ? 'civ' : weapon ? 'soldier' : 'unarmed', look, hat, variant, sex)) {
       const m = new THREE.Mesh(g.geometry, g.material); m.castShadow = true; m.receiveShadow = true; B[g.bone]?.add(m);
     }
     // the rifle lives in actor space (not on a bone) so the clip's arm swing can't shake it
     this.weapon = null;
     if (weapon) {
       this.weaponPivot = new THREE.Group(); this.root.add(this.weaponPivot);
-      this.weapon = buildNpcRifle(); this.weaponPivot.add(this.weapon);
-      this.muzzle = new THREE.Object3D(); this.muzzle.position.set(0, 0.005, 0.77); this.weapon.add(this.muzzle);
+      this.weapon = buildNpcWeapon(weaponTypeFor(look)); this.weaponPivot.add(this.weapon);
+      this.muzzle = new THREE.Object3D(); this.muzzle.position.set(0, 0.005, this.weapon.userData.muzzleZ); this.weapon.add(this.muzzle);
       this.gripR = new THREE.Vector3(0.0, -0.055, -0.035); this.gripL = new THREE.Vector3(0.0, -0.03, 0.25);
     }
     // animation

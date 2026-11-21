@@ -2,6 +2,7 @@
 // POV: PVT Han Min-jae. 2029-03-14 04:52 KST, central-front GOP sector.
 // Segments (checkpoints): truck → gp → op_move → op_radio → fallback → village → extraction
 import * as THREE from 'three';
+import { setEnemyMix } from '../ai/CharacterLib.js';
 import { pbr } from '../render/TextureFactory.js';
 import { GopSector, LAYOUT } from '../world/levels/GopSector.js';
 import { buildAPC, buildHelicopter } from '../world/Props.js';
@@ -19,6 +20,7 @@ export const EPILOGUE = '2029년 3월 14일 05시 31분. 한반도 전역에서 
 // build: level + persistent actors
 // ------------------------------------------------------------------
 export async function build(game) {
+  setEnemyMix({ kpa_sf: 0.45, kpa_sfb: 0.2, kpa: 0.25, kpa_officer: 0.1 });   // enemy unit types for this mission (uniform / gear)
   const level = new GopSector(game);
   game.level = level;
   await level.build(() => {});

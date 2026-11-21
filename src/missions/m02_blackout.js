@@ -5,6 +5,7 @@
 // defusing a timed charge · leading civilians · bus escort from a truck-mounted MG ·
 // overpass collapse.
 import * as THREE from 'three';
+import { setEnemyMix } from '../ai/CharacterLib.js';
 import { YeonseoCity, CITY } from '../world/levels/YeonseoCity.js';
 import { buildTruck } from '../world/Props.js';
 import { events } from '../core/Events.js';
@@ -19,6 +20,7 @@ export const TEXTURES = ['concrete', 'asphalt', 'dirt', 'metal', 'paintedMetal',
 export const EPILOGUE = '연서시 시민 3만 2천 명이 그날 오후까지 남쪽으로 빠져나갔다. 시장 구역은 저녁 무렵 불길에 잠겼다. 이서연 중위는 그날 밤, 사단 명령 전문 열한 건 중 세 건의 서명 방식이 다른 것과 미세하게 다르다는 사실을 처음 기록했다.';
 
 export async function build(game) {
+  setEnemyMix({ kpa_sf: 0.5, kpa_sfb: 0.3, kpa: 0.2 });   // enemy unit types for this mission (uniform / gear)
   const lv = new YeonseoCity(game); game.level = lv; await lv.build();
   const d = game.director; d.visionRange = 55;
   game.squad = {

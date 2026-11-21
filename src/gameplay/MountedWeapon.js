@@ -11,8 +11,8 @@ import { settings } from '../core/Settings.js';
 const settingsFov = () => settings.data.graphics.fov;
 
 const DEFS = {
-  mg: { name: '다목적 기관총', interval: 0.075, damage: 48, headMult: 2, range: 400, spread: 0.012, heatPerShot: 0.022, cool: 0.32, kick: 0.004, sound: 'rifle', vehicleDamage: 12 },
-  apc: { name: '30mm 기관포', interval: 0.33, damage: 200, headMult: 1, range: 600, spread: 0.004, heatPerShot: 0.09, cool: 0.38, kick: 0.012, sound: 'rifle', vehicleDamage: 140,
+  mg: { name: 'M60 기관총', interval: 0.075, damage: 48, headMult: 2, range: 400, spread: 0.012, heatPerShot: 0.022, cool: 0.32, kick: 0.004, sound: 'rifle', vehicleDamage: 12 },
+  apc: { name: 'K21 30mm 기관포', interval: 0.33, damage: 200, headMult: 1, range: 600, spread: 0.004, heatPerShot: 0.09, cool: 0.38, kick: 0.012, sound: 'rifle', vehicleDamage: 140,
     explosive: { radius: 3.6, damage: 160, owner: 'player', scale: 0.55, playerSafe: true } },
 };
 

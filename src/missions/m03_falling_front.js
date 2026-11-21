@@ -8,6 +8,7 @@
 // collapse and fighting retreat to the medevac point · the medevac truck
 // vanishes beyond the shelling: Park Do-yun is missing.
 import * as THREE from 'three';
+import { setEnemyMix } from '../ai/CharacterLib.js';
 import { HantanRiver, RIVER } from '../world/levels/HantanRiver.js';
 import { buildTruck } from '../world/Props.js';
 import { events } from '../core/Events.js';
@@ -59,6 +60,7 @@ function squadToLine(game) {
 function ensureSupport(game) { if (!game.support) game.support = new FireSupport(game, { calls: 2, rounds: 6, caller: 'seoyeon' }); }
 
 export async function build(game) {
+  setEnemyMix({ kpa: 0.75, kpa_sfb: 0.15, kpa_officer: 0.1 });   // enemy unit types for this mission (uniform / gear)
   const lv = new HantanRiver(game); game.level = lv; await lv.build();
   const d = game.director; d.visionRange = 70;
   game.squad = {
