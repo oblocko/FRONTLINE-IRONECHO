@@ -452,7 +452,7 @@ export class UI {
     events.on('hud:escort', (e) => { const el = $('.escort', hud); el.classList.toggle('hidden', !e); if (!e) return; $('.en', el).textContent = e.name; const i = $('.bar i', el); i.style.width = `${Math.max(0, Math.round(e.frac * 100))}%`; i.classList.toggle('low', e.frac < 0.35); });
     events.on('hud:timer', (t) => { const el = $('.timer', hud); el.classList.toggle('hidden', !t); if (!t) return; $('.tl', el).textContent = t.label; const tv = $('.tv', el); tv.textContent = fmtTime(Math.max(0, t.seconds)); tv.classList.toggle('urgent', t.seconds < 20); });
     events.on('hud:mounted', (m) => { this.mountedActive = !!m; const el = $('.mounted', hud); el.classList.toggle('hidden', !m); if (m) $('.mn', el).textContent = m.name; $('.ammo', hud).style.visibility = m ? 'hidden' : ''; });
-    events.on('hud:mountedHeat', ({ heat, over }) => { const i = $('.mounted .heat i', hud); i.style.width = `${Math.round(heat * 100)}%`; i.classList.toggle('over', over); });
+    events.on('hud:mountedHeat', ({ heat, over, ads }) => { this.mountedAds = !!ads; const i = $('.mounted .heat i', hud); i.style.width = `${Math.round(heat * 100)}%`; i.classList.toggle('over', over); });
     events.on('hud:binoculars', (b) => { const el = $('.binos', hud); el.classList.toggle('hidden', !b); if (b) $('.calls', el).textContent = `화력 지원 ${b.calls}회`; });
     events.on('hud:binocularsRange', (r) => { $('.binos .rng', hud).textContent = r ?? '---'; });
     events.on('player:friendlyFire', () => this.hint('<b style="color:var(--warn)">사격 중지! 아군입니다.</b>', 2));
@@ -466,7 +466,7 @@ export class UI {
     const xh = $('.xhair', this.hud); const ads = w.adsAmount;
     const d = w.current; const spread = d ? (d.hipSpread + d.moveSpread * Math.min(1, p.speed / 4)) : 0.03;
     const px = 6 + spread * 420 + (p.sprinting ? 10 : 0);
-    xh.style.opacity = this.mountedActive ? 1 : (ads > 0.6 || p.sprinting || !d || p.seat || w.reloading || w.hidden) ? 0 : 1;
+    xh.style.opacity = this.mountedActive ? (this.mountedAds ? 0 : 1) : (ads > 0.6 || p.sprinting || !d || p.seat || w.reloading || w.hidden) ? 0 : 1;
     const [t, b, l, r] = xh.querySelectorAll('i'); t.style.top = `${-px - 9}px`; b.style.top = `${px}px`; l.style.left = `${-px - 9}px`; r.style.left = `${px}px`;
     // health
     const hp = Math.max(0, Math.round(p.health)); $('.health .hp', this.hud).textContent = hp; const bar = $('.health .bar', this.hud); $('i', bar).style.width = `${hp}%`; bar.classList.toggle('low', hp < 35);

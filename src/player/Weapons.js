@@ -146,7 +146,8 @@ export class WeaponSystem {
   update(dt, time) {
     this.time = time;
     const inp = this.input; const p = this.player; const d = this.current; const s = this.state;
-    const ctl = this.enabled && p.controlsEnabled && p.alive && !p.seat && !this.lowered;
+    // hidden = binoculars / jammer / mounted gun in use: the rifle must not fire, reload or throw
+    const ctl = this.enabled && p.controlsEnabled && p.alive && !p.seat && !this.lowered && !this.hidden;
     // switching
     if (this.switching > 0) { this.switching = Math.max(0, this.switching - dt * 3.2); if (this.switching < 0.5 && this.pendingSwap) { this.pendingSwap(); this.pendingSwap = null; } }
     if (ctl) {

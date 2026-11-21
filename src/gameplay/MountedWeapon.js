@@ -7,6 +7,8 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { events } from '../core/Events.js';
 import { keyName } from '../player/Player.js';
+import { settings } from '../core/Settings.js';
+const settingsFov = () => settings.data.graphics.fov;
 
 const DEFS = {
   mg: { name: '다목적 기관총', interval: 0.075, damage: 48, headMult: 2, range: 400, spread: 0.012, heatPerShot: 0.022, cool: 0.32, kick: 0.004, sound: 'rifle', vehicleDamage: 12 },
@@ -105,8 +107,9 @@ export function buildMG() {
   G.add(M.park, bx(0.05, 0.03, 0.06), { x: -0.06, y: 0.035, z: -0.04 });          // feed tray guide (left)
   // rear sight leaf + aperture
   G.add(M.park, bx(0.036, 0.012, 0.03), { y: 0.081, z: 0.12 });
-  G.add(M.black, bx(0.026, 0.05, 0.008), { y: 0.108, z: 0.13, rx: -0.25 });
-  G.add(M.worn, new THREE.TorusGeometry(0.006, 0.0025, 4, 10), { y: 0.125, z: 0.135 });
+  // open aperture: a ring on two thin side posts (nothing solid behind the hole)
+  for (const sx of [-1, 1]) G.add(M.black, bx(0.006, 0.05, 0.008), { x: sx * 0.012, y: 0.105, z: 0.13 });
+  G.add(M.black, new THREE.TorusGeometry(0.009, 0.003, 6, 16), { y: 0.125, z: 0.13 });
   // charging handle (right) + slot
   G.add(M.black, bx(0.004, 0.012, 0.15), { x: 0.04, y: 0.0, z: -0.02 });
   G.add(M.worn, cx(0.009, 0.05), { x: 0.065, y: 0.0, z: -0.07 });
@@ -132,9 +135,10 @@ export function buildMG() {
   G.add(M.park, bx(0.03, 0.03, 0.03), { y: 0.03, z: -0.36 });
   G.add(M.black, new THREE.TorusGeometry(0.05, 0.007, 5, 14, Math.PI).rotateY(Math.PI / 2), { x: -0.02, y: 0.045, z: -0.36, rz: 0.5 });
   // front sight + protective ears
-  G.add(M.park, bx(0.02, 0.034, 0.02), { y: 0.03, z: -0.79 });
-  G.add(M.black, bx(0.004, 0.026, 0.004), { y: 0.058, z: -0.79 });
-  for (const s of [-1, 1]) G.add(M.park, bx(0.004, 0.03, 0.016), { x: s * 0.013, y: 0.06, z: -0.79 });
+  // tall front sight so the post sits in the aperture when the eye is behind the rear sight
+  G.add(M.park, bx(0.02, 0.06, 0.02), { y: 0.045, z: -0.79 });
+  G.add(M.black, bx(0.004, 0.05, 0.004), { y: 0.1, z: -0.79 });
+  for (const s of [-1, 1]) G.add(M.park, bx(0.004, 0.06, 0.016), { x: s * 0.014, y: 0.1, z: -0.79 });
   // flash hider: slotted cone
   G.add(M.black, cz(0.02, 0.012, 12), { z: -0.845 });
   for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; G.add(M.black, bx(0.005, 0.005, 0.075), { x: Math.cos(a) * 0.018, y: Math.sin(a) * 0.018, z: -0.885 }); }
@@ -157,11 +161,13 @@ export class MountedWeapon {
   // opts: { kind, pos (world) | parent+local, yaw, yawRange, pitchRange, prompt, seatOffset }
   constructor(game, opts) {
     this.game = game; this.kind = opts.kind; this.def = { ...DEFS[opts.kind], ...(opts.def || {}) };
-    this.heat = 0; this.overheated = false; this.fireT = 0; this.manned = false; this.enabled = true;
+    this.heat = 0; this.overheated = false; this.fireT = 0; this.manned = false; this.enabled = true; this.ads = 0;
     if (opts.kind === 'mg') {
       const m = buildMG(); this.root = m.g; this.pivot = m.pivot; this.tilt = m.tilt; this.muzzle = m.muzzle;
       this.root.position.copy(opts.pos); this.root.rotation.y = opts.yaw ?? 0; game.renderer.scene.add(this.root);
-      this.seat = new THREE.Object3D(); this.seat.position.set(0, 0.25, 0.88); this.pivot.add(this.seat);
+      this.seat = new THREE.Object3D(); this.seat.position.set(0, 0.2, 0.62); this.pivot.add(this.seat);
+      // gunner's eye: hip view just behind the stock; aimed view (right mouse) looks through the rear aperture
+      this.hipEye = new THREE.Vector3(0, 0.2, 0.62); this.adsEye = new THREE.Vector3(0, 0.115, 0.43);
       this.baseYaw = opts.yaw ?? 0;
     } else {
       // APC: drive an existing turret group (pivot = turret, tilt = gun mantlet)
@@ -190,12 +196,12 @@ export class MountedWeapon {
     p.lookYawLocal = 0; p.pitch = 0;
     g.weapons.hidden = true; this.lookYaw = 0;
     events.emit('hud:mounted', { name: this.def.name, heat: this.heat });
-    g.ui.hint(`좌클릭 사격 · ${this.kind === 'mg' ? `${keyName(g.input.binding('interact'))} 또는 ${keyName(g.input.binding('jump'))} 이탈 · 과열 주의` : '폭발탄 · 적 차량에 효과적'}`, 5);
+    g.ui.hint(`좌클릭 사격 · ${this.kind === 'mg' ? '우클릭 조준 · ' : ''}${this.kind === 'mg' ? `${keyName(g.input.binding('interact'))} 또는 ${keyName(g.input.binding('jump'))} 이탈 · 과열 주의` : '폭발탄 · 적 차량에 효과적'}`, 5);
     this.mountT = 0.4;
   }
   dismount(pos = null) {
     const g = this.game, p = g.player; if (!this.manned) return;
-    this.manned = false; g.weapons.hidden = false; events.emit('hud:mounted', null);
+    this.manned = false; g.weapons.hidden = false; events.emit('hud:mounted', null); this.ads = 0; p.fovOverride = null;
     if (this.kind === 'mg') { const out = this.root.localToWorld(new THREE.Vector3(0, 0, 1.3)); p.exitSeat(pos || out); if (this.it) this.it.enabled = this.enabled; }
   }
   disable() { this.enabled = false; if (this.it) this.it.enabled = false; if (this.manned) this.dismount(); }
@@ -210,15 +216,22 @@ export class MountedWeapon {
     this.pivot.rotation.y = (p.lookYawLocal || 0) + (p.seat.yawBase - (this.forward > 0 ? Math.PI : 0));
     this.tilt.rotation.x = this.forward > 0 ? -p.pitch : p.pitch;
     this.mountT -= dt;
+    if (this.kind === 'mg') {
+      // right mouse: bring the eye down to the sights, narrow the view, tighten the cone of fire
+      this.ads += ((inp.ads() ? 1 : 0) - this.ads) * Math.min(1, dt * 10);
+      this.tilt.updateMatrix(); const eye = this.adsEye.clone().applyMatrix4(this.tilt.matrix);
+      this.seat.position.lerpVectors(this.hipEye, eye, this.ads);
+      p.fovOverride = this.ads > 0.02 ? settingsFov() * (1 - 0.38 * this.ads) : null;
+    }
     if (this.kind === 'mg' && !this.locked && this.mountT <= 0 && (inp.pressed('interact') || inp.pressed('jump'))) { this.dismount(); return; }
     if (inp.fire() && this.fireT <= 0 && !this.overheated && p.alive) this.fire(time);
-    events.emit('hud:mountedHeat', { heat: this.heat, over: this.overheated });
+    events.emit('hud:mountedHeat', { heat: this.heat, over: this.overheated, ads: this.ads > 0.5 });
   }
   fire(time) {
     const g = this.game, p = g.player, d = this.def;
     this.fireT = d.interval; this.heat += d.heatPerShot; if (this.heat >= 1) { this.heat = 1; this.overheated = true; g.ui.hint('<b style="color:var(--warn)">과열! 냉각 중</b>', 1.5); }
     const eye = p.eyePos(new THREE.Vector3()); const f = p.forward(new THREE.Vector3());
-    const r = Math.sqrt(Math.random()) * d.spread, a = Math.random() * Math.PI * 2;
+    const r = Math.sqrt(Math.random()) * d.spread * (1 - 0.7 * this.ads), a = Math.random() * Math.PI * 2;
     const right = new THREE.Vector3(Math.cos(p.yaw), 0, -Math.sin(p.yaw)); const up = new THREE.Vector3().crossVectors(right, f);
     const dir = f.clone().addScaledVector(right, Math.cos(a) * r).addScaledVector(up, Math.sin(a) * r).normalize();
     this.root.updateMatrixWorld(true); const mz = this.muzzle.getWorldPosition(new THREE.Vector3());
@@ -226,7 +239,7 @@ export class MountedWeapon {
     g.weapons.shotsFired++; if (res?.hitAgent || res?.hitVehicle) g.weapons.shotsHit++;
     g.effects.muzzleFlash(mz, dir); g.effects.flashLight(mz, 0xffb060, this.kind === 'apc' ? 10 : 5, 0.05, 9);
     g.audio.shot(this.kind === 'apc' ? mz : null, { kind: 'rifle' }); if (this.kind === 'apc') g.audio.explosion(mz, 0.12);
-    p.pitch += d.kick; p.recoilPitch += d.kick * 0.6; p.addShake(this.kind === 'apc' ? 0.12 : 0.035);
+    p.pitch += d.kick * (1 - 0.4 * this.ads); p.recoilPitch += d.kick * 0.6; p.addShake(this.kind === 'apc' ? 0.12 : 0.035 * (1 - 0.6 * this.ads));
     p.lastFireT = time; g.director.noise(eye, 120, 'player');
   }
 }
