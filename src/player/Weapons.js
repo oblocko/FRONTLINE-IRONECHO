@@ -119,7 +119,8 @@ export class WeaponSystem {
     else { this.switching = 1; this.pendingSwap = doSwap; this.audio.switchWeapon(); }
   }
   addAmmo(id, amount) { const s = this.inventory[id]; if (!s) return 0; const max = WEAPON_DEFS[id].reserve * 1.5; const add = Math.min(amount, max - s.reserve); s.reserve += Math.max(0, add); this.emitAmmo(); return add; }
-  refill() { for (const id of this.order) { this.inventory[id].reserve = WEAPON_DEFS[id].reserve; } this.grenades = Math.max(this.grenades, 3); this.emitAmmo(); }
+  // resupply tops up to the standard load but never takes away ammo already carried above it
+  refill() { for (const id of this.order) { const s = this.inventory[id]; s.reserve = Math.max(s.reserve, WEAPON_DEFS[id].reserve); } this.grenades = Math.max(this.grenades, 3); this.emitAmmo(); }
   emitAmmo() { const s = this.state; events.emit('hud:ammo', s ? { name: this.current.name, mag: s.mag, reserve: s.reserve, magSize: this.current.mag, grenades: this.grenades, weapon: this.currentId } : null); }
   serialize() { return { inventory: structuredClone(this.inventory), order: [...this.order], current: this.currentId, grenades: this.grenades }; }
   restore(d) { if (!d) return; this.inventory = structuredClone(d.inventory); this.order = [...d.order]; this.grenades = d.grenades; this.currentId = null; this.equip(d.current || this.order[0], true); }
