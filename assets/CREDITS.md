@@ -29,3 +29,12 @@ All assets below are CC0 1.0 (public domain) from Poly Haven. Attribution is not
 | model | `utility_box_02` | Utility Box 02 | James Ray Cock | CC0 1.0 | https://polyhaven.com/a/utility_box_02 |
 | model | `concrete_road_barrier_02` | Concrete Road Barrier 02 | Amal Kumar | CC0 1.0 | https://polyhaven.com/a/concrete_road_barrier_02 |
 | model | `metal_trash_can` | Metal Trash Can | GurJas Studios | CC0 1.0 | https://polyhaven.com/a/metal_trash_can |
+
+## Characters (Quaternius, CC0 1.0)
+
+Characters use Quaternius packs, CC0 1.0 public domain (attribution not required, given here). Clothing, gear, rifle and all game-specific animation layering are original to this project. Rebuilt for the game with `tools/fetch_itch_free.py` + `tools/prepare_characters.py` (textures resized to 1024 px, unused clips removed).
+
+| Type | Files | Pack | Author | Licence | Source |
+|---|---|---|---|---|---|
+| model | `characters/body_m.glb`, `body_f.glb`, `hair_*.glb`, `eyebrows_*.glb` | Universal Base Characters (Standard) | Quaternius | CC0 1.0 | https://quaternius.com/packs/universalbasecharacters.html |
+| animation | `characters/anims.glb` (22 clips) | Universal Animation Library 1 & 2 (Standard) | Quaternius | CC0 1.0 | https://quaternius.com/packs/universalanimationlibrary.html |

@@ -329,7 +329,7 @@ html.js #about { display: none; }
 .choice-box { position: absolute; left: 50%; bottom: 22%; transform: translateX(-50%); background: rgba(8,10,10,0.82); border: 1px solid var(--line-strong); border-left: 3px solid var(--accent); padding: 14px 20px; min-width: 420px; }
 .choice-box .opt { margin-top: 8px; font-size: 15px; } .choice-box kbd { margin-right: 8px; }
 .choice-box kbd { font-family: var(--mono); border: 1px solid #aaa; padding: 0 6px; font-size: 12px; }
-#hud.jamming .ammo { opacity: 0.25; }
+#hud.jamming .ammo { visibility: hidden; }
 
 .cctv-ov { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 160px rgba(0,0,0,0.85); background: repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0 2px, transparent 2px 4px); }
 .cctv-ov .lbl { position: absolute; left: 40px; top: 90px; font: 600 13px var(--mono); color: #e8f0e8; letter-spacing: 0.15em; }

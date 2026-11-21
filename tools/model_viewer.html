@@ -1,0 +1,31 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><base href="../"><title>Model viewer</title>
+<style>html,body{margin:0;background:#2a2d30;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">{ "imports": { "three": "./vendor/three/build/three.module.js", "three/examples/jsm/": "./vendor/three/examples/jsm/" } }</script>
+</head><body>
+<script type="module">
+// Dev tool: raw Quaternius body + clips (?clips=Idle_Loop,Walk_Loop&t=0.4)
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+const q = new URLSearchParams(location.search);
+const clips = (q.get('clips') || 'A_TPose,Idle_Loop,Walk_Loop,Jog_Fwd_Loop,Crouch_Idle_Loop,Death01').split(',');
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(innerWidth, innerHeight); r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; document.body.appendChild(r.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x6a7078);
+scene.environment = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), 0.04).texture; scene.environmentIntensity = 0.5;
+scene.add(new THREE.HemisphereLight(0xc8d0dc, 0x4a4a44, 1.0)); const sun = new THREE.DirectionalLight(0xfff0dc, 2.2); sun.position.set(3, 6, 5); scene.add(sun);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ color: 0x8a8a84 })); ground.rotation.x = -Math.PI / 2; scene.add(ground);
+scene.add(new THREE.AxesHelper(1));
+const L = new GLTFLoader();
+const [body, anims] = await Promise.all([L.loadAsync('assets/characters/body_m.glb'), L.loadAsync('assets/characters/anims.glb')]);
+window.__info = { clips: anims.animations.map((a) => a.name) };
+clips.forEach((name, i) => {
+  const m = SkeletonUtils.clone(body.scene); m.position.set((i - (clips.length - 1) / 2) * 1.2, 0, 0); scene.add(m);
+  const clip = anims.animations.find((a) => a.name === name);
+  if (clip) { const mix = new THREE.AnimationMixer(m); const act = mix.clipAction(clip); act.play(); mix.setTime(clip.duration * +(q.get('t') || 0.3)); }
+});
+const cam = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 0.05, 100); cam.position.set(0, 1.4, 9); cam.lookAt(0, 0.9, 0);
+if (q.get('view') === 'side') { cam.position.set(9, 1.4, 0); cam.lookAt(0, 0.9, 0); }
+r.render(scene, cam); window.__ready = true;
+</script></body></html>

@@ -4,6 +4,8 @@
 // Hitboxes (spheres) are derived from bone positions for bullet tests.
 import * as THREE from 'three';
 import { buildHuman, buildNpcRifle } from './HumanModel.js';
+import { characterLib } from './CharacterLib.js';
+import { ModelActor } from './ModelActor.js';
 
 const lerp = (a, b, t) => a + (b - a) * t;
 
@@ -267,3 +269,6 @@ export class Actor {
     this.droppedWeapon = this.weapon;
   }
 }
+
+// Authored-model characters when their assets loaded, the procedural body otherwise.
+export function createActor(scene, opts) { return characterLib() ? new ModelActor(scene, opts) : new Actor(scene, opts); }

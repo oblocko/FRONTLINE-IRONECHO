@@ -29,10 +29,10 @@ export function roundedBox(w, h, d, r, { taperTop = 1, taperBottom = 1, segs = 4
   return g;
 }
 // profile: [[radius, y], ...] from bottom to top
-function lathe(profile, segs = 14) { return new THREE.LatheGeometry(profile.map(([r, y]) => new THREE.Vector2(r, y)), segs); }
-function sphere(r, sx = 1, sy = 1, sz = 1, ws = 16, hs = 12, thetaLen = Math.PI) { const g = new THREE.SphereGeometry(r, ws, hs, 0, Math.PI * 2, 0, thetaLen); g.scale(sx, sy, sz); return g; }
-function cyl(rt, rb, h, segs = 12) { return new THREE.CylinderGeometry(rt, rb, h, segs); }
-const T = (g, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) => { if (rx || ry || rz) g.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(rx, ry, rz))); g.translate(x, y, z); return g; };
+export function lathe(profile, segs = 14) { return new THREE.LatheGeometry(profile.map(([r, y]) => new THREE.Vector2(r, y)), segs); }
+export function sphere(r, sx = 1, sy = 1, sz = 1, ws = 16, hs = 12, thetaLen = Math.PI) { const g = new THREE.SphereGeometry(r, ws, hs, 0, Math.PI * 2, 0, thetaLen); g.scale(sx, sy, sz); return g; }
+export function cyl(rt, rb, h, segs = 12) { return new THREE.CylinderGeometry(rt, rb, h, segs); }
+export const T = (g, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) => { if (rx || ry || rz) g.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(rx, ry, rz))); g.translate(x, y, z); return g; };
 
 // ---------------- shared materials ----------------
 const MAT = new Map();
