@@ -172,10 +172,8 @@ export class UI {
       deploy.disabled = false; deploy.textContent = 'DEPLOY ▸  출격'; ls.textContent = 'READY';
       const go = () => { clearInterval(this._type); clearInterval(this._auto); this.game.startMission(id, checkpoint); };
       deploy.onclick = go;
-      if (autoDeploy) {
-        let n = 8; deploy.textContent = `DEPLOY ▸  출격 ${n}`;
-        clearInterval(this._auto); this._auto = setInterval(() => { if (!document.body.contains(deploy)) return clearInterval(this._auto); n--; deploy.textContent = `DEPLOY ▸  출격 ${n}`; if (n <= 0) go(); }, 1000);
-      }
+      // campaign flow: the briefing doubles as the loading screen and deploys as soon as loading is done
+      if (autoDeploy) { deploy.textContent = 'DEPLOY ▸  출격'; clearInterval(this._auto); this._auto = setTimeout(() => { if (document.body.contains(deploy)) go(); }, 600); }
     }).catch((e) => { if (e?.cancelled) return; console.error(e); ls.textContent = '로딩 실패: ' + e.message; });
   }
   drawBriefingMap(cv, m) {
@@ -344,7 +342,7 @@ export class UI {
       // campaign flow: roll straight into the next operation unless the player chooses otherwise
       const go = () => { stop(); this.briefing(next.id, { autoDeploy: true }); };
       nextBtn.addEventListener('click', go);
-      let n = 10; nextBtn.textContent = `다음 작전 ▸ ${n}`;
+      let n = 3; nextBtn.textContent = `다음 작전 ▸ ${n}`;
       stop(); this._next = setInterval(() => { if (!document.body.contains(nextBtn)) return stop(); n--; nextBtn.textContent = `다음 작전 ▸ ${n}`; if (n <= 0) go(); }, 1000);
     }
     this.show('complete');
