@@ -18,7 +18,7 @@ const all = []; const T0 = Date.now(); const log = (s) => console.log(`[${((Date
 async function newPage(save) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   const errs = [];
-  page.on('pageerror', (e) => errs.push('pageerror: ' + e.message + ' @ ' + (e.stack || '').split('\n')[1]?.trim()));
+  page.on('pageerror', (e) => errs.push('pageerror: ' + e.message + ' @ ' + (e.stack || '').split('\n').slice(1,7).map(s=>s.trim()).join(' | ')));
   page.on('console', (m) => { if (m.type() === 'error') errs.push('console: ' + m.text()); });
   page.on('response', (r) => { if (r.status() >= 400) errs.push(`http ${r.status()} ${r.url()}`); });
   await page.addInitScript((save) => {
