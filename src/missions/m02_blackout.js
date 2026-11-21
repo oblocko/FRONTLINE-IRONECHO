@@ -270,8 +270,8 @@ export const SEGMENTS = [
       for (const e of team) if (!e.dead) e.kill(game.player.position);
       game.audio.setMusic('ambient');
       // survivors in the stalled train
-      game.objectives.add('survivors', '열차 안 생존자 확인', { marker: V(361.8, 1.2, 3) });
-      await interact(game, { pos: V(361.6, 1.2, 3), prompt: '열차 문 두드리기', radius: 2.4 });
+      game.objectives.add('survivors', '열차 안 생존자 확인 — 열린 스크린도어로', { marker: V(361.2, 1.2, 3) });
+      await interact(game, { pos: V(361.4, 1.2, 3), prompt: '열차 문 두드리기', radius: 2.6 });
       lv.survivors = spawnCivilians(game, V(354, 0, 3), 8, { spread: 2.5 });
       const officer = game.director.spawn({ team: 'civilian', faction: 'rok', hat: 'cap', weapon: false, passive: true, invulnerable: true, name: '김정훈', pos: V(355, 0, 0), followOffset: V(0, 0, 1.6) });
       game.dialogue.bindSpeaker('police', officer); lv.officer = officer;

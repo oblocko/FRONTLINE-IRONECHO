@@ -151,9 +151,22 @@ export class YeonseoCity {
     const edge = new THREE.Mesh(new THREE.PlaneGeometry(0.6, S.z1 - S.z0), new THREE.MeshStandardMaterial({ color: 0xc8a020, roughness: 0.8 })); edge.rotation.x = -Math.PI / 2; edge.position.set(S.pit[0] - 0.4, 0.011, 0); scene.add(edge);
     // platform screen doors (glass) along the edge
     const psd = new THREE.MeshStandardMaterial({ color: 0x9ab0b8, transparent: true, opacity: 0.28, roughness: 0.05, metalness: 0.3, side: THREE.DoubleSide, depthWrite: false });
-    const psdM = new THREE.Mesh(new THREE.PlaneGeometry(S.z1 - S.z0, 2.3), psd); psdM.rotation.y = Math.PI / 2; psdM.position.set(S.pit[0] - 0.9, 1.15, 0); scene.add(psdM);
-    for (let z = S.z0 + 2; z < S.z1; z += 4) box(0.12, 2.4, 0.12, S.pit[0] - 0.9, 1.2, z, pbr('metal', { color: 0x9aa0a6, key: 'psd' }), { surface: 'metal' });
-    w.addBox(V(S.pit[0] - 0.95, -2, S.z0), V(S.pit[0] - 0.85, 2.4, S.z1), { surface: 'metal', walkable: false, cover: false }).passBullets = true;
+    // one door bay (z 1.5..4.5) stands open, facing the stalled car's door
+    const D0 = 1.5, D1 = 4.5, px = S.pit[0] - 0.9;
+    for (const [z0, z1] of [[S.z0, D0], [D1, S.z1]]) {
+      const pm = new THREE.Mesh(new THREE.PlaneGeometry(z1 - z0, 2.3), psd); pm.rotation.y = Math.PI / 2; pm.position.set(px, 1.15, (z0 + z1) / 2); scene.add(pm);
+      w.addBox(V(px - 0.05, -2, z0), V(px + 0.05, 2.4, z1), { surface: 'metal', walkable: false, cover: false }).passBullets = true;
+    }
+    for (let z = S.z0 + 2; z < S.z1; z += 4) if (z < D0 - 0.2 || z > D1 + 0.2) box(0.12, 2.4, 0.12, px, 1.2, z, pbr('metal', { color: 0x9aa0a6, key: 'psd' }), { surface: 'metal' });
+    for (const z of [D0, D1]) box(0.16, 2.5, 0.16, px, 1.25, z, pbr('metal', { color: 0x9aa0a6, key: 'psd' }), { surface: 'metal' });
+    // the two sliding panels pushed open behind the fixed glass
+    for (const [z, s2] of [[D0 - 0.75, -1], [D1 + 0.75, 1]]) { const pnl = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 2.2), psd); pnl.rotation.y = Math.PI / 2; pnl.position.set(px - 0.12, 1.1, z); scene.add(pnl); }
+    const doorSign = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.18), new THREE.MeshBasicMaterial({ color: 0x40d070, toneMapped: false })); doorSign.position.set(px - 0.06, 2.42, (D0 + D1) / 2); doorSign.rotation.y = -Math.PI / 2; scene.add(doorSign);
+    // emergency gangway plank laid from the platform edge across the pit to the car door
+    const plank = pbr('metal', { color: 0x8a7a52, key: 'gangway' });
+    box(362.4 - (S.pit[0] - 1.0), 0.1, 1.6, (S.pit[0] - 1.0 + 362.4) / 2, -0.05, 3, plank, { surface: 'metal' });
+    for (const s2 of [-1, 1]) box(362.4 - S.pit[0], 0.06, 0.06, (S.pit[0] + 362.4) / 2, 0.9, 3 + s2 * 0.8, pbr('metal', { color: 0xc8a020, key: 'rail' }), { surface: 'metal', collide: false });
+    for (const s2 of [-1, 1]) w.addBox(V(S.pit[0], 0, 3 + s2 * 0.8 - 0.05), V(362.4, 1.0, 3 + s2 * 0.8 + 0.05), { surface: 'metal', walkable: false, cover: false }).passBullets = true;
     // stopped train in the pit
     this.train = new THREE.Group(); scene.add(this.train);
     const tb = pbr('paintedMetal', { color: 0xc8ccd0, key: 'train' });
@@ -161,7 +174,8 @@ export class YeonseoCity {
       const cz = -18 + i * 21;
       box(3.0, 3.4, 20, 364, 0.4, cz, tb, { surface: 'metal' });
       const stripe = new THREE.Mesh(new THREE.BoxGeometry(3.02, 0.3, 20.02), new THREE.MeshStandardMaterial({ color: 0x2a6ab0 })); stripe.position.set(364, 0.5, cz); scene.add(stripe);
-      for (let wz = -8; wz <= 8; wz += 4) { const win = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.9), new THREE.MeshStandardMaterial({ color: 0x0c1014, roughness: 0.1, metalness: 0.4 })); win.position.set(362.48, 1.2, cz + wz); win.rotation.y = -Math.PI / 2; scene.add(win); }
+      if (i === 1) { const door = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 2.0), new THREE.MeshStandardMaterial({ color: 0x050607, roughness: 1 })); door.position.set(362.47, 0.95, 3); door.rotation.y = -Math.PI / 2; scene.add(door); }
+      for (let wz = -8; wz <= 8; wz += 4) { if (i === 1 && Math.abs(cz + wz - 3) < 1.5) continue; const win = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.9), new THREE.MeshStandardMaterial({ color: 0x0c1014, roughness: 0.1, metalness: 0.4 })); win.position.set(362.48, 1.2, cz + wz); win.rotation.y = -Math.PI / 2; scene.add(win); }
     }
     // emergency lighting: few red lights + green exit signs
     this.emergency = [];
