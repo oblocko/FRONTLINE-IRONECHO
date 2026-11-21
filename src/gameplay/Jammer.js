@@ -48,11 +48,11 @@ export class Jammer {
     game.renderer.vmScene.add(this.model);
     this.el = document.createElement('div'); this.el.className = 'jammer-hud';
     this.el.innerHTML = `<div class="cone hidden"><div class="ring"></div><div class="lbl">EW JAMMER</div></div><div class="brk"></div><div class="arrows"></div>
-      <div class="bat hidden"><div class="tag">BATTERY</div><div class="bar"><i></i></div><div class="st"></div></div>`;
+      <div class="bat hidden"><div class="tag">JAMMER · BATTERY</div><div class="bar"><i></i></div><div class="st"></div></div>`;
     (game.ui.hud || document.body).appendChild(this.el);
     this.hum = null;
   }
-  get key() { return keyName(this.game.input.binding('support')); }
+  get key() { return `${keyName(this.game.input.binding('support'))} 또는 ${keyName(this.game.input.binding('weapon3'))}`; }
   announce() { this.game.ui.hint(`${this.key} 재밍건 들기/내리기 · <b>좌클릭 유지</b>로 드론을 원 안에 붙잡아 두면 통제 신호가 끊깁니다`, 8); }
   toggle(on = !this.active) {
     const g = this.game, p = g.player;
@@ -77,8 +77,9 @@ export class Jammer {
   update(dt) {
     const g = this.game, inp = g.input, p = g.player, cam = g.renderer.camera;
     if (inp.pressed('support')) this.toggle();
+    else if (inp.pressed('weapon3') && !this.active) this.toggle(true);
     if (this.active && (!p.alive || p.seat || g.state !== 'playing')) this.toggle(false);
-    if (this.active && (inp.pressed('weapon1') || inp.pressed('weapon2'))) this.toggle(false);
+    if (this.active && (inp.pressed('weapon1') || inp.pressed('weapon2') || inp.mouse.wheel !== 0 || inp.pressed('reload'))) this.toggle(false);
     this.raise += ((this.active ? 1 : 0) - this.raise) * Math.min(1, dt * 10);
     // ---- emit / lock ----
     if (this.battery <= 0.01) this.empty = true; if (this.empty && this.battery > 0.3) this.empty = false;
@@ -111,10 +112,10 @@ export class Jammer {
     const el = this.el, W = innerWidth, H = innerHeight, p = this.game.player;
     el.querySelector('.cone').classList.toggle('hidden', !this.active);
     el.querySelector('.cone').classList.toggle('on', firing);
-    el.querySelector('.bat').classList.toggle('hidden', !this.active && this.battery > 0.99);
+    el.querySelector('.bat').classList.toggle('hidden', !!this.game.player.seat);
     el.querySelector('.bat i').style.width = `${Math.round(this.battery * 100)}%`;
     el.querySelector('.bat').classList.toggle('low', this.battery < 0.2);
-    el.querySelector('.bat .st').textContent = firing ? '교란 중' : this.empty ? '방전 — 충전 중' : this.active ? '대기 · 좌클릭 유지로 교란' : '';
+    el.querySelector('.bat .st').textContent = firing ? '교란 중' : this.empty ? '방전 — 충전 중' : this.active ? '대기 · 좌클릭 유지로 교란' : `재밍건 들기: ${this.key}`;
     // cone ring sized to the jamming angle at the current FOV
     const px = Math.tan(CONE) / Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * H / 2;
     const ring = el.querySelector('.ring'); ring.style.width = ring.style.height = `${px * 2}px`;
