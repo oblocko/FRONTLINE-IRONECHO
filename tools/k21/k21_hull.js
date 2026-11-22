@@ -7,22 +7,36 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 // ---------- materials ----------
-function camoTexture() {
-  // ROK vehicle 3-colour woodland: green base, black and brown blotches
-  const c = document.createElement('canvas'); c.width = c.height = 512; const g = c.getContext('2d');
-  g.fillStyle = '#48523a'; g.fillRect(0, 0, 512, 512);
-  let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  const blob = (col, n, r0, r1) => { g.fillStyle = col; for (let i = 0; i < n; i++) { const x = rnd() * 512, y = rnd() * 512, r = r0 + rnd() * (r1 - r0); g.beginPath(); for (let k = 0; k < 14; k++) { const a = k / 14 * Math.PI * 2, rr = r * (0.6 + rnd() * 0.6); g.lineTo(x + Math.cos(a) * rr * 1.6, y + Math.sin(a) * rr); } g.fill(); } };
-  blob('#564734', 18, 30, 70); blob('#25271f', 15, 22, 52);
-  // grime / panel wear
-  for (let i = 0; i < 2500; i++) { g.fillStyle = `rgba(${rnd() < 0.5 ? '30,28,22' : '120,118,96'},${0.04 + rnd() * 0.06})`; g.fillRect(rnd() * 512, rnd() * 512, 1 + rnd() * 3, 1 + rnd() * 3); }
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4;
+export function camoTexture() {
+  // current ROK armour scheme (K21 photos): sand base, large dark-green fields, thin black streaks along the
+  // field edges and small cream "gull" marks
+  const N = 1024, c = document.createElement('canvas'); c.width = c.height = N; const g = c.getContext('2d');
+  let seed = 11; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  g.fillStyle = '#7c6644'; g.fillRect(0, 0, N, N);
+  // dark green fields: big soft-edged blobs (drawn 3x3 tiled so the texture repeats seamlessly)
+  const fields = [];
+  for (let i = 0; i < 8; i++) { const x = (i % 4 + 0.15 + rnd() * 0.7) * N / 4, y = (Math.floor(i / 4) + 0.15 + rnd() * 0.7) * N / 2, rx = 190 + rnd() * 120, ry = 120 + rnd() * 80, rot = rnd() * Math.PI, pts = []; const NP = 36, ph = rnd() * 6, ph2 = rnd() * 6; for (let k = 0; k < NP; k++) { const a = k / NP * Math.PI * 2; const r = 0.82 + 0.18 * Math.sin(a * 3 + ph) + 0.1 * Math.sin(a * 5 + ph2); pts.push([Math.cos(a) * rx * r, Math.sin(a) * ry * r]); } fields.push({ x, y, rot, pts }); }
+  const tp = (f, ox, oy, k) => { const [px, py] = f.pts[(k + f.pts.length) % f.pts.length]; return [f.x + ox + px * Math.cos(f.rot) - py * Math.sin(f.rot), f.y + oy + px * Math.sin(f.rot) + py * Math.cos(f.rot)]; };
+  const path = (f, ox, oy) => { const n = f.pts.length; g.beginPath(); const m0 = tp(f, ox, oy, 0), m1 = tp(f, ox, oy, 1); g.moveTo((m0[0] + m1[0]) / 2, (m0[1] + m1[1]) / 2); for (let k = 1; k <= n; k++) { const a = tp(f, ox, oy, k), b = tp(f, ox, oy, k + 1); g.quadraticCurveTo(a[0], a[1], (a[0] + b[0]) / 2, (a[1] + b[1]) / 2); } g.closePath(); };
+  const tiled = (fn) => { for (const ox of [-N, 0, N]) for (const oy of [-N, 0, N]) fn(ox, oy); };
+  g.fillStyle = '#3a432d'; for (const f of fields) tiled((ox, oy) => { path(f, ox, oy); g.fill(); });
+  // thin black streaks hugging part of each field edge
+  g.strokeStyle = '#141512'; g.lineCap = 'round';
+  for (const f of fields) tiled((ox, oy) => { const n = f.pts.length, k0 = Math.floor(rnd() * n), len = 10 + Math.floor(rnd() * 10); g.lineWidth = 14 + rnd() * 10; g.beginPath(); const s0 = tp(f, ox, oy, k0); g.moveTo(s0[0], s0[1]); for (let k = 1; k <= len; k++) { const a = tp(f, ox, oy, k0 + k), b = tp(f, ox, oy, k0 + k + 1); g.quadraticCurveTo(a[0], a[1], (a[0] + b[0]) / 2, (a[1] + b[1]) / 2); } g.stroke(); });
+  // a few free black "crow" marks and cream "gull" marks
+  const gull = (x, y, s, col, w) => { g.strokeStyle = col; g.lineWidth = w; g.beginPath(); g.moveTo(x - s, y - s * 0.2); g.quadraticCurveTo(x - s * 0.4, y - s * 0.55, x, y + s * 0.15); g.quadraticCurveTo(x + s * 0.4, y - s * 0.55, x + s, y - s * 0.2); g.stroke(); };
+  for (let i = 0; i < 5; i++) { const x = rnd() * N, y = rnd() * N, sz = 24 + rnd() * 20; tiled((ox, oy) => gull(x + ox, y + oy, sz, '#d6ccb2', 9)); }
+  for (let i = 0; i < 9; i++) { const x = rnd() * N, y = rnd() * N, sz = 30 + rnd() * 34; tiled((ox, oy) => gull(x + ox, y + oy, sz, '#141512', 12)); }
+  // weathering: fine grime, dust toward the bottom
+  for (let i = 0; i < 9000; i++) { g.fillStyle = `rgba(${rnd() < 0.5 ? '40,36,28' : '170,160,130'},${0.03 + rnd() * 0.05})`; g.fillRect(rnd() * N, rnd() * N, 1 + rnd() * 3, 1 + rnd() * 3); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
   return t;
 }
-function mats() {
+export function mats() {
   const camo = camoTexture();
   return {
-    paint: new THREE.MeshStandardMaterial({ map: camo, roughness: 0.78, metalness: 0.15 }),
+    paint: new THREE.MeshStandardMaterial({ map: camo, roughness: 0.85, metalness: 0.1 }),
+    canvas: new THREE.MeshStandardMaterial({ color: 0x4d4a35, roughness: 0.95 }),
     dark: new THREE.MeshStandardMaterial({ color: 0x23251f, roughness: 0.85, metalness: 0.2 }),
     steel: new THREE.MeshStandardMaterial({ color: 0x3a3b36, roughness: 0.55, metalness: 0.6 }),
     rubber: new THREE.MeshStandardMaterial({ color: 0x161616, roughness: 0.95 }),
@@ -34,7 +48,7 @@ function mats() {
 }
 
 // box-projected UVs so the camo texture reads at the same scale on every face (1 texture = 2.4 m)
-function boxUV(geo, scale = 1 / 3.4) {
+export function boxUV(geo, scale = 1 / 4.2) {
   const p = geo.attributes.position, n = geo.attributes.normal, uv = new Float32Array(p.count * 2);
   for (let i = 0; i < p.count; i++) {
     const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i));
@@ -46,19 +60,18 @@ function boxUV(geo, scale = 1 / 3.4) {
   geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); return geo;
 }
 // extrude a side profile given as [z, y] points across x ∈ [x0, x1]
-function profileX(pts, x0, x1, bevel = 0.02) {
+export function profileX(pts, x0, x1, bevel = 0.02) {
   const s = new THREE.Shape(); pts.forEach(([z, y], i) => (i ? s.lineTo(z, y) : s.moveTo(z, y)));
   const g = new THREE.ExtrudeGeometry(s, { depth: x1 - x0 - bevel * 2, bevelEnabled: bevel > 0, bevelSize: bevel, bevelThickness: bevel, bevelSegments: 1, steps: 1 });
   g.rotateY(-Math.PI / 2); g.translate(x1 - bevel, 0, 0);   // shape x → world z, extrusion → world -x
   g.computeVertexNormals(); return boxUV(g.toNonIndexed());
 }
-const box = (w, h, d, x, y, z, rx = 0, ry = 0, rz = 0) => { const g = new THREE.BoxGeometry(w, h, d); g.rotateX(rx); g.rotateY(ry); g.rotateZ(rz); g.translate(x, y, z); return boxUV(g.toNonIndexed()); };
-const cylX = (r, len, x, y, z, seg = 20) => { const g = new THREE.CylinderGeometry(r, r, len, seg); g.rotateZ(Math.PI / 2); g.translate(x, y, z); return g.toNonIndexed(); };
-const cylY = (r0, r1, h, x, y, z, seg = 16) => { const g = new THREE.CylinderGeometry(r0, r1, h, seg); g.translate(x, y, z); return g.toNonIndexed(); };
-const clean = (g) => { for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k); if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2)); return g; };
+export const box = (w, h, d, x, y, z, rx = 0, ry = 0, rz = 0) => { const g = new THREE.BoxGeometry(w, h, d); g.rotateX(rx); g.rotateY(ry); g.rotateZ(rz); g.translate(x, y, z); return boxUV(g.toNonIndexed()); };
+export const cylX = (r, len, x, y, z, seg = 20) => { const g = new THREE.CylinderGeometry(r, r, len, seg); g.rotateZ(Math.PI / 2); g.translate(x, y, z); return g.toNonIndexed(); };
+export const cylY = (r0, r1, h, x, y, z, seg = 16) => { const g = new THREE.CylinderGeometry(r0, r1, h, seg); g.translate(x, y, z); return g.toNonIndexed(); };
+export const clean = (g) => { for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k); if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2)); return g; };
 
-export function buildK21Hull() {
-  const M = mats(); const parts = { paint: [], dark: [], steel: [], rubber: [], track: [], glass: [], lamp: [], red: [] };
+export function buildK21Hull(M = mats()) { const parts = { paint: [], dark: [], steel: [], rubber: [], track: [], glass: [], lamp: [], red: [] };
   const P = (k, g) => parts[k].push(clean(g));
 
   // ---- main hull body (side profile extruded across the hull width) ----
