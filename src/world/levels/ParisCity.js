@@ -162,6 +162,7 @@ const boxesTex = () => canvasTex('archboxes', 256, 128, (g, W, H) => {
   for (let x = 2; x < W - 20; x += 22 + Math.random() * 6) { const v = 150 + Math.random() * 40; g.fillStyle = `rgb(${v},${v - 18},${v - 50})`; const h = H - 10 - Math.random() * 14; g.fillRect(x, H - h, 20, h - 4); g.fillStyle = '#f0ece0'; g.fillRect(x + 4, H - h + 10, 12, 8); g.fillStyle = '#333'; g.fillRect(x + 6, H - h + 12, 8, 1); }
 });
 
+const at = (o, p) => { o.position.copy(p); return o; };
 // box with UVs in world metres (texture repeats every `tile` m)
 function wbox(sx, sy, sz, tile = 2) {
   const g = new THREE.BoxGeometry(sx, sy, sz); const uv = g.attributes.uv, p = g.attributes.position, n = g.attributes.normal;
@@ -450,7 +451,7 @@ export class ParisCity {
     scene.add(dump); w.addBoxCentered(V(-33, 0.7, 20.9), V(2.0, 1.4, 1.15), { surface: 'metal', cover: true });
     this.dumpster = dump;
     for (const [x, z] of [[-30, A.z1 - 0.02], [-46, A.z0 + 0.02], [-60, A.z1 - 0.02]]) { const door = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 2.3), new THREE.MeshStandardMaterial({ color: 0x3a2a22, roughness: 0.7 })); door.position.set(x, 1.15, z); door.rotation.y = z > 19 ? Math.PI : 0; scene.add(door); }
-    for (const x of [-22, -44, -62]) this.lampAnchors.push({ pos: V(x, 3.6, A.z1 - 0.4), color: 0xffb070, power: 22, dist: 11, zone: 'alley' }), scene.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 0.2), M.lampGlow), { position: V(x, 3.6, A.z1 - 0.15) }));
+    for (const x of [-22, -44, -62]) this.lampAnchors.push({ pos: V(x, 3.6, A.z1 - 0.4), color: 0xffb070, power: 22, dist: 11, zone: 'alley' }), scene.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.2, 0.2), M.lampGlow), V(x, 3.6, A.z1 - 0.15)));
     for (const x of [-20, -40, -56]) { const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 14, 6), M.iron); pipe.position.set(x, 7, A.z0 + 0.1); scene.add(pipe); }
     // the shop window used for the reflection trick (east pavement, bookshop at z ≈ 66)
   }
@@ -473,7 +474,7 @@ export class ParisCity {
     // clutter: bins, crates, bicycles shed, wall lamp
     for (const [x, z, id] of [[-80, 9, 'wooden_crate_01'], [-81.5, 9.5, 'wooden_crate_02'], [-70, 13, 'metal_trash_can'], [-84, 31, 'Barrel_01'], [-78, 32, 'utility_box_02']]) this.game.propLib?.place(id, x, z, { rotQ: 0 });
     this.lampAnchors.push({ pos: V(C.x0 + 0.5, 3.2, P.archiveDoor.z), color: 0xfff0d0, power: 28, dist: 14, zone: 'court' });
-    scene.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.25, 0.3), M.lampGlow), { position: V(C.x0 + 0.15, 3.2, P.archiveDoor.z) }));
+    scene.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.25, 0.3), M.lampGlow), V(C.x0 + 0.15, 3.2, P.archiveDoor.z)));
     this.lampAnchors.push({ pos: V(-77, 3.4, -20), color: 0xffb070, power: 20, dist: 12, zone: 'lane' });
     // Maya's van (dark grey panel van) waiting in the lane
     const van = new THREE.Group(); van.userData.dynamic = true; van.position.copy(P.van);

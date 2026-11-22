@@ -6,7 +6,7 @@
 // and audio ducking so speech never fights with music/SFX.
 import { events } from '../core/Events.js';
 import { settings } from '../core/Settings.js';
-import { CHARACTERS, speakerLabel } from './Characters.js';
+import { CHARACTERS, speakerLabel, LANG_LABEL } from './Characters.js';
 
 export class Dialogue {
   constructor(audio) {
@@ -17,9 +17,11 @@ export class Dialogue {
   clear() { for (const q of this.queue) q.resolve(); this.queue = []; if (this.current) this.current.resolve(); this.current = null; events.emit('subtitle', null); this.audio.duck(false); }
 
   // returns a promise resolved when the line finishes
-  say(speaker, text, { radio = false, priority = 2, duration = null, delay = 0 } = {}) {
+  say(speaker, text, { radio = false, priority = 2, duration = null, delay = 0, lang = null } = {}) {
     return new Promise((resolve) => {
       const dur = duration ?? Math.max(1.8, 0.75 + text.length * 0.065);
+      // lines spoken in another language are shown translated, tagged with the language: "[영어] ..."
+      const lg = lang ?? CHARACTERS[speaker]?.lang; if (lg && lg !== 'ko' && LANG_LABEL[lg]) text = `[${LANG_LABEL[lg]}] ${text}`;
       const line = { speaker, text, radio, priority, dur, resolve, delay };
       if (priority >= 3 && this.current && this.current.priority < 3) { this.current.resolve(); this.end(); this.queue.unshift(line); }
       else if (priority <= 1) {

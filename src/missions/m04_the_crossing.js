@@ -109,7 +109,7 @@ export async function build(game) {
   game.mission.every((dt) => {
     barkT -= dt; if (barkT > 0 || !d.enemies().some((e) => e.state === 'combat')) return;
     barkT = 7 + Math.random() * 6;
-    const lines = [['yoon', '엄폐하고 쏴!'], ['jung', '사격 중!'], ['reyes', 'Contact front! 정면 교전!'], ['marine', 'Moving! 이동 중!'], ['yoon', '컨테이너 위 조심해!'], ['jung', '재장전! 엄호!'], ['marine', 'Frag out! 수류탄!']];
+    const lines = [['yoon', '엄폐하고 쏴!'], ['jung', '사격 중!'], ['reyes', '정면에 적! 교전!'], ['marine', '이동 중!'], ['yoon', '컨테이너 위 조심해!'], ['jung', '재장전! 엄호!'], ['marine', '수류탄 투척!']];
     const l = lines[Math.floor(Math.random() * lines.length)]; game.dialogue.bark(l[0], l[1]);
   });
 }
@@ -140,7 +140,7 @@ export const SEGMENTS = [
       m.every(() => { lv.rotor?.setPos(heli.position); if (run.done) return false; });
       await m.talk([
         ['pilot', '해무가 짙다. 고도 30, 항만 상공 진입 1분 전.', { radio: true }],
-        ['reyes', 'This is Reyes, Eagle Two. 한국군 분대, 환영한다. 우리 중대는 2번기다. 포대부터 끝내자.', { radio: true }],
+        ['reyes', '여기는 이글 투, 레예스다. 한국군 분대, 환영한다. 우리 중대는 2번기다. 포대부터 끝내자.', { radio: true }],
         ['yoon', '…미군하고 같이 들어가는 건 처음이다.'],
         ['jung', '말 안 통하면 손짓하면 되지. 민재, 도어건 잡았지?'],
       ]);
@@ -387,7 +387,7 @@ export const SEGMENTS = [
       game.effects.smokeGrenade(pz.clone().setY(P.quay + 0.1), [0.85, 0.22, 0.18], 160);
       game.objectives.complete('smoke');
       await m.talk([
-        ['reyes', 'Eagle Flight, 적색 연막 확인 바란다. 착륙지대 표시 완료!', { radio: true, priority: 3 }],
+        ['reyes', '이글 편대, 적색 연막 확인 바란다. 착륙지대 표시 완료!', { radio: true, priority: 3 }],
         ['pilot', '적색 연막 확인. 도착까지 75초. 착륙지대 지켜 줘라.', { radio: true, priority: 3 }],
       ]);
       ensureSupport(game, 1); game.support.calls = Math.max(1, game.support.calls); game.support.announce();

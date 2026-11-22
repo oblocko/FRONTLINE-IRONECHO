@@ -352,6 +352,7 @@ export class UI {
         <div class="stat"><div class="tag">DEATHS</div><div class="v">${stats.deaths}</div></div>
       </div>
       <p style="color:#c3ccc6;line-height:1.8">${esc(stats.epilogue || '')}</p>
+      ${stats.choices?.length ? `<div class="choices-log"><b>이번 작전의 선택</b><br>${stats.choices.map((c) => '· ' + esc(c.replace(/<[^>]+>/g, ''))).join('<br>')}</div>` : ''}
       ${next ? `<div class="panel" style="padding:14px 16px;margin-top:10px"><div class="tag">NEXT // 다음 임무</div><div style="font-weight:700;letter-spacing:.08em;margin:4px 0">MISSION ${next.num} · ${next.title} <span style="color:var(--muted);font-weight:400">${next.ko}</span></div><div style="font-size:13px;color:var(--muted)">${esc(next.summary)}</div>${playableNext ? '' : '<div style="color:var(--warn);font-size:12px;margin-top:6px">이 임무는 아직 제작 중입니다 (설계 문서: docs/CAMPAIGN.md).</div>'}</div>` : ''}
       <div class="row-actions"><button class="btn small" data-a="replay">다시 하기</button><button class="btn small" data-a="menu" data-snd="back">메인 메뉴</button>${playableNext ? '<button class="btn small" data-a="next" style="border-color:var(--accent);color:var(--accent)">다음 작전 ▸</button>' : ''}</div></div></div>`));
     const stop = () => clearInterval(this._next);
@@ -410,7 +411,7 @@ export class UI {
       <div class="mounted hidden"><div class="mn"></div><div class="heat"><i></i></div></div>
       <div class="binos hidden"><div class="vig"></div><div class="tick h"></div><div class="tick v"></div><div class="info"><span class="rng">---</span> m · <span class="calls"></span></div><div class="lbl">LMB 좌표 지정 · RMB 취소</div></div>
       <div class="subs hidden"></div>
-      <div class="health"><div class="lbl"><span>HAN M.J.</span><span class="hp">100</span></div><div class="bar"><i style="width:100%"></i></div><div class="squad"></div></div>
+      <div class="health"><div class="lbl"><span class="who">HAN M.J.</span><span class="hp">100</span></div><div class="bar"><i style="width:100%"></i></div><div class="squad"></div></div>
       <div class="ammo"><div class="wn"></div><div class="pips"></div><div class="num"></div><div class="gren"></div></div>
     </div>`);
     el.classList.add('screen'); el.id = 'hud'; this.root.appendChild(el); this.screens.hud = el; this.hud = el;
@@ -419,7 +420,7 @@ export class UI {
     let html = ''; for (let rep = -1; rep <= 1; rep++) for (let d = 0; d < 360; d += 15) { const x = (rep * 360 + d) * 3; html += `<span class="${labels[d] ? '' : 'tick'}" style="left:${x}px">${labels[d] || '|'}</span>`; }
     strip.innerHTML = html; this.compassStrip = strip;
   }
-  setHUDVisible(v) { this.hud.classList.toggle('hidden', !v); }
+  setHUDVisible(v) { this.hud.classList.toggle('hidden', !v); const w = this.hud.querySelector('.health .who'); if (w) w.textContent = this.game.missionMeta?.pov === 'daniel' ? 'VOSS D.' : 'HAN M.J.'; }
   hint(html, dur = 5) {
     if (!settings.data.gameplay.hints) return;
     const e = $('.hint', this.hud); e.innerHTML = html; e.classList.add('on'); clearTimeout(this._hint); this._hint = setTimeout(() => e.classList.remove('on'), dur * 1000);

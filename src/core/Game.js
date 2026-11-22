@@ -120,7 +120,7 @@ export class Game {
     this.ui.hideAll();
     events.emit('ui:fade', { to: 1, dur: 0 });
     await nextFrame();
-    this.missionMeta = p.meta; this.missionMod = p.mod; this.missionId = id;
+    this.missionMeta = p.meta; this.missionMod = p.mod; this.missionId = id; if (!checkpointId) this.choiceLog = [];
     this.renderer.clearScene(); this.menuScene = null;
     audio.stopAllLoops(); audio.setMusic('silent'); audio.recover(); this.failReason = null;
     // fresh systems
@@ -211,7 +211,7 @@ export class Game {
     const meta = this.missionMeta; const next = nextMission(meta.id);
     this.state = 'complete'; this.input.exitLock();
     const st = this.stats; st.shotsFired = this.weapons.shotsFired; st.shotsHit = this.weapons.shotsHit;
-    const result = { time: Math.round(st.time), kills: st.kills, headshots: st.headshots, deaths: st.deaths, accuracy: st.shotsFired ? Math.round(st.shotsHit / st.shotsFired * 100) : 0, difficulty: settings.data.gameplay.difficulty, epilogue: this.missionMod.EPILOGUE };
+    const result = { time: Math.round(st.time), kills: st.kills, headshots: st.headshots, deaths: st.deaths, accuracy: st.shotsFired ? Math.round(st.shotsHit / st.shotsFired * 100) : 0, difficulty: settings.data.gameplay.difficulty, epilogue: typeof this.missionMod.EPILOGUE === 'function' ? this.missionMod.EPILOGUE() : this.missionMod.EPILOGUE, choices: (this.choiceLog || []).map((c) => c.text) };
     saves.completeMission(meta.id, result, next?.id);
     this.ui.setHUDVisible(false);
     this.teardownMission();
