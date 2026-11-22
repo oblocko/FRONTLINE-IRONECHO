@@ -41,7 +41,7 @@ export class FireSupport {
         s.t = 0.55 + Math.random() * 0.5; s.left--;
         const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * this.spread;
         const pt = new THREE.Vector3(s.at.x + Math.cos(a) * r, 0, s.at.z + Math.sin(a) * r); pt.y = g.world.heightFn(pt.x, pt.z);
-        g.combat.explode(pt, { radius: 6.5, damage: 200, owner: 'player', scale: 1.2, playerSafe: g.player.position.distanceTo(pt) > 12, snow: true });
+        g.combat.explode(pt, { radius: 7.5, damage: 220, owner: 'player', scale: 1.3, heavy: true, playerSafe: g.player.position.distanceTo(pt) > 12, snow: true });
       }
     }
     this.pending = this.pending.filter((s) => s.left > 0);

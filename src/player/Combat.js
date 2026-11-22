@@ -64,7 +64,7 @@ export class Combat {
   }
 
   // Area damage. Cover occlusion: line of sight from blast to target chest.
-  explode(pos, { radius = 7, damage = 120, owner = 'world', shake = 1, scale = 1, playerSafe = false, snow = false, kind = 'blast', label = null } = {}) {
+  explode(pos, { radius = 7, damage = 120, owner = 'world', shake = 1, scale = 1, playerSafe = false, snow = false, kind = 'blast', label = null, heavy = false } = {}) {
     this.effects.explosion(pos, scale, { snow });
     this.audio.explosion(pos, scale);
     const p = this.player;
@@ -79,7 +79,8 @@ export class Combat {
     for (const a of this.director.agents) {
       if (a.dead) continue;
       const d = a.position.distanceTo(pos); if (d > radius) continue;
-      if (!this.world.lineOfSight(pos.clone().setY(pos.y + 0.5), a.chestPos(new THREE.Vector3()))) continue;
+      // heavy shells (artillery / naval) reach behind sandbags and through thin cover close to the burst
+      if (!(heavy && d < radius * 0.7) && !this.world.lineOfSight(pos.clone().setY(pos.y + 0.5), a.chestPos(new THREE.Vector3()))) continue;
       a.suppress(1);
       if (a.team === 'enemy') { const killed = a.takeDamage(damage * (1 - d / radius) * 1.3, pos, 'chest', owner === 'player' ? p : null); if (killed && owner === 'player') { this.stats.kills++; events.emit('player:kill', { agent: a }); events.emit('hud:hitmarker', { kill: true }); } }
     }

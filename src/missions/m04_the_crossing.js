@@ -14,6 +14,7 @@ import { buildAPC } from '../world/Props.js';
 import { events } from '../core/Events.js';
 import { MountedWeapon } from '../gameplay/MountedWeapon.js';
 import { FireSupport } from '../gameplay/FireSupport.js';
+import { pbr } from '../render/TextureFactory.js';
 import { EnemyVehicle } from '../gameplay/EnemyVehicle.js';
 import { V, spawnEnemies, attackOrder, giveLoadout, interact } from './common.js';
 
@@ -74,6 +75,82 @@ function ensureMarines(game, at) {
   return game.marines;
 }
 function followAll(game) { for (const a of allies(game)) { a.unpose(); a.setPassive(false); a.follow(game.player); } }
+// Enemy strongpoint in the port below the bluff — the target for the naval gunfire. Sandbagged ring, a concrete
+// bunker, an MG nest that sweeps the bluff with bursts and RPG teams that fire at the player. Returns its defenders.
+function portStronghold(game, m, C) {
+  const lv = game.level, props = game.props, y0 = lv.hf(C.x, C.z);
+  props.sandbagWall(C.x - 9, C.z - 6, 9, 3, 1); props.sandbagWall(C.x + 9, C.z - 4, 8, 3, 1);
+  props.sandbagWall(C.x - 2, C.z - 11, 12, 3, 0); props.sandbagWall(C.x + 5, C.z + 4, 7, 2, 0);
+  const conc = pbr('concrete', { color: 0x8a8a84, key: 'sp_conc' });
+  props.box(V(6, 2.4, 4.5), V(C.x - 2, y0 + 1.2, C.z - 1), conc, { surface: 'concrete' });
+  props.box(V(6.6, 0.35, 5.1), V(C.x - 2, y0 + 2.55, C.z - 1), conc, { surface: 'concrete' });
+  // MG nest (sandbag horseshoe + gun on tripod) and the gunner's muzzle point
+  props.sandbagWall(C.x + 4, C.z - 9.5, 3.5, 2, 0); props.sandbagWall(C.x + 2.2, C.z - 8, 2.5, 2, 1); props.sandbagWall(C.x + 5.8, C.z - 8, 2.5, 2, 1);
+  const gm = new THREE.MeshStandardMaterial({ color: 0x1d1e1e, metalness: 0.6, roughness: 0.45 });
+  const mgp = V(C.x + 4, y0 + 1.05, C.z - 8.4);
+  const gun = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 1.2), gm); gun.position.copy(mgp); game.renderer.scene.add(gun);
+  for (const a of [0, 2.1, 4.2]) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.1, 6), gm); leg.position.set(mgp.x + Math.sin(a) * 0.3, y0 + 0.5, mgp.z + Math.cos(a) * 0.3); leg.rotation.set(Math.cos(a) * 0.35, 0, -Math.sin(a) * 0.35); game.renderer.scene.add(leg); }
+  // camo net over the bunker, a flag pole, ammo crates
+  const net = new THREE.Mesh(new THREE.PlaneGeometry(9, 7, 6, 5), new THREE.MeshStandardMaterial({ color: 0x4a4e38, roughness: 1, side: THREE.DoubleSide }));
+  const np = net.geometry.attributes.position; for (let i = 0; i < np.count; i++) np.setZ(i, Math.sin(i * 1.7) * 0.25); net.geometry.computeVertexNormals();
+  net.rotation.x = -Math.PI / 2; net.position.set(C.x - 2, y0 + 3.0, C.z - 1); game.renderer.scene.add(net);
+  for (let i = 0; i < 4; i++) props.box(V(0.9, 0.5, 0.5), V(C.x + 6 + (i % 2) * 1.0, y0 + 0.25 + Math.floor(i / 2) * 0.5, C.z + 1.5), pbr('wood', { color: 0x5a5a3a, key: 'sp_crate' }), { surface: 'wood' });
+  // burning barrels + a smoke plume so the position reads through the harbour fog
+  for (const [dx, dz] of [[-6, 3], [7, -3]]) { props.box(V(0.6, 0.9, 0.6), V(C.x + dx, y0 + 0.45, C.z + dz), gm, { surface: 'metal' }); game.effects.fireEmitter(V(C.x + dx, y0 + 0.95, C.z + dz), 0.45); }
+  game.effects.smokeColumn(V(C.x - 2, y0 + 3, C.z - 1), 0.9, [0.22, 0.22, 0.22]);
+  // defenders: hold the position (they do not run up the bluff), engage at long range
+  const spots = [[-8, -4], [-8, 1], [-4, -9], [0, -9], [3, -9.6], [7, -6], [8, -1], [6, 3], [-3, 4], [1, 2], [-6, -11], [10, -5]];
+  const def = spawnEnemies(game, spots.map(([dx, dz]) => [C.x + dx, C.z + dz]), { state: 'combat', accuracy: 0.32, visionRange: 220 });
+  def.forEach((e, i) => { e.hold(V(C.x + spots[i][0], 0, C.z + spots[i][1]), game.player.position); e.target = game.player; e.lastSeenPos = game.player.position.clone(); });
+  const mgGunner = def[4]; const rpgTeam = [def[2], def[7], def[10]];
+  // MG: bursts sweeping toward the player
+  let mgT = 2;
+  m.every((dt) => {
+    if (mgGunner.dead) return false; mgT -= dt; if (mgT > 0) return;
+    mgT = 2.4 + Math.random() * 2.2;
+    const tgt = game.player.chestPos(V(0, 0, 0)); const dir = tgt.clone().sub(mgp).normalize(); gun.lookAt(mgp.clone().add(dir));
+    let n = 7 + Math.floor(Math.random() * 6);
+    const burst = () => {
+      if (mgGunner.dead || n-- <= 0) return;
+      const aim = tgt.clone().add(V((Math.random() - 0.5) * 6, (Math.random() - 0.3) * 2.5, (Math.random() - 0.5) * 6));
+      const d = aim.clone().sub(mgp).normalize(); const hit = game.world.raycast(mgp, d, 260, { ignore: (c) => c.passBullets });
+      const end = hit ? hit.point : mgp.clone().addScaledVector(d, 260);
+      game.effects.muzzleFlash(mgp, d); game.effects.tracer(mgp, end, 260); game.audio.shot(mgp, { enemy: true });
+      if (hit) game.effects.impact(hit.point, hit.normal, hit.surface);
+      const pc = game.player.chestPos(V(0, 0, 0)); const along = pc.clone().sub(mgp).dot(d); const closest = mgp.clone().addScaledVector(d, along);
+      if (along > 0 && closest.distanceTo(pc) < 2.5) { game.player.nearMiss?.(closest); if (closest.distanceTo(pc) < 0.9 && game.world.lineOfSight(mgp, pc)) game.player.takeDamage(7, mgp, mgGunner); }
+      setTimeout(burst, 85);
+    };
+    burst();
+  });
+  // RPGs: a rocket every few seconds from one of the live RPG gunners; flies with a smoke trail and bursts on contact
+  let rpgT = 6;
+  const rockets = [];
+  m.every((dt) => {
+    rpgT -= dt; const live = rpgTeam.filter((e) => !e.dead);
+    if (rpgT <= 0 && live.length) {
+      rpgT = 7 + Math.random() * 6; const sh = live[Math.floor(Math.random() * live.length)];
+      const from = sh.chestPos(V(0, 0, 0)).add(V(0, 0.3, 0)); const to = game.player.position.clone().add(V((Math.random() - 0.5) * 8, 1 + Math.random(), (Math.random() - 0.5) * 8));
+      const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 0.7, 6).rotateX(Math.PI / 2), gm); mesh.position.copy(from); mesh.lookAt(to); game.renderer.scene.add(mesh);
+      rockets.push({ mesh, v: to.clone().sub(from).normalize().multiplyScalar(55), life: 6 });
+      game.effects.muzzleFlash(from, to.clone().sub(from).normalize()); game.audio.explosion(from, 0.25, { ring: false });
+      if (sh.actor?.gesture) sh.actor.gesture('wave', 0.4);
+    }
+    for (const r of rockets) {
+      if (r.done) continue; r.life -= dt; const step = r.v.clone().multiplyScalar(dt); const p = r.mesh.position;
+      const hit = game.world.raycast(p, step.clone().normalize(), step.length(), {});
+      const nearPlayer = p.distanceTo(game.player.chestPos(V(0, 0, 0))) < 1.2;
+      if (hit || nearPlayer || r.life <= 0) {
+        r.done = true; game.renderer.scene.remove(r.mesh);
+        game.combat.explode(hit ? hit.point : p.clone(), { radius: 4.5, damage: 55, owner: 'enemy', scale: 0.9, kind: 'grenade', label: 'RPG' });
+        continue;
+      }
+      p.add(step);
+      game.effects.smoke.spawn({ x: p.x, y: p.y, z: p.z, vx: (Math.random() - 0.5) * 0.3, vy: 0.2, vz: (Math.random() - 0.5) * 0.3, size: 0.25, endSize: 1.4, life: 1.6, alpha: 0.5, endAlpha: 0, r: 0.75, g: 0.74, b: 0.7, drag: 2 });
+    }
+  });
+  return def;
+}
 function ensureSupport(game, calls = 2) { if (!game.support) game.support = new FireSupport(game, { calls, rounds: 5, spread: 8, delay: 5.5, caller: 'reyes' }); else game.support.calls = Math.max(game.support.calls, calls); }
 
 export async function build(game) {
@@ -208,11 +285,23 @@ export const SEGMENTS = [
         if (done === 1) m.spawn(async () => {
           await m.talk([['reyes', `포대 ${b.name} 침묵! 구축함 연결됐다 — 함포 지원 두 번 가능하다. 쌍안경으로 찍어!`, { radio: true, priority: 3 }]]);
           ensureSupport(game, 2); game.support.announce();
+          // the strongpoint in the port opens up on the bluff — the naval guns' target
+          const C = V(-14, 0, -46); lv.strong = portStronghold(game, m, C); lv.fogTarget = 0.012;   // the fog lifts off the harbour: the position must be visible from the bluff
+          game.objectives.add('strong', '항만 적 진지 제압 — 쌍안경으로 함포 지원 요청', { marker: C.clone().setY(lv.hf(C.x, C.z) + 3) });
+          await m.say('jung', '아래 항만! 진지에서 기관총이랑 RPG 쏜다! 엎드려!', { priority: 3 });
+          await m.say('reyes', '저 진지 — 함포로 날려버려! 쌍안경으로 좌표 찍어!', { radio: true, priority: 3 });
+          // a call that misses still leaves the destroyer on station: top up while the position holds out
+          m.every(() => { const alive = lv.strong.filter((e) => !e.dead).length; if (alive <= 2) return false; if (game.support && game.support.calls <= 0 && !game.support.pending.some((p) => p.left > 0)) { game.support.calls = 1; game.support.announce(); } });
+          await m.until(() => lv.strong.filter((e) => !e.dead).length <= 2, 400);
+          for (const e of lv.strong) if (!e.dead) e.kill(C);
+          game.objectives.complete('strong');
+          await m.say('reyes', '직격! 진지 박살났다. 좋아!', { radio: true, priority: 3 });
         });
         else if (done < 3) m.spawn(() => m.say('yoon', `${b.name} 끝! 다음!`, { priority: 2 }));
       };
       await Promise.all(bats.map(plant));
       game.objectives.complete('batteries');
+      if (lv.strong) await m.until(() => lv.strong.every((e) => e.dead), 300);
       // a counter-attack from the bunker line
       const counter = spawnEnemies(game, [[4, -132], [8, -128], [0, -146], [14, -150, { role: 'flanker' }], [-4, -122]], { state: 'combat', accuracy: 0.8 }); attackOrder(game, counter, game.player);
       await m.say('jung', '벙커 쪽에서 나온다!', { priority: 3 });
