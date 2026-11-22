@@ -10,6 +10,8 @@ import { Sky } from '../../render/Sky.js';
 import { Weather } from '../../render/Effects.js';
 import { settings } from '../../core/Settings.js';
 import { buildTruck } from '../Props.js';
+import { wreck } from '../../render/Destruction.js';
+const rand = (a, b) => a + Math.random() * (b - a);
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -181,8 +183,11 @@ export class HantanRiver {
     };
     this.bridgeCols = { north: span(B.z0, B.mid[0], scene), south: span(B.mid[1], B.z1, scene) };
     // the middle span is a separate group: it is dropped when the bridge is blown
+    // built as four 5 m deck sections so the demolition can break it apart
     const mid = new THREE.Group(); mid.userData.dynamic = true; scene.add(mid); this.midSpan = mid;
-    this.bridgeCols.mid = span(B.mid[0], B.mid[1], mid);
+    this.midPieces = []; this.bridgeCols.mid = [];
+    const cuts = [B.mid[0], B.mid[0] + 5, 0, B.mid[1] - 5, B.mid[1]];
+    for (let i = 0; i < 4; i++) { const piece = new THREE.Group(); mid.add(piece); this.bridgeCols.mid.push(...span(cuts[i], cuts[i + 1], piece)); this.midPieces.push({ g: piece, z0: cuts[i], z1: cuts[i + 1] }); }
     // piers
     for (const z of [-10, 10]) {
       const pier = new THREE.Mesh(new THREE.BoxGeometry(B.half * 2 - 1, 6, 1.6), dark); pier.position.set(0, B.deck - 4.6, z); pier.castShadow = true; scene.add(pier);
@@ -192,8 +197,9 @@ export class HantanRiver {
     for (const z of [-20, 20]) { const ab = new THREE.Mesh(new THREE.BoxGeometry(B.half * 2 + 1, 4, 3), dark); ab.position.set(0, B.deck - 2.6, z); ab.castShadow = true; scene.add(ab); }
     // lamp posts (dark: power is out)
     for (const z of [-18, 0, 18]) for (const s of [-1, 1]) {
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 6, 8), rail); pole.position.set(s * (B.half - 0.2), B.deck + 3, z + s * 4); scene.add(pole);
-      const arm = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.15), rail); arm.position.set(s * (B.half - 0.75), B.deck + 5.95, z + s * 4); scene.add(arm);
+      const zz = z + s * 4; const host = Math.abs(zz) < B.mid[1] ? this.midPieces.find((pc) => zz >= pc.z0 && zz < pc.z1).g : scene;   // poles on the middle span go down with it
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 6, 8), rail); pole.position.set(s * (B.half - 0.2), B.deck + 3, zz); host.add(pole);
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.15), rail); arm.position.set(s * (B.half - 0.75), B.deck + 5.95, zz); host.add(arm);
     }
     p.sign(-7, 31, '한탄대교', { sub: 'HANTAN BRIDGE · 중량 40t', bg: '#1e4c7a', rotY: Math.PI, w: 2.6, h: 0.9, height: 2.2 });
     // abandoned cars on the bridge (cover for the enemy rush)
@@ -347,15 +353,47 @@ export class HantanRiver {
     g.audio.click(0.25, 200, 0.4);
     return f;
   }
-  dropMidSpan() {
-    const g = this.game, w = g.world;
+  // Demolition of the middle span: the charges shear it at both piers and in the middle. The two end
+  // sections hinge down off the pier caps, the two middle ones drop and tumble into the river; concrete
+  // chunks fly, rebar and jagged stubs are left on the standing spans, grit keeps trickling for a while.
+  // `rider`: something standing on the span (the tank) goes down with the section under it.
+  dropMidSpan(rider = null, { onRiderSplash = null } = {}) {
+    const g = this.game, w = g.world, B = RIVER.bridge, W = wreck(g); W.water = RIVER.water;
     for (const c of this.bridgeCols.mid) w.removeCollider(c);
-    const mid = this.midSpan; let t = 0;
-    g.mission.every((dt) => {
-      t += dt; const k = Math.min(1, t / 1.4);
-      mid.position.y = -k * k * 5.2; mid.rotation.x = k * 0.22; mid.rotation.z = Math.sin(k * 3) * 0.04;
-      if (k >= 1) { g.effects.explosion(V(0, RIVER.water + 0.2, 0), 1.6); return false; }
+    const topY = B.deck - 0.7;
+    this.brokenEnds(W);
+    for (const z of [-7.5, 0, 7.5]) { W.chunks(V(rand(-2, 2), B.deck + 0.3, z), { count: 22, size: 0.45, speed: 7, up: 7, mat: 'concrete' }); W.chunks(V(0, B.deck - 1, z), { count: 10, size: 0.6, speed: 4, up: 2, mat: 'concreteDark' }); }
+    let riderPiece = null;
+    if (rider) { riderPiece = this.midPieces.find((pc) => rider.position.z >= pc.z0 - 1 && rider.position.z < pc.z1 + 1) || this.midPieces[1]; riderPiece.g.updateMatrixWorld(true); riderPiece.g.attach(rider); }
+    this.midPieces.forEach((pc, i) => {
+      const hinge = i === 0 ? pc.z0 : i === 3 ? pc.z1 : null;
+      const pivot = new THREE.Group(); pivot.position.set(0, topY, hinge ?? (pc.z0 + pc.z1) / 2); this.game.renderer.scene.add(pivot); pivot.attach(pc.g);
+      const st = { t: 0, a: 0, va: 0, vy: 0, y: 0, wet: false, rot: V(rand(-0.25, 0.25), rand(-0.1, 0.1), rand(-0.2, 0.2)), delay: i === 1 || i === 2 ? 0.05 : 0.25 };
+      const maxA = 0.62 + rand(-0.06, 0.08), dir = i === 0 ? 1 : -1;
+      g.mission.every((dt) => {
+        st.t += dt; if (st.t < st.delay) return;
+        if (hinge !== null) {
+          st.va += dt * 2.4; st.a = Math.min(maxA, st.a + st.va * dt); pivot.rotation.x = dir * st.a; pivot.rotation.z = Math.sin(st.t * 7) * 0.01 * (1 - st.a / maxA);
+          if (st.a >= maxA) { const tip = V(0, RIVER.water, pc.z0 + (pc.z1 - pc.z0) / 2 + dir * 1.5); W.splash(tip, 1.6); W.chunks(tip.clone().add(V(0, 0.5, 0)), { count: 10, size: 0.4, speed: 4, up: 4 }); if (pc === riderPiece) onRiderSplash?.(); return false; }
+        } else {
+          st.vy += 16 * dt; st.y -= st.vy * dt; pivot.position.y = topY + st.y; pivot.rotation.x += st.rot.x * dt * 2; pivot.rotation.z += st.rot.z * dt * 2;
+          if (!st.wet && pivot.position.y < RIVER.water + 0.4) { st.wet = true; st.vy *= 0.25; W.splash(V(0, RIVER.water, pivot.position.z), 2.0); W.splash(V(rand(-2, 2), RIVER.water, pivot.position.z + rand(-2, 2)), 1.2); g.audio.explosion(pivot.position, 0.8, { ring: false }); if (pc === riderPiece) onRiderSplash?.(); }
+          if (pivot.position.y < RIVER.water - 1.6) return false;   // rests on the river bed, top half above water
+        }
+      });
     });
+    g.player.addShake(0.9);
+    return riderPiece;
+  }
+  // broken faces of the standing spans: jagged concrete, bent rebar, trickling grit
+  brokenEnds(W = wreck(this.game), { dust = true } = {}) {
+    if (this._ends) return; this._ends = true; const B = RIVER.bridge;
+    for (const [z, out] of [[B.mid[0], V(0, 0, 1)], [B.mid[1], V(0, 0, -1)]]) {
+      W.brokenEdge(V(0, B.deck - 0.35, z), out, { width: B.half * 2 - 0.4, depth: 0.8 });
+      W.rebar(V(0, B.deck - 0.4, z), out, { width: B.half * 2 - 0.8, n: 12, len: 1.2 });
+      W.rebar(V(0, B.deck - 1.3, z), out, { width: B.half * 2 - 2, n: 7, len: 0.9 });
+      if (dust) W.dustFall(V(0, B.deck - 0.6, z + out.z * 0.3), { width: B.half * 2 - 1, dur: 12, side: V(1, 0, 0) });
+    }
   }
   // thermal sight: cold sky, grey ground, hot engines glow white
   setThermal(on) {

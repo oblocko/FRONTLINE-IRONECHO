@@ -16,6 +16,7 @@ import { saves } from '../core/SaveSystem.js';
 import { MountedWeapon } from '../gameplay/MountedWeapon.js';
 import { FireSupport } from '../gameplay/FireSupport.js';
 import { EnemyBoat } from '../gameplay/EnemyBoat.js';
+import { wreck } from '../render/Destruction.js';
 import { V, spawnEnemies, attackOrder, hintKeys, giveLoadout, shell, interact } from './common.js';
 
 export const TEXTURES = ['concrete', 'asphalt', 'dirt', 'grassdead', 'metal', 'paintedMetal', 'wood', 'fabric', 'camoROK', 'camoEnemy', 'sandbag', 'plaster', 'brick'];
@@ -442,10 +443,18 @@ export const SEGMENTS = [
         await m.say('yoon', '…너무 일렀다! 전차는 그대로다!', { priority: 3 });
         game.failMission('전차가 중앙 경간에 오르기 전에 기폭했습니다', '전차가 중앙 경간 위에 있을 때 기폭'); await m.wait(999);
       }
-      lv.dropMidSpan(); tankV.dead = true;
-      // the tank goes down with the span
-      let tt = 0; const t0 = tank.position.clone();
-      m.every((dt) => { tt += dt; const k = Math.min(1, tt / 1.6); tank.position.y = t0.y - k * k * 6.5; tank.rotation.x = -k * 0.5; if (k >= 1) { game.effects.explosion(V(tank.position.x, R.water + 0.3, tank.position.z), 1.8); game.audio.explosion(tank.position, 1.2); return false; } });
+      tankV.dead = true;
+      // the tank rides its deck section into the river; when it hits the water the ammunition goes up,
+      // the turret is thrown clear and the hull burns half-submerged
+      lv.dropMidSpan(tank, { onRiderSplash: () => {
+        const W = wreck(game), tp = tank.getWorldPosition(new THREE.Vector3());
+        game.effects.explosion(tp.clone().add(V(0, 1.5, 0)), 2.0); game.audio.explosion(tp, 1.4); game.effects.flashLight(tp, 0xff8a30, 60, 0.4, 50);
+        W.char(tank, 0.2);
+        const tur = tank.userData.turret; W.detach(tur, { v: V(rand(-2, 2), 12, rand(2, 5)), av: V(rand(-3, 3), rand(-5, 5), rand(-3, 3)), half: 0.7, life: 120 });
+        W.cookOff(tp.clone().add(V(0, 1.2, 0)), { dur: 12, n: 6, scale: 0.7 });
+        game.effects.fireEmitter(tp.clone().add(V(0, 1.2, 0)), 1.3); game.effects.smokeColumn(tp.clone().add(V(0, 3, 0)), 1.4, [0.1, 0.1, 0.1]);
+        game.effects.smokeColumn(V(tp.x, R.water + 0.3, tp.z), 0.8, [0.75, 0.78, 0.8]);   // steam where the hot hull meets the water
+      } });
       for (const e of game.director.enemies()) if (Math.abs(e.position.x) < 6 && Math.abs(e.position.z) < 30) e.kill(V(0, 0, 0));
       game.objectives.complete('blow');
       game.player.addShake(1); game.audio.tinnitus(0.6);
@@ -464,6 +473,8 @@ export const SEGMENTS = [
     async setup(game) {
       giveLoadout(game); const lv = game.level; lv.ghostsGone = true; lv.war = true;
       lv.dropMidSpanInstant = true; lv.midSpan.visible = false; for (const c of lv.bridgeCols.mid) game.world.removeCollider(c);
+      lv.brokenEnds(undefined, { dust: false });
+      for (const [z, rx] of [[-6, 0.55], [6, -0.6], [0, 0.15]]) { const slab = new THREE.Mesh(new THREE.BoxGeometry(8.6, 0.8, 5), new THREE.MeshStandardMaterial({ color: 0x7a7a74, roughness: 0.95 })); slab.position.set(rand(-0.6, 0.6), R.water - 0.5, z); slab.rotation.set(rx, rand(-0.15, 0.15), rand(-0.12, 0.12)); game.renderer.scene.add(slab); }
       game.player.teleport(V(-6, lv.hf(-6, 40), 40), Math.PI);
       lv.truck.position.set(1, lv.hf(1, 56), 56);
       unseatSquad(game, lv.truck, V(-4, 0, 42));
