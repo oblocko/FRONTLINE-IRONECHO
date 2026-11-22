@@ -125,7 +125,11 @@ function prepBody(gltf) {
   }
   // face front at eye level (for eyewear placement)
   let faceZ = -1; for (let i = 0; i < n; i++) if (za[i * 4] > 0.5 && Math.abs(pos.getY(i) - eyeY) < 0.02 && Math.abs(pos.getX(i)) < 0.05) faceZ = Math.max(faceZ, pos.getZ(i));
-  return { scene, body, rest, eyeY, faceZ };
+  // eye geometry (for the procedural eyelids) and the average skin colour of the body texture
+  let eye = null; if (eyes) { const bb = new THREE.Box3().setFromObject(eyes); const r = Math.max(0.008, (bb.max.y - bb.min.y) / 2); eye = { x: Math.max(0.02, bb.max.x - r), y: (bb.min.y + bb.max.y) / 2, z: bb.max.z, r }; }
+  let skinAvg = new THREE.Color(0xc8967c);
+  try { const img = body.material.map?.image; if (img) { const c = document.createElement('canvas'); c.width = c.height = 16; const g = c.getContext('2d'); g.drawImage(img, 0, 0, 16, 16); const d = g.getImageData(0, 0, 16, 16).data; let rr = 0, gg = 0, b2 = 0, n = 0; for (let i = 0; i < d.length; i += 4) { if (d[i + 3] < 200) continue; rr += d[i]; gg += d[i + 1]; b2 += d[i + 2]; n++; } if (n) skinAvg = new THREE.Color().setRGB(rr / n / 255, gg / n / 255, b2 / n / 255, THREE.SRGBColorSpace); } } catch {}
+  return { scene, body, rest, eyeY, faceZ, eye, skinAvg };
 }
 
 export function loadCharacters() {
@@ -191,6 +195,7 @@ export function lookFor(key, variant) {
   if (LOOKS[key]) return LOOKS[key];
   return { cloth: 'fabric', top: CIV_TOPS[variant % CIV_TOPS.length], pants: CIV_PANTS[(variant >> 1) % CIV_PANTS.length], boot: SHOES[(variant >> 2) % SHOES.length], glove: -1, rep: 12, sleeve: variant % 3 === 0 ? 0 : 1 };
 }
+export function skinTone(key, variant) { const t = SKIN_TINTS[key === 'civ' || key === 'us' ? variant % SKIN_TINTS.length : variant % 5]; return t; }
 const SKIN_TINTS = [[1, 1, 1], [0.93, 0.9, 0.86], [0.84, 0.78, 0.72], [1.05, 1.02, 0.98], [0.97, 0.92, 0.85], [0.76, 0.68, 0.6]];
 
 // skin (head, hands, and short-sleeved forearms); everything under the garments is discarded
@@ -216,15 +221,40 @@ export function bodyMaterial(base, key, variant) {
 }
 
 // uniform fabric on the garment shell: camo / colour per zone, ripstop weave normal, boots
+// Cloth normal map: fine weave plus folds — compression creases (soft ridges at random angles, mostly
+// across the limb), a few long drape folds and seams. Height field → normals on a canvas, made once.
+let FOLD = null;
+function clothFoldNormal() {
+  if (FOLD) return FOLD;
+  const N = 512, h = new Float32Array(N * N);
+  let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  // weave
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) h[y * N + x] = 0.06 * Math.sin(x * Math.PI / 2) * Math.sin(y * Math.PI / 2) + 0.03 * (rnd() - 0.5);
+  // folds: gaussian ridges along short segments, wrapped (tileable)
+  const ridge = (cx, cy, ang, len, w, amp) => { const dx = Math.cos(ang), dy = Math.sin(ang); const R = Math.ceil(len / 2 + w * 3);
+    for (let oy = -R; oy <= R; oy++) for (let ox = -R; ox <= R; ox++) { const along = ox * dx + oy * dy, across = -ox * dy + oy * dx; if (Math.abs(along) > len / 2) continue;
+      const fall = Math.cos(along / (len / 2) * Math.PI / 2); const v = amp * fall * fall * Math.exp(-(across * across) / (2 * w * w));
+      const x = ((Math.round(cx + ox) % N) + N) % N, y = ((Math.round(cy + oy) % N) + N) % N; h[y * N + x] += v; } };
+  for (let i = 0; i < 70; i++) ridge(rnd() * N, rnd() * N, (rnd() - 0.5) * 0.9, 40 + rnd() * 110, 3 + rnd() * 6, (rnd() < 0.5 ? 1 : -0.7) * (0.6 + rnd() * 0.8));   // creases
+  for (let i = 0; i < 10; i++) ridge(rnd() * N, rnd() * N, Math.PI / 2 + (rnd() - 0.5) * 0.5, 160 + rnd() * 200, 10 + rnd() * 8, 0.9);                              // drape folds
+  for (let i = 0; i < 3; i++) { const y0 = Math.floor(rnd() * N); for (let x = 0; x < N; x++) { h[y0 * N + x] -= 0.5; h[((y0 + 1) % N) * N + x] -= 0.25; } }            // seams
+  const c = document.createElement('canvas'); c.width = c.height = N; const g = c.getContext('2d'); const img = g.createImageData(N, N);
+  const H = (x, y) => h[((y + N) % N) * N + ((x + N) % N)];
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const nx = (H(x - 1, y) - H(x + 1, y)) * 2.2, ny = (H(x, y - 1) - H(x, y + 1)) * 2.2; const l = Math.hypot(nx, ny, 1); const i = (y * N + x) * 4;
+    img.data[i] = (nx / l * 0.5 + 0.5) * 255; img.data[i + 1] = (ny / l * 0.5 + 0.5) * 255; img.data[i + 2] = (1 / l * 0.5 + 0.5) * 255; img.data[i + 3] = 255; }
+  g.putImageData(img, 0, 0);
+  FOLD = new THREE.CanvasTexture(c); FOLD.wrapS = FOLD.wrapT = THREE.RepeatWrapping; FOLD.anisotropy = 4; FOLD.colorSpace = THREE.NoColorSpace;
+  return FOLD;
+}
 export function garmentMaterial(key, variant) {
   const lk = lookFor(key, variant);
   const mkey = `garment|${key}|${key === 'civ' ? variant % 60 : 0}`;
   if (LIB.mats.has(mkey)) return LIB.mats.get(mkey);
   const tex = pbr(lk.cloth, { repeat: [1, 1], key: `cloth_${lk.cloth}` });
-  const weave = pbr('fabric', { repeat: [1, 1], key: 'weave' }).normalMap.clone(); weave.repeat.set(lk.rep * 6, lk.rep * 6); weave.needsUpdate = true;
+  const weave = clothFoldNormal().clone(); weave.repeat.set(lk.rep * 0.9, lk.rep * 0.9); weave.needsUpdate = true;   // fabric weave + creases and folds
   // plain cloth (civilian clothes, police, greatcoat): colour only, the weave normal gives the texture
   let map = null; if (lk.cloth !== 'fabric') { map = tex.map.clone(); map.repeat.set(lk.rep, lk.rep); map.needsUpdate = true; }
-  const m = new THREE.MeshStandardMaterial({ map, normalMap: weave, normalScale: new THREE.Vector2(0.6, 0.6), roughness: 0.93, metalness: 0, side: THREE.DoubleSide });
+  const m = new THREE.MeshStandardMaterial({ map, normalMap: weave, normalScale: new THREE.Vector2(0.9, 0.9), roughness: 0.93, metalness: 0, side: THREE.DoubleSide });
   const U = { uTop: { value: new THREE.Color(lk.top) }, uPants: { value: new THREE.Color(lk.pants) }, uBoot: { value: new THREE.Color(lk.boot) }, uShirt: { value: new THREE.Color(lk.shirt ?? 0xffffff) }, uShirtOn: { value: lk.shirt ? 1 : 0 } };
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);

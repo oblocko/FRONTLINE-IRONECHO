@@ -7,7 +7,7 @@
 //            pointing / halt gestures, head look-at.
 // Same public interface as the procedural Actor (target / anim / rayTest / die …).
 import * as THREE from 'three';
-import { characterLib, cloneBody, bodyMaterial, garmentMaterial, maskMaterial, gearFor, lookKey, lookFor, LOOKS, buildNpcWeapon, weaponTypeFor, vhash } from './CharacterLib.js';
+import { characterLib, skinTone, cloneBody, bodyMaterial, garmentMaterial, maskMaterial, gearFor, lookKey, lookFor, LOOKS, buildNpcWeapon, weaponTypeFor, vhash } from './CharacterLib.js';
 import { buildNpcRifle } from './HumanModel.js';
 
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -79,6 +79,7 @@ export class ModelActor {
       const mat = src.material.clone(); if (color != null) mat.color.setHex(color);
       if (id.startsWith('eyebrows')) { mat.map = null; mat.alphaMap = null; mat.transparent = false; mat.roughness = 0.95; mat.metalness = 0; }   // the brow texture lost its alpha in the JPEG pack → solid brows
       const m = new THREE.Mesh(src.geometry, mat); m.matrixAutoUpdate = false; m.matrix.multiplyMatrices(headInv, src.matrixWorld); m.castShadow = true; B.Head.add(m);
+      if (id.startsWith('eyebrows')) { this.brows = m; m.userData.headInv = headInv; m.userData.src = src.matrixWorld.clone(); m.userData.T = new THREE.Matrix4(); }
     };
     const HAIRC = [0x1a1410, 0x2a1d14, 0x0f0d0b, 0x3a2a1c, 0x55463a];
     // individual variation: head proportions, build and height
@@ -87,6 +88,20 @@ export class ModelActor {
     B.spine_03.scale.set(0.94 + r(4) * 0.1, 1, 0.95 + r(5) * 0.08);
     this.model.scale.setScalar((sex === 'f' ? 0.94 : 0.97) + r(6) * 0.07);
     if (!LOOKS[look]?.mask) addHair(sex === 'f' ? 'eyebrows_female' : 'eyebrows_regular', [0x1a1410, 0x2a1d14, 0x0f0d0b, 0x3a2a1c][variant % 4]);
+    // eyelids: skin-coloured ellipsoids in front of the eyes (rest-space, carried by the head bone like the
+    // hair) — a thin upper lid normally; they blink, narrow when aiming and close in pain / death
+    const E = lib[sex].eye;
+    if (E && !LOOKS[look]?.mask) {
+      const tint = skinTone(look, variant); const col = lib[sex].skinAvg.clone(); col.r *= tint[0] * 0.92; col.g *= tint[1] * 0.9; col.b *= tint[2] * 0.9;
+      const mat = new THREE.MeshStandardMaterial({ color: col, roughness: 0.7 });
+      const holder = new THREE.Group(); holder.matrixAutoUpdate = false; holder.matrix.copy(headInv); B.Head.add(holder);
+      this.lids = [];
+      for (const sx of [-1, 1]) {
+        const lid = new THREE.Mesh(new THREE.SphereGeometry(E.r * 1.1, 14, 10), mat); lid.userData.c = new THREE.Vector3(sx * E.x, E.y, E.z - E.r * 0.55);
+        lid.position.copy(lid.userData.c); lid.scale.set(1.2, 0.2, 0.5); holder.add(lid); this.lids.push(lid);
+      }
+      this.eyeR = E.r;
+    }
     if (hat === 'none' || hat === 'headset') {
       const pick = sex === 'f' ? ['hair_long', 'hair_buns', 'hair_buzzedfemale'][variant % 3] : ['hair_simpleparted', 'hair_buzzed', 'hair_simpleparted'][variant % 3];
       addHair(pick, HAIRC[variant % HAIRC.length]);
@@ -182,6 +197,20 @@ export class ModelActor {
     if (a.reload > 0) a.reload = Math.max(0, a.reload - dt / 2.4);
     if (a.dying) a.dead = Math.min(1, a.dead + dt * 1.6);
     const armed = !!this.weapon && this.weapon.parent === this.weaponPivot;
+    // ---- face: blinks, squint when aiming, pain, eyes closed when dead; eyebrows frown / lift ----
+    if (this.lids || this.brows) {
+      a.blinkT = (a.blinkT ?? 3) - dt; let blink = 0;
+      if (a.blinkT < 0) { blink = Math.max(0, 1 - Math.abs(a.blinkT + 0.07) / 0.07); if (a.blinkT < -0.14) a.blinkT = 1.5 + Math.random() * 4.5 - (a.aim > 0.5 ? 0.8 : 0); }
+      const pain = Math.min(1, a.flinch || 0), dead = a.dying ? Math.min(1, (a.dead || 0) * 3) : 0, wounded = a.wounded || 0;
+      const target = Math.max(blink, a.aim * 0.32, pain * 0.65, dead, wounded * 0.45);
+      a.lid = target > (a.lid || 0) ? target : damp(a.lid || 0, target, 14, dt);
+      if (this.lids) for (const l of this.lids) { const k = a.lid; l.scale.y = 0.2 + 0.85 * k; l.position.y = l.userData.c.y + this.eyeR * (0.85 - 0.85 * k); }
+      if (this.brows) {
+        const talkLift = a.talk > 0.3 ? Math.max(0, Math.sin((a.breathe || 0) * 3.1 + this.variant)) * 0.0025 * a.talk : 0;
+        const oy = -a.aim * 0.0022 + pain * 0.003 + talkLift - dead * 0.001, oz = a.aim * 0.001;
+        const u = this.brows.userData; u.T.makeTranslation(0, oy, oz).multiply(u.src); this.brows.matrix.multiplyMatrices(u.headInv, u.T);   // offset in rest (body) space: up / forward
+      }
+    }
 
     // ---- clip weights ----
     const W = {}; for (const k in this.actions) W[k] = 0;
