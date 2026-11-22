@@ -210,10 +210,19 @@ export class ModelActor {
     }
     const ac = this.actions;
     if (ac.Walk_Loop) ac.Walk_Loop.timeScale = clamp(s / 1.45, 0.55, 1.6);
-    if (ac.Jog_Fwd_Loop) ac.Jog_Fwd_Loop.timeScale = clamp(s / 3.4, 0.6, 1.5);
-    if (ac.Sprint_Loop) ac.Sprint_Loop.timeScale = clamp(s / 5.4, 0.7, 1.4);
+    // running cadence: longer strides rather than a faster skip (fast playback made soldiers look like they bounce)
+    if (ac.Jog_Fwd_Loop) ac.Jog_Fwd_Loop.timeScale = clamp(s / 3.9, 0.6, 1.12);
+    if (ac.Sprint_Loop) ac.Sprint_Loop.timeScale = clamp(s / 6.0, 0.7, 1.08);
     if (ac.Crouch_Fwd_Loop) ac.Crouch_Fwd_Loop.timeScale = clamp(s / 1.3, 0.5, 1.6);
     this.mixer.update(dt);
+    // a loaded soldier runs heavy and low: flatten the clips' vertical hop around its running average and
+    // lean the torso into the run
+    const runW = (this.weights.Jog_Fwd_Loop || 0) + (this.weights.Sprint_Loop || 0);
+    const pel = this.bones?.pelvis;
+    if (pel && !a.dying) {
+      this._pelAvg = this._pelAvg === undefined ? pel.position.y : damp(this._pelAvg, pel.position.y, 2.5, dt);
+      if (runW > 0.01) pel.position.y = this._pelAvg + (pel.position.y - this._pelAvg) * (1 - 0.7 * Math.min(1, runW));
+    }
     this.root.updateMatrixWorld(true);
 
     // ---- procedural layers ----
@@ -222,6 +231,7 @@ export class ModelActor {
     const rootQ = this.root.getWorldQuaternion(new THREE.Quaternion());
     const right = new THREE.Vector3(-1, 0, 0).applyQuaternion(rootQ);          // model's right is −X
     const busy = Math.max(a.wounded, a.sit);
+    if (runW > 0.01 && B.spine_01 && busy < 0.5) { rotateWorldAxis(B.spine_01, right, 0.13 * Math.min(1, runW) * (armed ? 1 : 0.6)); B.spine_01.updateMatrixWorld(true); }
     // spine aim & look
     if (busy < 0.5) {
       const yawK = armed ? 0.33 : 0.2, pitchK = armed ? 0.33 * a.aim : 0.12;

@@ -39,6 +39,15 @@ function mats() {
   return M;
 }
 
+// first-person sleeve look per player character: 'rok' (granite camo) or 'jacket' (dark softshell, Voss)
+export function setSleeveLook(kind = 'rok') {
+  const m = mats();
+  if (!m._rokSleeve) m._rokSleeve = { map: m.sleeve.map, normalMap: m.sleeve.normalMap, color: m.sleeve.color.clone() };
+  if (kind === 'jacket') { m.sleeve.map = null; m.sleeve.color.set(0x23262a); m.cuff.color.set(0x15171a); m.glove.color.set(0x1d1d1d); m.gloveKnuckle.color.set(0x141414); }
+  else { m.sleeve.map = m._rokSleeve.map; m.sleeve.color.copy(m._rokSleeve.color); m.cuff.color.set(0x2f3426); m.glove.color.set(0x2a2a24); m.gloveKnuckle.color.set(0x1c1c18); }
+  m.sleeve.needsUpdate = true;
+}
+
 // ---------- geometry helpers ----------
 // Side profile given as [z, y] points, extruded symmetrically along X.
 function profile(pts, width, { bevel = 0.0025, segs = 2 } = {}) {
@@ -329,8 +338,16 @@ export function buildPistol() {
     // the Glock's grip ends higher than the old pistol's: bring both hands (and sleeves) up onto it
     for (const o of [right, left, rArm, lArm]) o.position.add(new THREE.Vector3(0, 0.034, 0.012));
   }
+  // screw-on suppressor (hidden unless the mission issues one): thread collar + matte tube with end cap
+  const sup = new THREE.Group(); sup.visible = false; g.add(sup);
+  const supLen = 0.155, supR = 0.0165, sz0 = muzzleP.z + 0.006;
+  mesh(cylZ(0.0075, 0.012, sz0 - 0.004, { y: muzzleP.y, seg: 14 }), m.anodDark, sup);
+  mesh(cylZ(supR, supLen, sz0 - 0.012 - supLen / 2, { y: muzzleP.y, seg: 24 }), m.anod, sup);
+  for (const dz of [0.004, supLen - 0.004]) mesh(cylZ(supR + 0.0012, 0.006, sz0 - 0.012 - dz, { y: muzzleP.y, seg: 24 }), m.anodDark, sup);
+  mesh(cylZ(0.005, 0.002, sz0 - 0.013 - supLen, { y: muzzleP.y, seg: 12 }), m.slot, sup);
   g.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; } });
-  g.userData = { mag: magG, magBaseY: 0, slide, slideAxis: 'z', slideBase: 0, muzzle: muzzleP, sightY, sightZ, leftHand: left, leftHandBase: left.position.clone(), rightHand: right };
+  g.userData = { mag: magG, magBaseY: 0, slide, slideAxis: 'z', slideBase: 0, muzzle: muzzleP, sightY, sightZ, leftHand: left, leftHandBase: left.position.clone(), rightHand: right,
+    suppressor: sup, suppressedMuzzle: new THREE.Vector3(muzzleP.x, muzzleP.y, sz0 - 0.014 - supLen) };
   return g;
 }
 

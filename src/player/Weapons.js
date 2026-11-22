@@ -110,6 +110,9 @@ export class WeaponSystem {
     if (!this.currentId) this.equip(id, true);
     this.emitAmmo();
   }
+  // per-mission weapon setup: suppressor on the pistol, display name of the rifle
+  setSuppressed(on) { WEAPON_DEFS.pistol.suppressed = !!on; const u = this.models.pistol.userData; if (u.suppressor) u.suppressor.visible = !!on; }
+  setRifleName(name = 'K2C1 소총') { WEAPON_DEFS.rifle.name = name; this.emitAmmo(); }
   clear() { this.inventory = {}; this.order = []; this.currentId = null; for (const m of Object.values(this.models)) m.visible = false; this.grenades = 0; }
   equip(id, instant = false) {
     if (!this.inventory[id] || (id === this.currentId && !instant)) return;
@@ -189,7 +192,8 @@ export class WeaponSystem {
   fire(time) {
     const d = this.current, s = this.state, p = this.player;
     s.mag--; this.fireT = d.interval; this.shotsFired++; this.shotsSinceTrigger++;
-    p.lastFireT = time;
+    if (!d.suppressed) p.lastFireT = time;   // a suppressed shot does not give the shooter away
+    this.lastShot = { t: time, suppressed: !!d.suppressed, id: d.id };
     const eye = p.eyePos(new THREE.Vector3()); const f = p.forward(new THREE.Vector3());
     // spread (abstract)
     const moveK = Math.min(1, p.speed / 4);
@@ -203,8 +207,8 @@ export class WeaponSystem {
     const muzzleW = eye.clone().addScaledVector(f, 0.8).addScaledVector(right, 0.12 * (1 - this.adsAmount)).add(new THREE.Vector3(0, -0.08 * (1 - this.adsAmount), 0));
     const res = this.combat.playerShot(eye, dir, d, muzzleW);
     if (res?.hitAgent) this.shotsHit++;
-    this.effects.flashLight(muzzleW, 0xffb060, 3, 0.05, 7);
-    this.audio.shot(null, { kind: d.sound });
+    if (!d.suppressed) this.effects.flashLight(muzzleW, 0xffb060, 3, 0.05, 7);
+    this.audio.shot(null, { kind: d.sound, suppressed: !!d.suppressed });
     // abstract recoil: camera kick + viewmodel kick
     const kickMul = (1 - this.adsAmount * 0.45) * (p.crouching ? 0.8 : 1);
     p.pitch += d.kick * kickMul; p.recoilPitch += d.kick * kickMul * 0.7;
@@ -212,7 +216,7 @@ export class WeaponSystem {
     p.addShake(0.02);
     this.kick = 1; this.kickRot = 1;
     this.flash.visible = true; this.flashT = 0.04; this.flash.material.rotation = Math.random() * 6;
-    this.vmFlashLight.intensity = 6;
+    this.vmFlashLight.intensity = d.suppressed ? 0.8 : 6;
     events.emit('player:fired', { pos: eye });
     this.emitAmmo();
     if (s.mag === 0 && s.reserve > 0) setTimeout(() => { if (this.state === s && s.mag === 0) this.reload(); }, 250);
@@ -271,8 +275,9 @@ export class WeaponSystem {
     this.holder.position.copy(pos); this.holder.rotation.copy(rot);
     m.position.set(0, 0, 0);
     // muzzle flash
-    const mz = m.userData.muzzle; this.flash.position.copy(mz);
-    if (this.flashT > 0) { this.flashT -= dt; this.flash.scale.setScalar(0.18 + Math.random() * 0.1); } else this.flash.visible = false;
+    const sup = this.current?.suppressed && u.suppressor;
+    const mz = sup ? u.suppressedMuzzle : m.userData.muzzle; this.flash.position.copy(mz);
+    if (this.flashT > 0) { this.flashT -= dt; this.flash.scale.setScalar((0.18 + Math.random() * 0.1) * (sup ? 0.35 : 1)); } else this.flash.visible = false;
     this.vmFlashLight.intensity = damp(this.vmFlashLight.intensity, 0, 30, dt);
     if (u.dot) { u.dot.visible = ads > 0.35; if (u.ring) u.ring.visible = ads > 0.35; }
     this.vmCamera.fov = 60 - ads * 8; this.vmCamera.updateProjectionMatrix();

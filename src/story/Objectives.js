@@ -11,6 +11,7 @@ export class Objectives {
   }
   get(id) { return this.list.find((o) => o.id === id); }
   progress(id, n = 1) { const o = this.get(id); if (!o) return; o.progress = Math.min(o.count, o.progress + n); this.changed(); if (o.count && o.progress >= o.count) this.complete(id); }
+  setText(id, text) { const o = this.get(id); if (o) { o.text = text; this.changed(); } }
   setMarker(id, pos) { const o = this.get(id); if (o) { o.marker = pos ? pos.clone() : null; this.changed(); } }
   setMarkers(id, list) { const o = this.get(id); if (o) { o.markers = list.map((p) => p.clone()); this.changed(); } }
   complete(id) { const o = this.get(id); if (!o || o.done) return; o.done = true; o.marker = null; o.markers = null; events.emit('objective:complete', o); this.changed(); }

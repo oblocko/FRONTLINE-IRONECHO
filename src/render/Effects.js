@@ -87,6 +87,7 @@ export class Effects {
     this.scene = scene; this.camera = camera;
     const budget = { low: 0.4, medium: 0.7, high: 1 }[settings.data.graphics.effects] ?? 1;
     this.budget = budget;
+    this.extras = [];   // other per-frame systems (e.g. Destruction)
     this.smoke = new ParticlePool(scene, Math.floor(1400 * budget), softSprite('smoke'), false);
     this.fire = new ParticlePool(scene, Math.floor(1200 * budget), softSprite('spark'), true);
     this.flashSprites = new ParticlePool(scene, 64, softSprite('flash'), true);
@@ -227,6 +228,7 @@ export class Effects {
 
   update(dt) {
     const h = innerHeight;
+    for (const x of this.extras) x.update(dt);
     // emitters
     for (const e of this.emitters) {
       if (e.life != null) { e.life -= dt; if (e.life <= 0) { e.dead = true; continue; } }

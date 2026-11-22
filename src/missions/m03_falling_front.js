@@ -93,6 +93,76 @@ export async function build(game) {
 }
 const m03time = (game) => game.mission?.time ?? 0;
 
+
+// the three charges on the deck (also re-placed when restarting at the tank checkpoint)
+function placeChargeBoxes(game) {
+  const cm = new THREE.MeshStandardMaterial({ color: 0x4a4a30, roughness: 0.7 }); const ledM = new THREE.MeshBasicMaterial({ color: 0xff2010, toneMapped: false });
+  for (const c of R.charges) { const box = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.22, 0.3), cm); box.position.copy(c).setY(c.y + 0.11); game.renderer.scene.add(box); const led = new THREE.Mesh(new THREE.SphereGeometry(0.025, 6, 4), ledM); led.position.set(0.12, 0.13, 0.1); box.add(led); }
+}
+// Tank "crew": drives the tank along the road and over the bridge the way a wary crew would —
+// bounds forward, halts to scan and fire from a stop, waits for its infantry before committing to the
+// bridge, edges across in short moves, and backs off a few metres when it takes fire or loses escorts.
+// Every attempt plays out differently, so the detonation has to be timed by watching it.
+function tankCrew(game, m, tank, tankV, { hit }) {
+  const pts = [[-4, -125], [-5, -95], [-2, -62], [-0.4, -36], [0, -20], [0.3, 0], [-0.2, 20], [0, 40], [1, 60]].map(([x, z]) => V(x, 0, z));
+  const curve = new THREE.CatmullRomCurve3(pts); const L = curve.getLength();
+  const sAt = (z) => { let lo = 0, hi = 1; for (let i = 0; i < 24; i++) { const mid = (lo + hi) / 2; if (curve.getPoint(mid).z < z) lo = mid; else hi = mid; } return lo * L; };
+  const sBridge = sAt(-34), sSpan0 = sAt(R.bridge.mid[0] - 6);
+  const c = { s: 0, speed: 0, target: 4.5, state: 'advance', t: rand(5, 8), recon: false, escort: [], lastEscort: 4, stopped: false, gunT: 4, coaxT: 3 };
+  c.stop = () => { c.stopped = true; };
+  const setState = (st, dur) => { c.state = st; c.t = dur; };
+  m.every((dt, time) => {
+    if (c.stopped || tankV.dead) return false;
+    c.t -= dt;
+    const alive = c.escort.filter((e) => !e.dead).length; const lostEscort = alive < c.lastEscort; c.lastEscort = alive;
+    const onBridge = c.s > sBridge;
+    // decisions
+    if (!c.recon && c.s > sBridge - 3 && c.state === 'advance') { c.recon = true; setState('recon', rand(4, 7)); m.spawn(() => m.say('jung', '전차가 다리 앞에서 멈췄다… 살피고 있어.', { priority: 2 })); }
+    else if ((hit() || lostEscort) && onBridge && c.state !== 'reverse' && Math.random() < (lostEscort ? 0.7 : 0.35)) setState('reverse', rand(1.2, 2.6));
+    else if (c.t <= 0) {
+      if (c.state === 'advance') setState('halt', onBridge ? rand(1.2, 3.2) : rand(2.5, 5));
+      else if (c.state === 'reverse') setState('halt', rand(1.5, 3));
+      else { setState('advance', onBridge ? rand(1.4, 3.2) : rand(4, 8)); c.target = onBridge ? rand(1.6, 3.4) : rand(3.5, 5.5); }
+    }
+    // the last few metres before the span: it creeps
+    if (c.state === 'advance' && c.s > sSpan0 - 4 && c.s < sSpan0 + 20) c.target = Math.min(c.target, 2.6);
+    const want = c.state === 'advance' ? c.target : c.state === 'reverse' ? -1.8 : 0;
+    c.speed += (want - c.speed) * Math.min(1, dt * (want === 0 ? 1.6 : 0.9));
+    c.s = Math.max(0, Math.min(L - 0.1, c.s + c.speed * dt));
+    const u = c.s / L, p = curve.getPointAt(u), q = curve.getPointAt(Math.min(1, u + 0.01));
+    const sway = onBridge ? Math.sin(time * 0.7) * 0.35 : 0;       // the driver corrects left/right on the narrow deck
+    tank.position.set(p.x + sway, gy(game, p.x, p.z), p.z);
+    tank.rotation.y += wrap(Math.atan2(q.x - p.x, q.z - p.z) - tank.rotation.y) * Math.min(1, dt * 2);
+    tank.rotation.x = -c.speed * 0.004 + (want === 0 && Math.abs(c.speed) > 0.3 ? 0.012 : 0);   // nose dips when braking
+    // turret: tracks the player, main gun fires from a halt, coax bursts at whoever it can see
+    const tur = tank.userData.turret; const tp = game.player.position; const yawTo = Math.atan2(tp.x - tank.position.x, tp.z - tank.position.z) - tank.rotation.y;
+    const sweep = c.state === 'recon' ? Math.sin(time * 0.8) * 0.7 : 0;
+    tur.rotation.y += wrap(yawTo + sweep - tur.rotation.y) * Math.min(1, dt * 0.9);
+    c.gunT -= dt;
+    if (c.gunT <= 0 && Math.abs(c.speed) < 0.4 && tank.position.z > -80) {
+      c.gunT = rand(5, 8); const mz = tank.userData.gun.getWorldPosition(new THREE.Vector3());
+      game.effects.muzzleFlash(mz, V(0, 0, 1)); game.effects.flashLight(mz, 0xffb060, 12, 0.1, 30); game.audio.explosion(mz, 0.7, { ring: false });
+      const aim = tp.clone().add(V((Math.random() - 0.5) * 10, 0, (Math.random() - 0.3) * 8));
+      m.spawn(() => shell(game, m, aim, { delay: 0.25, safeRadius: 6, damage: 55, scale: 1.4 }));
+    }
+    c.coaxT -= dt;
+    if (c.coaxT <= 0 && tank.position.z > -70) {
+      c.coaxT = rand(2.2, 4); const mz = tank.position.clone().add(V(0, 2.1, 0)); const pc = game.player.chestPos(V(0, 0, 0));
+      if (game.world.lineOfSight(mz, pc)) {
+        let n = 6 + Math.floor(Math.random() * 6);
+        const burst = () => { if (n-- <= 0 || tankV.dead) return; const aimP = pc.clone().add(V((Math.random() - 0.5) * 5, (Math.random() - 0.3) * 2, (Math.random() - 0.5) * 5)); const d = aimP.sub(mz).normalize();
+          const h = game.world.raycast(mz, d, 200); const end = h ? h.point : mz.clone().addScaledVector(d, 200); game.effects.tracer(mz, end, 240); game.audio.shot(mz, { enemy: true });
+          if (h) game.effects.impact(h.point, h.normal, h.surface);
+          const along = pc.clone().sub(mz).dot(d); const close = mz.clone().addScaledVector(d, along); if (along > 0 && close.distanceTo(pc) < 2.2) { game.player.nearMiss?.(close); if (close.distanceTo(pc) < 0.8) game.player.takeDamage(6, mz, null); }
+          setTimeout(burst, 90); };
+        burst();
+      }
+    }
+  });
+  return c;
+}
+const rand = (a, b) => a + Math.random() * (b - a);
+
 // ------------------------------------------------------------------
 export const SEGMENTS = [
   // ============ 0. NIGHT CONVOY TO THE RIVER ============
@@ -310,37 +380,68 @@ export const SEGMENTS = [
       game.objectives.add('det', '기폭 장치로 복귀', { marker: R.detonator.clone().setY(lv.hf(R.detonator.x, R.detonator.z) + 0.8) });
       await m.reach(R.detonator, 3);
       game.objectives.complete('det');
-      // ---- the tank ----
+    },
+  },
+
+  // ============ 3b. THE TANK: blow the span with the tank on it ============
+  {
+    id: 'tank',
+    async setup(game) {
+      giveLoadout(game); const lv = game.level; lv.ghostsGone = true; lv.war = true;
+      lv.truck.position.set(1, lv.hf(1, 56), 56);
+      game.player.teleport(V(R.detonator.x - 1.2, lv.hf(R.detonator.x - 1.2, R.detonator.z + 1.5), R.detonator.z + 1.5), 0);
+      unseatSquad(game, lv.truck, V(0, 0, 33)); squadToLine(game); ensureSupport(game);
+      placeChargeBoxes(game);
+    },
+    async run(game, m) {
+      const lv = game.level, scene = game.renderer.scene;
+      if (lv.mg.manned) lv.mg.dismount();
+      const charges = R.charges.map((c) => c.clone());
+      // ---- the tank: driven like a crewed vehicle (bounds forward, halts to look and shoot, backs off under fire) ----
       const tank = lv.buildTank(); scene.add(tank); tank.position.set(-4, lv.hf(-4, -125), -125);
-      const tankV = { isVehicle: true, position: tank.position, radius: 3, dead: false, hp: 1e9, damage: () => false, update() {}, remove() { scene.remove(tank); },
+      let hitT = -99;
+      const tankV = { isVehicle: true, position: tank.position, radius: 3, dead: false, hp: 1e9, damage: () => { hitT = m.time; return false; }, update() {}, remove() { scene.remove(tank); },
         rayTest(o, d, max) { tank.updateMatrixWorld(true); const inv = tank.matrixWorld.clone().invert(); const lo = o.clone().applyMatrix4(inv), ld = d.clone().transformDirection(inv); const h = new THREE.Ray(lo, ld).intersectBox(new THREE.Box3(V(-1.9, 0.4, -3.4), V(1.9, 2.8, 3.5)), new THREE.Vector3()); if (!h) return null; const dist = h.distanceTo(lo); return dist > max ? null : { dist, point: h.applyMatrix4(tank.matrixWorld) }; } };
       game.director.vehicles.push(tankV);
       const tEng = game.audio.engineLoop('truck'); tEng?.set(0.9, 0.25);
-      const run = driver(game, m, tank, [[-4, -125], [-5, -95], [-1, -62], [0, -32], [0, -2]], { speed: 4.2, accel: 0.4, onStep: () => tEng?.setPos(tank.position) });
-      const escort = spawnEnemies(game, [[-3, -112], [3, -110], [-2, -104]], { state: 'idle' });
-      escort.forEach((e, i) => m.every(() => { if (e.dead || run.done) return false; if (e.state !== 'combat') e.moveTo(tank.position.clone().add(V((i - 1) * 2, 0, -6)), { run: false }); }));
+      const crew = tankCrew(game, m, tank, tankV, { hit: () => m.time - hitT < 2 });
+      const escort = spawnEnemies(game, [[-3, -112], [3, -110], [-2, -104], [2, -100]], { state: 'idle', accuracy: 0.7 });
+      crew.escort = escort;
+      escort.forEach((e, i) => m.every(() => { if (e.dead || tankV.dead) return false; if (e.state !== 'combat') e.moveTo(tank.position.clone().add(V((i % 2 ? 2.2 : -2.2), 0, i < 2 ? 7 : -6)), { run: false }); }));
+      m.every(() => { tEng?.setPos(tank.position); tEng?.set(0.5 + crew.speed * 0.12, 0.25); if (tankV.dead) { tEng?.stop(); return false; } });
       await m.talk([
-        ['seoyeon', '적 전차 한 대, 북쪽 도로로 교량 접근 중!', { radio: true, priority: 3 }],
-        ['yoon', '기다려… 놈이 중앙 경간에 올라설 때까지 기다려라, 민재!', { priority: 3 }],
+        ['seoyeon', '적 전차 한 대, 북쪽 도로로 교량 접근 중! 보병이 붙어 있습니다!', { radio: true, priority: 3 }],
+        ['yoon', '서두르지 마라. 놈이 중앙 경간 위에 있을 때만 눌러. 일찍 누르면 다리만 날아가고 전차는 남는다.', { priority: 3 }],
       ]);
-      game.objectives.add('blow', '전차가 중앙 경간에 들어서면 기폭', { marker: R.detonator.clone().setY(lv.hf(R.detonator.x, R.detonator.z) + 0.8) });
-      // main gun: rounds land near the bank while it closes in
-      let gunT = 5;
-      m.every((dt) => {
-        if (tankV.dead) { tEng?.stop(); return false; }
-        const tur = tank.userData.turret; const tp = game.player.position; const yawTo = Math.atan2(tp.x - tank.position.x, tp.z - tank.position.z) - tank.rotation.y; tur.rotation.y += wrap(yawTo - tur.rotation.y) * Math.min(1, dt * 0.8);
-        gunT -= dt; if (gunT <= 0 && tank.position.z > -70) {
-          gunT = 6 + Math.random() * 3; const mz = tank.userData.gun.getWorldPosition(new THREE.Vector3()).add(V(0, 0, 0)); game.effects.muzzleFlash(mz, V(0, 0, 1)); game.effects.flashLight(mz, 0xffb060, 12, 0.1, 30); game.audio.explosion(mz, 0.7);
-          const aim = tp.clone().add(V((Math.random() - 0.5) * 12, 0, (Math.random() - 0.3) * 10));
-          m.spawn(() => shell(game, m, aim, { delay: 0.25, safeRadius: 7, damage: 55, scale: 1.4 }));
-        }
+      lv.flare(V(-6, 60, -40));
+      game.objectives.add('blow', '전차가 중앙 경간 위에 있을 때 기폭', { marker: R.detonator.clone().setY(lv.hf(R.detonator.x, R.detonator.z) + 0.8) });
+      // span meter: where the tank is relative to the middle span
+      const meter = document.createElement('div'); meter.className = 'stealth-meter span-meter';
+      meter.innerHTML = '<div class="lbl">전차 위치 · 교량</div><div class="bar"><b class="win"></b><i class="tk"></i></div><div class="st"></div>';
+      game.ui.hud.appendChild(meter); m.bind(() => meter.remove());
+      const z0 = -40, z1 = 20, onSpan = () => tank.position.z > R.bridge.mid[0] + 2 && tank.position.z < R.bridge.mid[1] - 2;
+      meter.querySelector('.win').style.cssText = `left:${(R.bridge.mid[0] + 2 - z0) / (z1 - z0) * 100}%;width:${(R.bridge.mid[1] - R.bridge.mid[0] - 4) / (z1 - z0) * 100}%`;
+      m.every(() => {
+        if (tankV.dead) return false;
+        const k = Math.max(0, Math.min(1, (tank.position.z - z0) / (z1 - z0)));
+        meter.querySelector('.tk').style.left = `${k * 100}%`; meter.classList.toggle('warn', onSpan());
+        meter.querySelector('.st').textContent = tank.position.z < z0 ? '접근 중' : onSpan() ? '중앙 경간 위 — 지금!' : tank.position.z > R.bridge.mid[1] - 2 ? '경간 통과 중!' : crew.state === 'reverse' ? '후진 중' : crew.speed < 0.3 ? '정지 · 경계' : '이동 중';
       });
-      await m.until(() => run.done || tank.position.z > R.bridge.mid[0] + 1, 240);
-      game.ui.hint('<b>지금!</b> 기폭 장치를 누르십시오', 4);
-      await interact(game, { pos: R.detonator.clone().setY(lv.hf(R.detonator.x, R.detonator.z) + 0.4), prompt: '기폭', radius: 2.4 });
+      // the plunger is live from the start: blow it early and the tank survives, too late and it is across
+      let fired = false; const det = interact(game, { pos: R.detonator.clone().setY(lv.hf(R.detonator.x, R.detonator.z) + 0.4), prompt: '기폭', radius: 2.4 }).then(() => { fired = true; });
+      m.spawn(async () => { await m.until(() => onSpan() || tankV.dead, 400); if (!tankV.dead && !fired) game.ui.hint('<b>지금!</b> 전차가 중앙 경간 위에 있다', 2.5); });
+      await m.until(() => fired || tank.position.z > R.bridge.mid[1] + 4, 600);
+      if (!fired) { meter.remove(); game.failMission('전차가 교량을 건넜습니다', '전차가 중앙 경간 위에 있을 때 기폭'); await m.wait(999); }
+      const caught = onSpan(); crew.stop();
       lv.plunger.position.y -= 0.2;
       for (const [i, c] of charges.entries()) setTimeout(() => game.combat.explode(c.clone(), { radius: 7, damage: 300, scale: 2.2, owner: 'player', playerSafe: true }), i * 180);
       await m.wait(0.5);
+      meter.remove();
+      if (!caught) {
+        lv.dropMidSpan();
+        await m.say('yoon', '…너무 일렀다! 전차는 그대로다!', { priority: 3 });
+        game.failMission('전차가 중앙 경간에 오르기 전에 기폭했습니다', '전차가 중앙 경간 위에 있을 때 기폭'); await m.wait(999);
+      }
       lv.dropMidSpan(); tankV.dead = true;
       // the tank goes down with the span
       let tt = 0; const t0 = tank.position.clone();

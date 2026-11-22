@@ -22,7 +22,9 @@ function vnoise(x, z) {
 const fbm = (x, z) => vnoise(x, z) * 0.6 + vnoise(x * 2.1, z * 2.1) * 0.3 + vnoise(x * 4.3, z * 4.3) * 0.1;
 
 export const PORT = {
-  bounds: { minX: -64, maxX: 100, minZ: -195, maxZ: 135 },
+  bounds: { minX: -64, maxX: 250, minZ: -195, maxZ: 135 },
+  base: V(170, 0, -142),         // enemy compound on the inland hill east of the LZ (seen from the battery bluff)
+  noGoX: 104,                    // minefield fence: the player stays west of it
   coastX: -62, quay: 2.5,
   lz: V(30, 0, -150), batteries: [V(-46, 0, -108), V(-47, 0, -140), V(-36, 0, -172)],
   crane: { x: -52, z: 12 }, control: V(-36, 0, -30), plaza: V(28, 0, 96),
@@ -33,7 +35,10 @@ function heightAt(x, z) {
   const P = PORT;
   const bluff = smooth(-50, -105, z) * 12.5;
   const rough = smooth(-60, -110, z) * (fbm(x * 0.05, z * 0.05) - 0.5) * 2.2 * (1 - Math.exp(-((x - 36) ** 2) / 60));
-  const land = P.quay + bluff + rough;
+  // inland hill carrying the enemy compound (flat top), rising beyond the minefield fence
+  const dh = Math.hypot((x - P.base.x) * 0.9, z - P.base.z);
+  const hill = smooth(-60, -100, z) * (1 - smooth(40, 75, dh)) * 4;
+  const land = P.quay + bluff + rough + hill;
   // the coast: vertical quay in the port, a steep cliff below the bluff
   return x >= P.coastX ? land : -9;
 }
@@ -173,7 +178,7 @@ export class CoastalPort {
     const lz = P.lz; const ly = hf(lz.x, lz.z);
     const hm = new THREE.Mesh(new THREE.RingGeometry(5, 5.5, 32), new THREE.MeshBasicMaterial({ color: 0xd8d8c8 })); hm.rotation.x = -Math.PI / 2; hm.position.set(lz.x, ly + 0.06, lz.z); scene.add(hm);
     p.bareTrees([[50, -100], [60, -150], [44, -180], [70, -120], [-20, -186], [80, -170], [64, -90]].map(([x, z]) => ({ x, z, s: 0.9 })));
-    const pines = []; for (let i = 0; i < 90; i++) { const x = 50 + Math.random() * 48, z = -190 + Math.random() * 120; if (Math.abs(x - 36) > 9) pines.push({ x, z, s: 0.8 + Math.random() * 0.6 }); }
+    const pines = []; for (let i = 0; i < 90; i++) { const x = 50 + Math.random() * 48, z = -190 + Math.random() * 120; if (Math.abs(x - 36) > 9 && !(Math.abs(z - P.base.z) < 40 && Math.random() < 0.85)) pines.push({ x, z, s: 0.8 + Math.random() * 0.6 }); }   // sparse in front of the enemy hill so it can be seen
     p.pineForest(pines);
     p.rocks(Array.from({ length: 30 }, () => ({ x: -58 + Math.random() * 8, z: -190 + Math.random() * 135, r: 0.5 + Math.random() * 1.2 })));
   }
@@ -290,10 +295,21 @@ export class CoastalPort {
   blockers() {
     const w = this.game.world, B = PORT.bounds;
     w.addBox(V(PORT.coastX - 2, -10, B.minZ - 10), V(PORT.coastX + 0.4, 30, B.maxZ + 10), { surface: 'concrete', walkable: false, cover: false }).passBullets = true;
+    // minefield fence east of the LZ: wire posts, triangle signs; an invisible wall keeps the player (and the squad) west of it
+    const X = PORT.noGoX, scene = this.game.renderer.scene; const pm = new THREE.MeshStandardMaterial({ color: 0x4a4030, roughness: 0.9 }); const wm = new THREE.MeshStandardMaterial({ color: 0x777770, metalness: 0.6, roughness: 0.5 });
+    const sign = new THREE.MeshStandardMaterial({ color: 0xc81e1e, roughness: 0.6 });
+    for (let z = -194; z < -58; z += 3) {
+      const y = heightAt(X, z); const post = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.4, 0.1), pm); post.position.set(X, y + 0.7, z); scene.add(post);
+      for (const h of [0.45, 0.95, 1.3]) { const wire = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.02, 3), wm); wire.position.set(X, heightAt(X, z + 1.5) + h, z + 1.5); scene.add(wire); }
+      if (Math.round(z) % 12 === 0) { const t = new THREE.Mesh(new THREE.CircleGeometry(0.28, 3), sign); t.position.set(X - 0.06, y + 1.0, z); t.rotation.y = -Math.PI / 2; t.rotation.z = Math.PI / 2; scene.add(t); }
+    }
+    w.addBox(V(X - 0.2, -10, B.minZ - 10), V(X + 0.2, 60, -56), { surface: 'concrete', walkable: false, cover: false }).passBullets = true;
   }
 
   // ---- dynamic ----
   helicopter(pos) { const h = buildHelicopter(); h.position.copy(pos); this.game.renderer.scene.add(h); this.helos.push(h); return h; }
+  // the morning haze thins enough to see the enemy compound on the inland hill
+  thinFog(target = 0.0042, seconds = 14) { if (this.fog <= target) return; this.fogTarget = target; this.fogRate = (this.fog - target) / seconds; }
   liftFog(seconds = 10) { this.fogTarget = 0.0006; this.fogRate = (this.fog - this.fogTarget) / seconds; this.landingCraft = true; for (const c of this.craft) c.visible = true; }
   update(dt, t) {
     const g = this.game, scene = g.renderer.scene;

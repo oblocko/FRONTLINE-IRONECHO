@@ -78,7 +78,7 @@ export class HantanRiver {
 
   atmosphere() {
     const g = this.game, scene = g.renderer.scene;
-    scene.fog = new THREE.FogExp2(0x10151b, 0.0165);
+    scene.fog = new THREE.FogExp2(0x10151b, 0.0145);   // thick rain fog, but the tank on the bridge road must read at ~60 m
     scene.environment = g.renderer.envMap; scene.environmentIntensity = 0.18;
     this.sky = new Sky(scene, { zenith: 0x05070b, horizon: 0x1a2028, stars: 0, sunDir: [-0.4, 0.35, -0.8], sunColor: 0x8090a8, sunSize: 0.9999 });
     this.hemi = new THREE.HemisphereLight(0x58667e, 0x24261f, 0.75); scene.add(this.hemi);

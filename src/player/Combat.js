@@ -67,6 +67,7 @@ export class Combat {
   explode(pos, { radius = 7, damage = 120, owner = 'world', shake = 1, scale = 1, playerSafe = false, snow = false, kind = 'blast', label = null, heavy = false } = {}) {
     this.effects.explosion(pos, scale, { snow });
     this.audio.explosion(pos, scale);
+    events.emit('combat:explosion', { pos: pos.clone(), radius, damage, heavy, owner, kind });
     const p = this.player;
     if (p) {
       const d = p.position.distanceTo(pos);

@@ -136,6 +136,15 @@ export class Game {
     this.combat.director = this.director;
     this.player = new Player({ camera: this.renderer.camera, world: this.world, input: this.input, audio });
     this.combat.player = this.player; this.director.player = this.player;
+    // where the squad leader heads: the first active objective with a marker (nearest of a marker set)
+    this.director.objectiveTarget = () => {
+      const pp = this.player.position;
+      for (const o of this.objectives.active()) {
+        if (o.marker) return o.marker;
+        if (o.markers?.length) return o.markers.reduce((a, b) => (a.distanceToSquared(pp) < b.distanceToSquared(pp) ? a : b));
+      }
+      return null;
+    };
     this.weapons = new WeaponSystem({ player: this.player, input: this.input, audio, effects: this.effects, combat: this.combat, vmScene: this.renderer.vmScene, vmCamera: this.renderer.vmCamera, camera: this.renderer.camera });
     this.player.weapons = this.weapons;
     this.dialogue.clear(); this.dialogue = new Dialogue(audio);

@@ -62,7 +62,9 @@ export class AIAgent {
     this.setPath(pos);
   }
   hold(pos = null, face = null) { this.script = { kind: 'hold', pos: pos ? pos.clone() : this.position.clone(), face }; if (pos) this.setPath(pos); }
-  follow(anchor, offset) { this.script = null; this.anchor = anchor; if (offset) this.followOffset = offset; this.state = 'follow'; }
+  follow(anchor, offset) { this.script = null; this.anchor = anchor; if (offset) this.followOffset = offset; this.state = 'follow'; this.leads = false; }
+  // lead the player (squad leader) — see leadGoal()
+  lead(player) { this.follow(player); this.leads = true; this._leadGoal = null; }
   clearScript() { this.script = null; }
   lookAt(pos) { this.lookAtPos = pos ? pos.clone() : null; }
   pose(kind) { this.script = { kind: 'static', pose: kind }; this.path = null; this.actor.target.sit = kind === 'sit' ? 1 : 0; this.actor.target.wounded = kind === 'wounded' ? 1 : 0; }
@@ -277,7 +279,21 @@ export class AIAgent {
     }
     // stragglers: when only a couple of enemies are left in the fight they come for the player
     const left = d.enemiesInCombat();
-    if (left <= 2 && this.target.isPlayer && time - (this.combatSince ?? (this.combatSince = time)) > 6) { if (this.cover) { this.cover.occupant = null; this.cover = null; } return this.rushBrain(dt, time); }
+    if (this.combatSince === undefined) this.combatSince = time;
+    if (this.losT === undefined) this.losT = time;
+    if (left <= 2 && this.target.isPlayer && time - this.combatSince > 6) { if (this.cover) { this.cover.occupant = null; this.cover = null; } return this.rushBrain(dt, time); }
+    // pressure: a fighter that has had no line of fire for a while does not keep hiding behind the same
+    // container — first it relocates to a spot it can shoot from (flanking around the obstacle), and if
+    // that still gives nothing it pushes the target outright. Flankers/assaulters get impatient sooner.
+    const blind = time - this.losT, patience = this.role === 'flanker' ? 6 : 9 + (this.id % 3) * 2;
+    if (this.target.isPlayer && blind > patience * 2.4 && time - this.combatSince > 14) { if (this.cover) { this.cover.occupant = null; this.cover = null; } return this.rushBrain(dt, time); }
+    if (blind > patience && !(this.pushUntil > time) && (this.coverPhase !== 'move' || !this.path)) {
+      const spot = d.findFiringSpot(this, this.target);
+      if (spot) { if (this.cover) { this.cover.occupant = null; this.cover = null; } this.setPath(spot); this.coverPhase = 'move'; this.pushUntil = time + 8; d.metrics.pushes = (d.metrics.pushes || 0) + 1; }
+      else this.losT = time - patience * 1.6;                               // nowhere to shoot from: escalate to a rush sooner
+      // flush a hidden target with a grenade on the way
+      if (this.grenadeCD <= 0 && this.target.isPlayer && this.lastSeenPos) { const dist = this.position.distanceTo(this.lastSeenPos); if (dist > 8 && dist < 32 && Math.random() < 0.5) { this.grenadeCD = rand(16, 26); d.throwGrenade(this, this.lastSeenPos); this.actor.gesture('wave', 0.8); } }
+    }
     // choose/validate cover
     this.coverCheckT = (this.coverCheckT ?? 0) - dt;
     if (this.coverCheckT <= 0) {
@@ -285,7 +301,7 @@ export class AIAgent {
       const threat = this.lastSeenPos || this.target.position;
       const compromised = this.cover && !d.coverProtects(this.cover, threat);
       const tooLong = this.cycles >= (this.role === 'flanker' ? 2 : 4);
-      if (!this.cover || compromised || (tooLong && Math.random() < 0.6)) {
+      if (!(this.pushUntil > time) && this.coverPhase !== 'engage' && (!this.cover || compromised || (tooLong && Math.random() < 0.6))) {
         const c = d.findCover(this, threat, { flank: this.role === 'flanker' && this.cycles > 0, advance: tooLong });
         if (c) { if (this.cover) this.cover.occupant = null; this.cover = c; c.occupant = this; this.setPath(c.pos); this.cycles = 0; this.coverPhase = 'move'; d.metrics.coverMoves++; }
       }
@@ -293,11 +309,19 @@ export class AIAgent {
       if (time - this.lastSeenT > 8 && this.lastSeenPos && !this.path) { if (this.cover) this.cover.occupant = null; this.cover = null; this.setPath(this.lastSeenPos); this.coverPhase = 'move'; this.lastSeenT = time - 4; }
     }
     if (this.coverPhase === 'move' && this.path) {
-      const arrived = this.followPath(dt, 4.0); desiredSpeed = this.moveSpeed; aim = 0.3;
-      // fire on the move occasionally if visible
-      if (this.canSeeCached(time)) { aim = 1; if (Math.random() < dt * 0.6) this.combatFire(dt, time, 0.5); }
-      if (arrived) { this.coverPhase = 'hide'; this.phaseT = rand(0.6, 1.5); }
+      const pushing = this.pushUntil > time;
+      const arrived = this.followPath(dt, pushing ? 3.4 : 4.0); desiredSpeed = this.moveSpeed; aim = 0.3;
+      // fire on the move occasionally if visible; a pushing fighter stops to shoot as soon as it has a line
+      if (this.canSeeCached(time)) { aim = 1; if (pushing && !this.cover) { this.path = null; this.coverPhase = 'engage'; this.phaseT = rand(2.5, 4); return { desiredSpeed: 0, crouch: 0, aim: 1 }; } if (Math.random() < dt * 0.6) this.combatFire(dt, time, 0.5); }
+      if (arrived) { this.coverPhase = this.cover ? 'hide' : 'engage'; this.phaseT = rand(0.6, 1.5); }
       return { desiredSpeed, crouch: 0, aim };
+    }
+    // in the open at a firing spot: shoot while there is a line, crouch when suppressed, then re-evaluate
+    if (this.coverPhase === 'engage' && !this.cover) {
+      this.phaseT -= dt; const see = this.canSeeCached(time);
+      if (see) this.combatFire(dt, time);
+      if (this.phaseT <= 0 || (!see && this.phaseT < 1.5)) { this.coverPhase = 'hide'; this.coverCheckT = 0; this.pushUntil = 0; }
+      return { desiredSpeed: 0, crouch: this.suppression > 0.6 ? 1 : 0, aim: 1 };
     }
     // at cover: hide/peek cycle
     this.phaseT -= dt;
@@ -319,7 +343,9 @@ export class AIAgent {
       }
       this.combatFire(dt, time);
       if (this.phaseT <= 0 || this.suppression > 0.8) {
+        if (!this.canSeeCached(time)) this.blindPeeks = (this.blindPeeks || 0) + 1; else this.blindPeeks = 0;
         this.coverPhase = 'hide'; this.phaseT = rand(1.2, 2.8) + this.suppression * 2; this.cycles++; this.releaseToken();
+        if (this.blindPeeks >= 2) { this.blindPeeks = 0; this.losT = Math.min(this.losT, time - 30); }   // this cover can't see anything: move now
       }
     }
     if (!this.cover) {
@@ -343,7 +369,7 @@ export class AIAgent {
     return { desiredSpeed: 0, crouch: this.suppression > 0.5 ? 1 : 0, aim: 1 };
   }
   canSeeCached(time) {
-    if (this._seeT === undefined || time - this._seeT > 0.3) { this._seeT = time; this._see = this.target ? this.canSee(this.target, 200) : false; }
+    if (this._seeT === undefined || time - this._seeT > 0.3) { this._seeT = time; this._see = this.target ? this.canSee(this.target, 200) : false; if (this._see) this.losT = time; }
     return this._see;
   }
 
@@ -356,9 +382,14 @@ export class AIAgent {
     if (anchorPos) {
       // formation point relative to anchor heading
       let goal;
-      if (this.anchor.isPlayer) {
+      if (this.leads && this.anchor.isPlayer) goal = this.leadGoal(time);
+      else if (this.anchor.isPlayer) {
         const yaw = this.anchor.yaw ?? 0; const o = this.followOffset;
         goal = tmpB.set(anchorPos.x + Math.cos(yaw) * o.x + Math.sin(yaw) * o.z, 0, anchorPos.z - Math.sin(yaw) * o.x + Math.cos(yaw) * o.z).clone();
+      } else if (this.anchor.actor && this.anchor.yaw !== undefined) {
+        // following a squadmate (the leader): offset in the leader's frame (agents face +Z at yaw 0); x = side, z = behind
+        const y = this.anchor.yaw, o = this.followOffset;
+        goal = new THREE.Vector3(anchorPos.x + Math.cos(y) * o.x - Math.sin(y) * o.z, 0, anchorPos.z - Math.sin(y) * o.x - Math.cos(y) * o.z);
       } else goal = anchorPos.clone().add(this.followOffset);
       if (enemiesNear && this.target) {
         // take cover near goal facing threat
@@ -389,6 +420,26 @@ export class AIAgent {
       }
     }
     return { desiredSpeed, crouch, aim };
+  }
+
+  // Squad leader: walks ahead of the player toward the current objective along the nav path and waits
+  // there if the player lags — so the sergeant leads and the private follows, not the other way round.
+  leadGoal(time) {
+    const d = this.director, p = this.anchor.position;
+    if (this._leadT !== undefined && time - this._leadT < 0.8 && this._leadGoal) return this._leadGoal;
+    this._leadT = time;
+    const target = d.objectiveTarget?.();
+    let goal = null;
+    if (target && Math.hypot(target.x - p.x, target.z - p.z) > 7) {
+      const path = d.world.findPath(p, target, 20000);
+      if (path && path.length > 1) {
+        let left = 7.5; let prev = path[0]; goal = path[path.length - 1].clone();
+        for (let i = 1; i < path.length; i++) { const seg = prev.distanceTo(path[i]); if (seg >= left) { goal = prev.clone().lerp(path[i], left / seg); break; } left -= seg; prev = path[i]; }
+        if (goal.distanceTo(target) < 2.5) goal = target.clone().lerp(p, 2.5 / Math.max(2.5, target.distanceTo(p)));
+      }
+    }
+    if (!goal) { const yaw = this.anchor.yaw ?? 0; goal = new THREE.Vector3(p.x - Math.sin(yaw) * 4 - Math.cos(yaw) * 1.2, 0, p.z - Math.cos(yaw) * 4 + Math.sin(yaw) * 1.2); }
+    goal.y = 0; this._leadGoal = goal; return goal;
   }
 
   // ---------- shooting ----------
@@ -484,6 +535,27 @@ export class AIDirector {
     const eye = tmpB.copy(cover.pos).setY(cover.pos.y + 0.9);
     const t = tmpC.copy(threat).setY(threat.y + 1.4);
     return !this.world.lineOfSight(eye, t) || dist < 2;
+  }
+  // a standable spot (own nav component, not taken) from which the agent can see and shoot the target:
+  // rings around the target, nearest-to-agent first, preferring spots off the agent's current bearing (flank)
+  findFiringSpot(agent, target) {
+    const w = this.world; if (!w.nav) return null;
+    const myComp = w.navCompAt(agent.position.x, agent.position.z); const tp = target.chestPos(new THREE.Vector3());
+    const base = Math.atan2(agent.position.x - tp.x, agent.position.z - tp.z); let best = null, bestS = Infinity; let tests = 0;
+    const eye = new THREE.Vector3();
+    for (const r of [9, 14, 20, 27]) for (let i = 0; i < 14; i++) {
+      const a = base + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * (Math.PI / 7);
+      const x = tp.x + Math.sin(a) * r, z = tp.z + Math.cos(a) * r;
+      const [ci, cj] = w.navCell(x, z); if (!w.navFree(ci, cj)) continue;
+      if (myComp && w.navCompAt(x, z) !== myComp) continue;
+      if (this.agents.some((o) => o !== agent && !o.dead && o.position.distanceToSquared(eye.set(x, o.position.y, z)) < 2.5)) continue;
+      const y = w.groundHeight(x, z, tp.y + 2); if (Math.abs(y - agent.position.y) > 4) continue;
+      if (++tests > 40) break;
+      if (!w.lineOfSight(eye.set(x, y + 1.55, z), tp)) continue;
+      const s = Math.hypot(x - agent.position.x, z - agent.position.z) + Math.abs(angleDiff(base, a)) * -2 + r * 0.3;
+      if (s < bestS) { bestS = s; best = new THREE.Vector3(x, y, z); }
+    }
+    return best;
   }
   findCover(agent, threat, { flank = false, advance = false, near = null, radius = 30 } = {}) {
     const origin = near || agent.position;

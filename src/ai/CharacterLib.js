@@ -165,6 +165,8 @@ export const LOOKS = {
   kpa_sfb: { cloth: 'camoKPABrown', top: 0xffffff, pants: 0xffffff, boot: 0x5a4430, glove: 0x3a3428, rep: 7, gaiter: 0.6 },
   kpa_officer: { cloth: 'fabric', top: 0x5e573c, pants: 0x4e4a36, boot: 0x141414, glove: -1, rep: 14 },
   us: { cloth: 'camoUS', top: 0xffffff, pants: 0xffffff, boot: 0x8a7354, glove: 0x6e6248, rep: 4.5 },
+  // private security contractors (Voss's former outfit): dark softshells, plain plate carriers, headsets
+  pmc: { cloth: 'fabric', top: 0x2a2d31, pants: 0x3b3a36, boot: 0x2a2620, glove: 0x1a1a1a, rep: 10 },
   police: { cloth: 'fabric', top: 0x1f2a44, pants: 0x1c2232, boot: 0x141414, glove: -1, rep: 10 },
 };
 const CIV_TOPS = [0x3b4a6b, 0x6b3b3b, 0x5a5a5a, 0x2f4f3f, 0x7a6a4a, 0x2a2a35, 0x8a8478, 0x4a3a5a, 0xa05a2a, 0x2a5a6a, 0xc8c2b4];
@@ -382,7 +384,7 @@ export function gearFor(kind, key, hat, variant, sex = 'm') {
     P('Head', M.shell, T(sphere(0.134, 1, 0.94, 1.1, 22, 10, Math.PI * 0.5), hc.x, hc.y + 0.02, hc.z - 0.008));
     for (const sx of [-1, 1]) P('Head', M.dark, T(roundedBox(0.012, 0.028, 0.13, 0.004), hc.x + sx * 0.13, hc.y + 0.01, hc.z - 0.005));
     P('Head', M.dark, T(roundedBox(0.05, 0.034, 0.022, 0.006), hc.x, hc.y + 0.1, hc.z + 0.135, -0.4));
-    const headset = key === 'kpa' || key === 'kpa_sfb' || key === 'rok_sf' || key === 'rok_707' || key === 'us';
+    const headset = key === 'kpa' || key === 'kpa_sfb' || key === 'rok_sf' || key === 'rok_707' || key === 'us' || key === 'pmc';
     // eye protection: shooting glasses / goggles (707: tinted lenses)
     const ey = LIB[sex].eyeY, fz = LIB[sex].faceZ;
     if (key === 'rok_707') goggles(P, M, M.tint, 0, ey + 0.004, fz + 0.016 - 0.105, 0.105, false);
@@ -411,7 +413,7 @@ export function gearFor(kind, key, hat, variant, sex = 'm') {
     P('spine_03', M.leather, T(roundedBox(0.03, 0.62, 0.012, 0.004), 0.02, chest.y - 0.02, cz + 0.13, 0, 0, -0.5));
     P('pelvis', M.leather, T(roundedBox(0.07, 0.15, 0.05, 0.015), pel.x - 0.17, pel.y + 0.0, pel.z + 0.06));
   } else if (soldier) {
-    const real = armorPart({ kpa: 'rig', us: 'heavy' }[key] || 'olive');
+    const real = armorPart({ kpa: 'rig', us: 'heavy', pmc: 'heavy' }[key] || 'olive');
     if (real) {
       const fit = ARMOR_FIT[key] || ARMOR_FIT.def;
       P('spine_03', real.material, real.geometry.clone().translate(0, chest.y + fit[0], cz + fit[1]));
@@ -507,7 +509,7 @@ function weaponParts(type) {
   return (WEAPONS[type] = { geos, mats: M, muzzle });
 }
 export function weaponTypeFor(look) {
-  return { rok: 'k2c1', rok_sf: 'k13', rok_707: 'k13', us: 'k13', kpa: 'ak88', kpa_officer: 'ak88', kpa_sf: 'ak88s', kpa_sfb: 'aknew' }[look] || 'k2c1';
+  return { rok: 'k2c1', rok_sf: 'k13', rok_707: 'k13', us: 'k13', pmc: 'k13', kpa: 'ak88', kpa_officer: 'ak88', kpa_sf: 'ak88s', kpa_sfb: 'aknew' }[look] || 'k2c1';
 }
 // real models (src/gear) per procedural type; the procedural rifle stays as the fallback
 const GEAR_FOR = { k2c1: 'k2c1', k13: 'm4a1', ak88: 'ak74', ak88s: 'ak74m', aknew: 'ak74m' };
