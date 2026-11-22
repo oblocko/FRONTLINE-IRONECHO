@@ -54,11 +54,11 @@ export const ARMOR = {
   olive:   { file: 'gear/vestpack.glb', mesh: /^Vest_Vest_0/, size: [0.40, 0.46, 0.33] },   // plate carrier (ROK)
   heavy:   { file: 'gear/carrier.glb', basis: XFWD, size: [0.42, 0.44, 0.36] },        // loaded carrier (SF / US)
   // helmets: fit 'top' = uniform scale to the given outer width, top of the shell at y 0, centred in x/z
-  helmet:   { file: 'gear/helmet_hs.glb', basis: XFWD, fit: 'top', width: 0.30 },          // FAST + headset (US)
-  ssh60:    { file: 'gear/ssh60.glb', largest: true, fit: 'top', width: 0.30 },           // steel helmet (KPA)
-  fast_cam: { file: 'gear/fast_cam.glb', fit: 'top', width: 0.285 },                        // FAST, digital camo (ROK)
-  fast_blk: { file: 'gear/fast_blk.glb', basis: XFWD, fit: 'top', width: 0.285 },           // FAST, black (707)
-  ushanka:  { file: 'gear/ushanka.glb', fit: 'top', width: 0.30, tint: 0x6e604e },           // fur hat (KPA officers)
+  helmet:   { file: 'gear/helmet_hs.glb', basis: XFWD, fit: 'top', width: 0.27 },          // FAST + headset (US)
+  ssh60:    { file: 'gear/ssh60.glb', largest: true, fit: 'top', width: 0.262 },           // steel helmet (KPA)
+  fast_cam: { file: 'gear/fast_cam.glb', fit: 'top', width: 0.252 },                        // FAST, digital camo (ROK)
+  fast_blk: { file: 'gear/fast_blk.glb', basis: XFWD, fit: 'top', width: 0.252 },           // FAST, black (707)
+  ushanka:  { file: 'gear/ushanka.glb', fit: 'top', width: 0.262, tint: 0x6e604e },           // fur hat (KPA officers)
 };
 const armorCache = {};
 export async function loadArmor(names = Object.keys(ARMOR)) {

@@ -358,7 +358,7 @@ export function gearFor(kind, key, hat, variant, sex = 'm') {
   const realHat = (hat === 'helmet' || key === 'kpa_officer') && armorPart(HELMET[key]);
   if (realHat) {
     // real helmet / hat model: shell top above the skull, centred on the head (offsets: top, forward)
-    const fit = { ssh60: [0.205, -0.01], ushanka: [0.17, -0.005], fast_cam: [0.158, 0.0], fast_blk: [0.158, 0.0], helmet: [0.19, -0.01] }[HELMET[key]];
+    const fit = { ssh60: [0.168, -0.008], ushanka: [0.178, -0.005], fast_cam: [0.142, -0.004], fast_blk: [0.142, -0.004], helmet: [0.162, -0.01] }[HELMET[key]];
     P('Head', realHat.material, realHat.geometry.clone().translate(hc.x, hc.y + fit[0], hc.z + fit[1]));
     const ey = LIB[sex].eyeY, fz = LIB[sex].faceZ;
     if (key === 'rok_707') goggles(P, M, M.tint, 0, ey + 0.004, fz + 0.016 - 0.105, 0.105, false);

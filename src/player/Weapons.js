@@ -14,7 +14,7 @@ const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
 export const WEAPON_DEFS = {
   rifle: { id: 'rifle', name: 'K2C1 소총', short: 'RIFLE', mag: 30, reserve: 180, interval: 0.085, auto: true, damage: 34, headMult: 2.6, range: 300,
     hipSpread: 0.03, adsSpread: 0.003, moveSpread: 0.025, kick: 0.010, kickYaw: 0.004, reload: 2.2, reloadEmpty: 2.7, adsTime: 0.22, adsZoom: 0.3, sound: 'rifle' },
-  pistol: { id: 'pistol', name: 'G17 권총', short: 'PISTOL', mag: 12, reserve: 48, interval: 0.16, auto: false, damage: 30, headMult: 2.4, range: 120,
+  pistol: { id: 'pistol', name: 'G17 권총', short: 'PISTOL', mag: 17, reserve: 51, interval: 0.16, auto: false, damage: 30, headMult: 2.4, range: 120,
     hipSpread: 0.025, adsSpread: 0.006, moveSpread: 0.015, kick: 0.02, kickYaw: 0.006, reload: 1.6, reloadEmpty: 1.9, adsTime: 0.15, adsZoom: 0.15, sound: 'pistol' },
 };
 
