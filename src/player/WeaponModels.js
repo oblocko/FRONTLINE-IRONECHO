@@ -248,6 +248,11 @@ function realK2C1() {
     if (keepA.length) body.add(new THREE.Mesh(pick(keepA), mat));
     if (magA.length) mag.add(new THREE.Mesh(pick(magA), mat));
   });
+  // centre the bore on x = 0: the model's barrel sits a few millimetres off its bounding-box centre, which put
+  // the front sight post (and the bullet line) beside the holographic reticle when aiming
+  { let sx = 0, n = 0; const vv = new THREE.Vector3();
+    body.traverse((o) => { if (!o.isMesh) return; const p = o.geometry.attributes.position; for (let i = 0; i < p.count; i++) { vv.fromBufferAttribute(p, i); if (vv.z < -0.35 && vv.z > -0.62) { sx += vv.x; n++; } } });
+    const off = n ? sx / n : 0; for (const grp of [body, mag]) grp.traverse((o) => { if (o.isMesh) o.geometry.translate(-off, 0, 0); }); }
   const bb = new THREE.Box3().setFromObject(body);
   return { body, mag, railTop: 0.040, muzzle: new THREE.Vector3(0, -0.005, -0.625), size: bb.getSize(new THREE.Vector3()) };
 }

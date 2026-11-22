@@ -11,6 +11,7 @@ import { keyName } from '../player/Player.js';
 import { MountedWeapon } from '../gameplay/MountedWeapon.js';
 import { FireSupport } from '../gameplay/FireSupport.js';
 import { EnemyVehicle } from '../gameplay/EnemyVehicle.js';
+import { squadFollow as squadFollowC } from './common.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 export const TEXTURES = ['snowground', 'asphalt', 'dirt', 'concrete', 'plaster', 'brick', 'corrugated', 'paintedMetal', 'metal', 'wood', 'sandbag', 'rock', 'grassdead', 'camoROK', 'camoEnemy', 'fabric'];
@@ -55,7 +56,7 @@ export async function build(game) {
 
 // helpers -----------------------------------------------------------
 function setSquadStatus(game, id, status) { const s = game.squadList.find((x) => x.id === id); if (s) s.status = status; }
-function squadFollow(game, list = ['yoon', 'doyun', 'jung']) { for (const k of list) { const a = game.squad[k]; a.unpose(); a.follow(game.player); a.setPassive(false); } }
+function squadFollow(game, list = ['yoon', 'doyun', 'jung']) { squadFollowC(game, list); }
 function spawnEnemies(game, list, opts = {}) {
   return list.map(([x, z, extra = {}]) => game.director.spawn({ team: 'enemy', pos: V(x, 0, z), yaw: opts.yaw ?? 0, accuracy: opts.accuracy ?? 1, state: opts.state || 'idle', visionRange: opts.visionRange, ...extra }));
 }
@@ -370,7 +371,7 @@ export const SEGMENTS = [
       m.flags.inTrench = true;
       game.objectives.setMarker('op', V(76, lv.hf(76, -37), -37));
       // squad files into trench
-      sq.yoon.moveTo(V(66, 0, -41), { run: true, onArrive: (a) => a.follow(game.player) });
+      sq.yoon.moveTo(V(66, 0, -41), { run: true, onArrive: (a) => a.lead(game.player) });
       await m.talk([
         ['yoon', '백두-3, 백두-3. 여기 순찰조, 응답하라.', { radio: true }],
         ['op', '(…지직…)', { radio: true, duration: 1.4 }],
@@ -502,8 +503,7 @@ export const SEGMENTS = [
         for (const e of m.flags.patrol) if (!e.dead) e.kill(game.player.position);
         await m.say('yoon', '총소리 났다. 마을 쪽도 깨어났을 거다. 붙어서 가.', { priority: 3 });
       } else await m.say('yoon', '…지나갔다. 숨 쉬어라, 민재. 조용히 마을로 들어간다.', { priority: 3 });
-      for (const k of ['yoon', 'jung']) { sq[k].setPassive(false); sq[k].follow(game.player); }
-      sq.doyun.setPassive(false); sq.doyun.follow(game.player);
+      squadFollowC(game, ['yoon', 'jung', 'doyun']);
       await m.until(() => game.player.position.z > 30);
       // ---- AMBUSH ----
       const amb = spawnEnemies(game, [
@@ -552,7 +552,7 @@ export const SEGMENTS = [
         ['doyun', '괜찮다… 괜찮다 캤제… 아, 씨. 커피 못 내리면 우짜노.', { priority: 2 }],
         ['minjae', '말하지 마십시오. 갑니다.'],
       ]));
-      sq.yoon.follow(game.player, V(-2.5, 0, 3)); sq.jung.follow(game.player, V(2, 0, 2));
+      sq.yoon.lead(game.player); sq.jung.follow(game.player, V(2, 0, 2));   // Jung stays with the private helping Do-yun
       game.objectives.add('clear', '마을의 적 제압', { count: amb.length });
       const off = m.bind(events.on('ai:death', ({ agent }) => { if (amb.includes(agent)) game.objectives.progress('clear'); }));
       await m.until(() => amb.every((e) => e.dead), 180); for (const e of amb) if (!e.dead) e.kill(game.player.position);   // last-resort: never stall on a lost straggler

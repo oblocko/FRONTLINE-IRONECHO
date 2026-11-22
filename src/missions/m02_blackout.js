@@ -135,7 +135,7 @@ export const SEGMENTS = [
       game.objectives.complete('push');
       await m.say('jung', '됐다! 길 열렸다!', { priority: 2 });
       // back on the truck… then the drones come
-      sq.yoon.follow(game.player); sq.jung.follow(game.player);
+      squadFollow(game, ['yoon', 'jung']);
       const proxy = { position: truck.position, aimHeight: 2, damage: () => {} };
       await m.wait(2.5);
       game.audio.setMusic('combat');

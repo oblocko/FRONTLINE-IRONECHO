@@ -165,8 +165,17 @@ export class WeaponSystem {
       if (inp.pressed('grenade')) this.throwGrenade();
     }
     if (this.throwing > 0) this.throwing -= dt;
+    // wall check: how close is the nearest surface along the line of the barrel
+    this._wallT = (this._wallT || 0) - dt;
+    if (this._wallT <= 0) {
+      this._wallT = 0.05; const eye = p.eyePos(new THREE.Vector3()); const f = p.forward(new THREE.Vector3());
+      const reach = this.currentId === 'pistol' ? 0.55 : 0.9; const hit = d && !p.seat ? this.combat.world.raycast(eye, f, reach, { ignore: (c) => c.passBullets }) : null;
+      this._wallTarget = hit && !hit.terrain && Math.abs(hit.normal?.y ?? 0) < 0.7 ? Math.min(1, Math.max(0, (reach - hit.dist) / (reach * 0.65))) : 0;
+    }
+    this.wallTuck = damp(this.wallTuck || 0, this._wallTarget || 0, 10, dt);
+    const tucked = this.wallTuck > 0.55;
     // ADS
-    const wantAds = ctl && d && !p.sprinting && this.switching === 0 && (inp.ads() || (this.adsToggled && !inp.ads()));
+    const wantAds = ctl && d && !tucked && !p.sprinting && this.switching === 0 && (inp.ads() || (this.adsToggled && !inp.ads()));
     this.adsAmount = damp(this.adsAmount, wantAds && !this.reloading ? 1 : 0, 1 / (d?.adsTime ?? 0.2) * 1.6, dt);
     // reload progress
     if (this.reloading) {
@@ -177,7 +186,7 @@ export class WeaponSystem {
     }
     // fire
     this.fireT -= dt;
-    if (ctl && !this._trigLock && d && this.switching === 0 && !this.reloading && !(this.throwing > 0)) {
+    if (ctl && !this._trigLock && d && !tucked && this.switching === 0 && !this.reloading && !(this.throwing > 0)) {
       const trigger = d.auto ? inp.fire() : inp.firePressed();
       if (inp.firePressed()) this.shotsSinceTrigger = 0;
       if (trigger && this.fireT <= 0 && !p.sprinting) {
@@ -252,8 +261,11 @@ export class WeaponSystem {
     pos.x += sprint * 0.06; pos.y -= sprint * 0.06; pos.z += sprint * 0.04;
     // switch / lower
     pos.y -= this.switching * 0.35 + this.lowerAmt * 0.45;
+    // muzzle against a wall: the weapon is pulled back and lifted (barrel up) instead of clipping into it
+    const wall = this.wallTuck || 0;
+    pos.z += wall * 0.16; pos.y += wall * 0.05; pos.x -= wall * 0.03;
     const rot = new THREE.Euler(
-      this.kickRot * 0.06 + this.sway.y * 0.05 - sprint * 0.35 + this.switching * -0.8,
+      this.kickRot * 0.06 + this.sway.y * 0.05 - sprint * 0.35 + this.switching * -0.8 + wall * 0.75,
       this.sway.x * 0.06 + sprint * 0.7,
       this.sway.x * 0.04 + sprint * 0.35 + (p.speed > 0.5 ? Math.sin(bt * 0.5) * 0.015 * bobAmp : 0));
     // reload animation: tilt weapon, drop mag down, bring new mag

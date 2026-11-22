@@ -212,7 +212,7 @@ export const SEGMENTS = [
     },
     async run(game, m) {
       const lv = game.level, sq = game.squad;
-      sq.yoon.follow(game.player); sq.jung.follow(game.player); sq.doyun.follow(game.player, V(1.5, 0, 3));
+      sq.yoon.lead(game.player); sq.jung.follow(sq.yoon, V(1.6, 0, 2.4)); sq.doyun.follow(sq.yoon, V(-1.6, 0, 4));
       const door = V(R.cmd.x, 0, R.cmd.z + 3.6);
       game.objectives.add('cp', '전방지휘소에 도착 보고', { marker: door.clone().setY(lv.hf(door.x, door.z) + 1) });
       await m.reach(door, 4);
@@ -477,7 +477,7 @@ export const SEGMENTS = [
         ['yoon', '도윤이 데리고 후송 지점까지 간다. 민재, 도윤이 옆에 붙어!', { priority: 3 }],
       ]);
       sq.doyun.unpose(); sq.doyun.follow(game.player, V(1.2, 0, 1.6));
-      sq.yoon.setPassive(false); sq.jung.setPassive(false); sq.yoon.follow(game.player); sq.jung.follow(game.player);
+      sq.yoon.setPassive(false); sq.jung.setPassive(false); sq.yoon.lead(game.player); sq.jung.follow(sq.yoon, V(1.6, 0, 2.4));
       game.audio.setMusic('combat');
       game.objectives.add('casevac', '박도윤을 후송 지점까지 엄호', { marker: R.evac.clone().setY(lv.hf(R.evac.x, R.evac.z) + 1) });
       game.squadList.find((s) => s.id === 'doyun').status = '후송 중';

@@ -72,10 +72,15 @@ function ensureMarines(game, at) {
   game.marines = names.map((n, i) => d.spawn({ team: 'friendly', faction: 'us', name: n, pos: V(at.x + 2 + i * 1.3, 0, at.z + 2), invulnerable: true, accuracy: 1.15, followOffset: V(-3 + i * 2, 0, 5 + (i % 2) * 1.5) }));
   game.dialogue.bindSpeaker('reyes', game.marines[0]); game.dialogue.bindSpeaker('marine', game.marines[1]);
   game.squadList.push({ id: 'reyes', rank: 'CPT', name: '레예스 (미 해병)', status: '' });
-  for (const mr of game.marines) mr.follow(game.player);
+  followAll(game);
   return game.marines;
 }
-function followAll(game) { for (const a of allies(game)) { a.unpose(); a.setPassive(false); a.follow(game.player); } }
+// chain of command: Yoon leads the Korean squad toward the objective, Jung follows him; Capt. Reyes leads his marines
+function followAll(game) {
+  const s = game.squad; for (const a of allies(game)) { a.unpose(); a.setPassive(false); }
+  s.yoon.lead(game.player); s.jung.follow(s.yoon, V(1.6, 0, 2.4));
+  const mr = game.marines || []; if (mr[0]) { mr[0].lead(game.player); mr[0].followOffset = V(4, 0, 0); mr.slice(1).forEach((a, i) => a.follow(mr[0], V(i % 2 ? 2 : -2, 0, 2.5 + i * 1.5))); }
+}
 // Enemy strongpoint in the port below the bluff — the target for the naval gunfire. Sandbagged ring, a concrete
 // bunker, an MG nest that sweeps the bluff with bursts and RPG teams that fire at the player. Returns its defenders.
 function ensureSupport(game, calls = 2) { if (!game.support) game.support = new FireSupport(game, { calls, rounds: 5, spread: 8, delay: 5.5, caller: 'reyes' }); else game.support.calls = Math.max(game.support.calls, calls); }
