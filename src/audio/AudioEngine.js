@@ -175,7 +175,7 @@ export class AudioEngine {
     const g = c.createGain(); this.env(g, t, 0.003, 0.4, 0.07); n.connect(f).connect(g); this.route(g, pos, { ref: 1, wet: false });
     n.start(t, Math.random()); n.stop(t + 0.1);
   }
-  explosion(pos, scale = 1) {
+  explosion(pos, scale = 1, { ring = true } = {}) {
     if (!this.ready) return; const c = this.ctx, t = c.currentTime;
     const dist = pos && this.listenerPos ? this.listenerPos.distanceTo(pos) : 0;
     const delay = Math.min(1.5, dist / 343); const t0 = t + delay;
@@ -191,7 +191,7 @@ export class AudioEngine {
     this.route(mix, pos, { ref: 15, rolloff: 0.6 });
     n.start(t0, Math.random()); n.stop(t0 + 3.5); crack.start(t0, Math.random()); crack.stop(t0 + 0.4); o.start(t0); o.stop(t0 + 1.6);
     this.track(n, 3.5 + delay);
-    if (dist < 25) this.tinnitus(1 - dist / 25);
+    if (ring && dist < 25) this.tinnitus((1 - dist / 25) * Math.min(1, scale));   // ear ringing only from real blasts, scaled by their size
   }
   tinnitus(amount) {
     if (!this.ready || amount < 0.3) return; const c = this.ctx, t = c.currentTime;

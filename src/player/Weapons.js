@@ -148,6 +148,9 @@ export class WeaponSystem {
     const inp = this.input; const p = this.player; const d = this.current; const s = this.state;
     // hidden = binoculars / jammer / mounted gun in use: the rifle must not fire, reload or throw
     const ctl = this.enabled && p.controlsEnabled && p.alive && !p.seat && !this.lowered && !this.hidden;
+    // a click that was meant for the binoculars / jammer / mounted gun must not carry over to the rifle once it
+    // comes back: the trigger stays locked until the button has been released
+    if (!ctl) this._trigLock = true; else if (this._trigLock && !inp.fire()) this._trigLock = false;
     // switching
     if (this.switching > 0) { this.switching = Math.max(0, this.switching - dt * 3.2); if (this.switching < 0.5 && this.pendingSwap) { this.pendingSwap(); this.pendingSwap = null; } }
     if (ctl) {
@@ -171,7 +174,7 @@ export class WeaponSystem {
     }
     // fire
     this.fireT -= dt;
-    if (ctl && d && this.switching === 0 && !this.reloading && !(this.throwing > 0)) {
+    if (ctl && !this._trigLock && d && this.switching === 0 && !this.reloading && !(this.throwing > 0)) {
       const trigger = d.auto ? inp.fire() : inp.firePressed();
       if (inp.firePressed()) this.shotsSinceTrigger = 0;
       if (trigger && this.fireT <= 0 && !p.sprinting) {

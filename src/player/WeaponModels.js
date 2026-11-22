@@ -326,6 +326,8 @@ export function buildPistol() {
     for (const c of [...g.children]) if (!keep.has(c)) g.remove(c);
     slide.clear(); slide.add(real.slide); magG.clear(); magG.add(real.mag); g.add(real.frame, slide, magG);
     muzzleP = real.muzzle; sightY = real.sightY; sightZ = real.sightZ;
+    // the Glock's grip ends higher than the old pistol's: bring both hands (and sleeves) up onto it
+    for (const o of [right, left, rArm, lArm]) o.position.add(new THREE.Vector3(0, 0.034, 0.012));
   }
   g.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; } });
   g.userData = { mag: magG, magBaseY: 0, slide, slideAxis: 'z', slideBase: 0, muzzle: muzzleP, sightY, sightZ, leftHand: left, leftHandBase: left.position.clone(), rightHand: right };
@@ -345,11 +347,26 @@ function realG17() {
   const off = new THREE.Vector3(-(bs.min.x + bs.max.x) / 2, 0.054 - bs.max.y, 0.03 - bs.max.z);
   for (const m of [slideM, frameM, magM]) m.geometry?.translate(off.x, off.y, off.z);
   bs.translate(off); bf.translate(off);
-  if (mg) {   // seat the magazine: flush with the bottom of the grip, centred in the grip well
-    const bm = new THREE.Box3().setFromObject(magM);
-    const gp = frameM.geometry.attributes.position; let zs = 0, n = 0; for (let i = 0; i < gp.count; i++) { const y = gp.getY(i); if (y < bf.min.y + 0.03) { zs += gp.getZ(i); n++; } }
-    const gz = n ? zs / n : (bf.min.z + bf.max.z) / 2;
-    magM.geometry.translate(0, bf.min.y + 0.002 - bm.min.y, gz - (bm.min.z + bm.max.z) / 2 + (bm.max.z - bm.min.z) * 0.0);
+  if (mg) {
+    // seat the magazine inside the grip: measure the grip's centre line (rake) from the frame mesh, tilt the
+    // magazine to match and sink it so only the base plate shows under the grip
+    const gp = frameM.geometry.attributes.position, yb = bf.min.y;
+    const centre = (y0, y1) => { let zs = 0, n = 0, z0 = Infinity, z1 = -Infinity; for (let i = 0; i < gp.count; i++) { const y = gp.getY(i); if (y > y0 && y < y1) { const z = gp.getZ(i); z0 = Math.min(z0, z); z1 = Math.max(z1, z); n++; } } return n ? (z0 + z1) / 2 : null; };
+    const zLo = centre(yb + 0.004, yb + 0.02), zHi = centre(yb + 0.06, yb + 0.075);
+    // rake from the backstrap (rear edge of the grip): unaffected by the trigger guard in front
+    const back = (y0, y1) => { let z1 = -Infinity; for (let i = 0; i < gp.count; i++) { const y = gp.getY(i); if (y > y0 && y < y1) z1 = Math.max(z1, gp.getZ(i)); } return z1; };
+    const bLo = back(yb + 0.004, yb + 0.012), bHi = back(yb + 0.045, yb + 0.055);
+    const rake = isFinite(bLo) && isFinite(bHi) ? Math.min(0.5, Math.max(0.2, Math.atan2(bLo - bHi, 0.042))) : 0.38;
+    // magazine's own long axis: centroid of its lowest vs highest vertices
+    const mp = magM.geometry.attributes.position; const bm = new THREE.Box3().setFromBufferAttribute(mp), h = bm.max.y - bm.min.y;
+    const lo = new THREE.Vector3(), hi = new THREE.Vector3(); let nl = 0, nh = 0; const v = new THREE.Vector3();
+    for (let i = 0; i < mp.count; i++) { v.fromBufferAttribute(mp, i); if (v.y < bm.min.y + h * 0.15) { lo.add(v); nl++; } else if (v.y > bm.max.y - h * 0.15) { hi.add(v); nh++; } }
+    lo.divideScalar(nl || 1); hi.divideScalar(nh || 1);
+    const magAxis = hi.clone().sub(lo).normalize();
+    const gripAxis = new THREE.Vector3(0, Math.cos(rake), -Math.sin(rake));                      // grip leans: top toward the muzzle (−Z)
+    magM.geometry.translate(-lo.x, -lo.y, -lo.z);                                                  // base-plate centre at the origin
+    magM.geometry.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(magAxis, gripAxis));
+    magM.geometry.translate(0, yb - 0.006, (zLo ?? (bf.min.z + bf.max.z) / 2));
   }
   // sights: rear notch at the back of the slide top, front post at the front
   const sp = slideM.geometry.attributes.position; let rearTop = -1, frontTop = -1;

@@ -414,12 +414,21 @@ export const SEGMENTS = [
       game.effects.smokeColumn(V(0, 2, 192), 2.4, [0.16, 0.16, 0.16]); game.effects.smokeColumn(V(4, 2, 198), 2, [0.18, 0.17, 0.16]);
       await m.say('medevac', '후송 1호, 포격 구간 진입한다— 지직—', { radio: true, priority: 3 });
       await m.until(() => go.done, 30); truck.visible = false; eng?.stop();
+      game.objectives.complete('hold');    // the truck is away: what was asked is done
       await m.talk([
         ['seoyeon', '후송 1호, 응답하십시오. 후송 1호!', { radio: true, priority: 3 }],
         ['jung', '…연기 때문에 아무것도 안 보여.', { priority: 3 }],
       ]);
-      await m.until(() => north.every((e) => e.dead) && game.director.enemies().filter((e) => e.position.z > 60).length <= 1, 120);
-      game.objectives.complete('hold');
+      // mop-up: the rest of the northern assault, counted and marked so nothing hidden can stall the ending
+      const rest = () => game.director.enemies().filter((e) => !e.dead && e.position.z > 60);
+      const n0 = rest().length;
+      if (n0 > 1) {
+        game.objectives.add('clear', '도로 북쪽 잔적 소탕', { count: n0 - 1 });
+        let done = 0;
+        m.every(() => { const r = rest(); const k = Math.min(n0 - 1, n0 - r.length); while (done < k) { done++; game.objectives.progress('clear'); } if (r.length <= 4) game.objectives.setMarkers('clear', r.map((e) => e.position.clone().setY(e.position.y + 1.6))); if (r.length <= 1) return false; });
+        await m.until(() => rest().length <= 1, 120);
+        game.objectives.complete('clear');
+      }
       // ---------------- ENDING ----------------
       game.audio.setMusic('cinematic'); game.cine.letterbox(true);
       for (const e of game.director.enemies()) e.kill(game.player.position);

@@ -255,9 +255,11 @@ export const SEGMENTS = [
       game.objectives.add('road', '항만 진입로 확보 — 적 차량 파괴', { count: 2 });
       await m.say('apc', '출발한다! 포수, 부두 쪽 차량부터 잡아!', { radio: true, priority: 3 });
       const ride = drive(game, m, apc, [[36, -116], [36, -90], [35, -64], [32, -40], [27, -14], [23, 12]], { speed: 5.5, onStep: () => eng?.setPos(apc.position) });
-      const techs = [new EnemyVehicle(game, { path: [V(80, 0, 40), V(40, 0, 36), V(26, 0, 30)], speed: 7, hp: 420 }), new EnemyVehicle(game, { path: [V(-50, 0, 110), V(-50, 0, 40), V(-30, 0, -36), V(0, 0, -40)], speed: 6, hp: 420 })];
+      const techs = [new EnemyVehicle(game, { path: [V(24, 0, 75), V(22.5, 0, 50), V(24, 0, 32)], speed: 7, hp: 420 }), new EnemyVehicle(game, { path: [V(-50, 0, 25), V(-50, 0, -36), V(-40, 0, -41), V(6, 0, -42)], speed: 6, hp: 420 })];
       const inf = spawnEnemies(game, [[-6, -20], [6, -6], [-12, 4], [14, 22], [2, 40], [-26, 30], [40, 4]], { state: 'combat', accuracy: 0.6 }); attackOrder(game, inf, game.player);
       m.bind(events.on('vehicle:destroyed', ({ vehicle }) => { if (techs.includes(vehicle)) game.objectives.progress('road'); }));
+      // live markers on the trucks still running (they come in from the quay side streets)
+      m.every(() => { const live = techs.filter((t) => !t.dead); game.objectives.setMarkers('road', live.map((t) => t.position.clone().setY(t.position.y + 2))); if (!live.length) return false; });
       await m.until(() => ride.done && techs.every((t) => t.dead), 150);
       for (const t of techs) if (!t.dead) t.destroy();
       ride.target = 0; game.objectives.complete('road');

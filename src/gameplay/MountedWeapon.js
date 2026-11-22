@@ -238,7 +238,7 @@ export class MountedWeapon {
     const res = g.combat.playerShot(eye, dir, { ...d, hipSpread: 0, moveSpread: 0, adsSpread: 0 }, mz);
     g.weapons.shotsFired++; if (res?.hitAgent || res?.hitVehicle) g.weapons.shotsHit++;
     g.effects.muzzleFlash(mz, dir); g.effects.flashLight(mz, 0xffb060, this.kind === 'apc' ? 10 : 5, 0.05, 9);
-    g.audio.shot(this.kind === 'apc' ? mz : null, { kind: 'rifle' }); if (this.kind === 'apc') g.audio.explosion(mz, 0.12);
+    g.audio.shot(this.kind === 'apc' ? mz : null, { kind: 'rifle' }); if (this.kind === 'apc') g.audio.explosion(mz, 0.12, { ring: false });   // muzzle report, no ear ringing
     p.pitch += d.kick * (1 - 0.4 * this.ads); p.recoilPitch += d.kick * 0.6; p.addShake(this.kind === 'apc' ? 0.12 : 0.035 * (1 - 0.6 * this.ads));
     p.lastFireT = time; g.director.noise(eye, 120, 'player');
   }
