@@ -73,46 +73,50 @@ export function buildK21Hull() {
     const x = s * 1.6;
     const panels = [[-3.7, -2.25], [-2.2, -0.75], [-0.7, 0.75], [0.8, 2.25], [2.3, 3.0]];
     for (const [z0, z1] of panels) {
-      P('paint', box(0.07, 0.88, z1 - z0 - 0.03, x, 1.42, (z0 + z1) / 2));
+      P('paint', box(0.07, 1.28, z1 - z0 - 0.03, x, 1.22, (z0 + z1) / 2));
       P('paint', box(0.09, 0.05, z1 - z0 - 0.03, x + s * 0.01, 1.84, (z0 + z1) / 2));       // top lip
-      for (const zz of [z0 + 0.12, z1 - 0.12]) for (const yy of [1.08, 1.76]) P('steel', cylX(0.022, 0.03, x + s * 0.04, yy, zz, 8));   // bolts
+      for (const zz of [z0 + 0.12, z1 - 0.12]) for (const yy of [0.7, 1.22, 1.76]) P('steel', cylX(0.022, 0.03, x + s * 0.04, yy, zz, 8));   // bolts
+      P('dark', box(0.075, 0.03, z1 - z0 - 0.03, x, 0.59, (z0 + z1) / 2));   // bottom edge
     }
     // front skirt end follows the glacis rake
-    const fr = [[2.3, 0.98], [2.95, 0.98], [3.32, 1.4], [3.32, 1.62], [2.3, 1.86]];
+    const fr = [[2.3, 0.58], [2.9, 0.58], [3.42, 1.18], [3.42, 1.55], [2.3, 1.86]];
     P('paint', s > 0 ? profileX(fr, x - 0.035, x + 0.035, 0.008) : profileX(fr, x - 0.035, x + 0.035, 0.008));
     // mud flap at the rear
-    P('rubber', box(0.05, 0.4, 0.3, x, 0.88, -3.72));
+    P('rubber', box(0.05, 0.3, 0.3, x, 0.45, -3.72));
     // rail of tie-down loops along the roof edge
     for (let z = -3.4; z < 1.9; z += 0.75) P('steel', box(0.05, 0.05, 0.12, s * 1.5, 1.93, z));
   }
 
   // ---- running gear: 6 road wheels (dual), front drive sprocket, rear idler, return rollers ----
-  const WZ = [-2.75, -1.85, -0.95, -0.05, 0.92, 1.85], WY = 0.42, WR = 0.36;
+  const WZ = [-2.72, -1.82, -0.92, -0.02, 0.9, 1.82], WY = 0.31, WR = 0.3;
   for (const s of [-1, 1]) {
     const xo = s * 1.38;
     for (const z of WZ) {
-      for (const dx of [0.085, -0.085]) P('rubber', new THREE.TorusGeometry(WR - 0.05, 0.05, 8, 28).rotateY(Math.PI / 2).translate(xo + s * dx, WY, z).toNonIndexed());   // dual rubber tyres (rings)
-      P('paint', cylX(WR - 0.07, 0.22, xo, WY, z, 24));                                                               // disc (painted)
-      P('steel', cylX(0.1, 0.3, xo, WY, z, 12)); P('dark', cylX(0.05, 0.32, xo, WY, z, 8));                        // hub
-      for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; P('dark', cylX(0.025, 0.25, xo, WY + Math.sin(a) * 0.17, z + Math.cos(a) * 0.17, 6)); }   // lightening holes
+      for (const dx of [0.085, -0.085]) P('rubber', new THREE.TorusGeometry(WR - 0.045, 0.045, 16, 56).rotateY(Math.PI / 2).translate(xo + s * dx, WY, z).toNonIndexed());   // dual rubber tyres (rings)
+      P('paint', cylX(WR - 0.065, 0.22, xo, WY, z, 48));                                                               // disc (painted)
+      P('steel', cylX(0.09, 0.3, xo, WY, z, 24)); P('dark', cylX(0.045, 0.32, xo, WY, z, 16));                        // hub
+      for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; P('dark', cylX(0.022, 0.25, xo, WY + Math.sin(a) * 0.15, z + Math.cos(a) * 0.15, 12)); }   // lightening holes
       // torsion arm
-      P('dark', box(0.08, 0.08, 0.42, s * 1.24, WY + 0.12, z + 0.18, 0.5, 0, 0));
+      P('dark', box(0.08, 0.08, 0.4, s * 1.24, WY + 0.1, z + 0.17, 0.45, 0, 0));
     }
     // drive sprocket (front, high) with teeth
-    const sz = 2.98, sy = 0.72;
-    P('steel', cylX(0.3, 0.26, xo, sy, sz, 22)); P('dark', cylX(0.12, 0.3, xo, sy, sz, 12));
-    for (let k = 0; k < 11; k++) { const a = k / 11 * Math.PI * 2; P('steel', box(0.22, 0.07, 0.07, xo, sy + Math.sin(a) * 0.32, sz + Math.cos(a) * 0.32, a, 0, 0)); }
+    const sz = 2.95, sy = 0.5;
+    P('steel', cylX(0.25, 0.26, xo, sy, sz, 40)); P('dark', cylX(0.1, 0.3, xo, sy, sz, 20));
+    for (let k = 0; k < 11; k++) { const a = k / 11 * Math.PI * 2; P('steel', box(0.22, 0.06, 0.06, xo, sy + Math.sin(a) * 0.27, sz + Math.cos(a) * 0.27, a, 0, 0)); }
     // idler (rear)
-    const iz = -3.42, iy = 0.62;
-    P('steel', cylX(0.3, 0.26, xo, iy, iz, 22)); P('dark', cylX(0.1, 0.3, xo, iy, iz, 10));
+    const iz = -3.4, iy = 0.47;
+    P('steel', cylX(0.26, 0.26, xo, iy, iz, 40)); P('dark', cylX(0.09, 0.3, xo, iy, iz, 20));
     // return rollers
-    for (const z of [-2.2, -0.5, 1.4]) P('steel', cylX(0.08, 0.2, xo, 0.92, z, 12));
+    for (const z of [-2.2, -0.5, 1.4]) P('steel', cylX(0.07, 0.2, xo, 0.72, z, 20));
     // track: links laid along the loop around idler → road wheels → sprocket → return line
     const loop = new THREE.CurvePath();
     const L = (a, b) => loop.add(new THREE.LineCurve3(new THREE.Vector3(0, a[1], a[0]), new THREE.Vector3(0, b[1], b[0])));
-    const bottom = WY - WR - 0.03, topY = 1.0;
-    L([iz, bottom + 0.2], [WZ[0], bottom]); L([WZ[0], bottom], [WZ[5], bottom]); L([WZ[5], bottom], [sz, sy - 0.36]);
-    L([sz, sy - 0.36], [sz + 0.36, sy]); L([sz + 0.36, sy], [sz, sy + 0.36]); L([sz, sy + 0.36], [-3.0, topY]); L([-3.0, topY], [iz - 0.36, iy + 0.1]); L([iz - 0.36, iy + 0.1], [iz, bottom + 0.2]);
+    const bottom = 0.03, topY = 0.8;
+    const R = 0.3;   // sprocket / idler wrap radius incl. track
+    L([iz, iy - R], [WZ[0], bottom]); L([WZ[0], bottom], [WZ[5], bottom]); L([WZ[5], bottom], [sz, sy - R]);
+    for (let k = 0; k < 6; k++) { const a0 = -Math.PI / 2 + k * Math.PI / 6, a1 = a0 + Math.PI / 6; L([sz + Math.cos(a0) * R, sy + Math.sin(a0) * R], [sz + Math.cos(a1) * R, sy + Math.sin(a1) * R]); }
+    L([sz, sy + R], [-3.0, topY]); L([-3.0, topY], [iz, iy + R]);
+    for (let k = 0; k < 6; k++) { const a0 = Math.PI / 2 + k * Math.PI / 6, a1 = a0 + Math.PI / 6; L([iz + Math.cos(a0) * R, iy + Math.sin(a0) * R], [iz + Math.cos(a1) * R, iy + Math.sin(a1) * R]); }
     const total = loop.curves.reduce((a, c) => a + (c.getLength ? c.getLength() : 0), 0); const n = Math.round(total / 0.155);
     const linkGeos = [];
     for (let i = 0; i < n; i++) {
