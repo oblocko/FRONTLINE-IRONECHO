@@ -44,7 +44,7 @@ function driver(game, m, obj, pts, { speed = 8, accel = 0.6, onStep = null } = {
 function seatSquad(game, truck) {
   const scene = game.renderer.scene; const sq = game.squad;
   const seat = (a, x, z, yaw) => { scene.remove(a.actor.root); truck.add(a.actor.root); a.actor.root.position.set(x, 1.36, z); a.yaw = yaw; a.actor.root.rotation.y = yaw; a.pose('sit'); a.actor.target.sit = 1; };
-  seat(sq.yoon, 0.75, -0.4, -Math.PI / 2); seat(sq.doyun, 0.75, -1.6, -Math.PI / 2); seat(sq.jung, -0.75, -0.2, Math.PI / 2);
+  seat(sq.yoon, 0.75, -0.4, -Math.PI / 2); seat(sq.doyun, 0.75, -1.6, -Math.PI / 2); seat(sq.jung, -0.75, -2.1, Math.PI / 2);   // player sits at (-0.75, -0.9)
 }
 function unseatSquad(game, truck, at) {
   const scene = game.renderer.scene; const sq = game.squad;
