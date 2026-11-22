@@ -1,0 +1,26 @@
+<!doctype html><html><head><meta charset="utf-8"><base href="../"><title>Gear viewer</title>
+<script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/examples/jsm/":"/vendor/three/examples/jsm/","three/addons/":"/vendor/three/examples/jsm/"}}</script></head>
+<body style="margin:0;background:#888"><script type="module">
+import * as THREE from 'three'; import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { GUNS, loadGear, cloneGun } from './src/gear/GearLib.js'; import { buildNpcWeapon } from './src/ai/CharacterLib.js';
+const q = new URLSearchParams(location.search);
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(innerWidth, innerHeight); r.toneMapping = THREE.ACESFilmicToneMapping; document.body.appendChild(r.domElement);
+const s = new THREE.Scene(); s.background = new THREE.Color(0x8a9096); s.environment = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment()).texture;
+const d = new THREE.DirectionalLight(0xffffff, 1.5); d.position.set(2, 3, 4); s.add(d);
+if (q.get('vm')) { const { buildRifle } = await import('./src/player/WeaponModels.js'); await loadGear(['k2c1']); const vm = buildRifle(); s.add(vm); s.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.5)); const c2 = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.01, 10); const ang = +(q.get('vm')); c2.position.set(Math.sin(ang) * 1.6, 0.1, Math.cos(ang) * 1.6 - 0.25); c2.lookAt(0, -0.05, -0.25); r.render(s, c2); window.__ready = true; throw 0; }
+const names = (q.get('g') || Object.keys(GUNS).join(',')).split(','); const proc = { k2c1: 'k2c1', ak74: 'ak88', ak74m: 'aknew', m4a1: 'k13' };
+await loadGear(names); const info = [];
+const { loadGLTF } = await import('./src/core/Assets.js'); for (const n of names) { const raw = (await loadGLTF(GUNS[n].file)).scene; raw.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(raw); info.push(n + ' RAW ' + b.min.toArray().map((v) => v.toFixed(2)) + ' / ' + b.max.toArray().map((v) => v.toFixed(2))); }
+names.forEach((n, i) => {
+  const g = cloneGun(n); const row = new THREE.Group(); row.position.y = 0.6 - i * 0.4; s.add(row);
+  if (g) { row.add(g); info.push(n + ' size ' + g.userData.size.toArray().map((v) => v.toFixed(3)).join(',')); }
+  const p = buildNpcWeapon(proc[n]); p.traverse((o) => { if (o.isMesh) o.material = new THREE.MeshBasicMaterial({ color: 0xff3020, wireframe: true, transparent: true, opacity: 0.35 }); }); row.add(p);
+  for (const [z, y, c] of q.get('nodots') ? [] : [[-0.035, -0.055, 0x00ff00], [0.25, -0.03, 0x00a0ff], [g?.userData.muzzleZ ?? 0, g?.userData.muzzleY ?? 0.005, 0xffff00]]) { const m = new THREE.Mesh(new THREE.SphereGeometry(0.012), new THREE.MeshBasicMaterial({ color: c, depthTest: false })); m.position.set(0, y, z); m.renderOrder = 9; row.add(m); }
+});
+let cam = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.01, 50); cam.position.set(-3.2, 0, 0.15); cam.lookAt(0, 0, 0.15);
+if (q.get('ortho')) { const h = 0.32, w = h * innerWidth / innerHeight; cam = new THREE.OrthographicCamera(-w, w, h, -h, 0.01, 50); cam.position.set(-3, 0.6, 0.1); cam.lookAt(0, 0.6, 0.1);
+  const gm = new THREE.LineBasicMaterial({ color: 0x404850 }); const pts = []; for (let z = -0.6; z <= 0.8; z += 0.05) pts.push(new THREE.Vector3(0.3, 0.6 - 0.3, z), new THREE.Vector3(0.3, 0.6 + 0.3, z)); for (let y = -0.3; y <= 0.3; y += 0.05) pts.push(new THREE.Vector3(0.3, 0.6 + y, -0.6), new THREE.Vector3(0.3, 0.6 + y, 0.8));
+  const grid = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), gm); s.add(grid);
+  const ax = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0.29, 0.6, -0.6), new THREE.Vector3(0.29, 0.6, 0.8), new THREE.Vector3(0.29, 0.3, 0), new THREE.Vector3(0.29, 0.9, 0)]), new THREE.LineBasicMaterial({ color: 0xffffff })); s.add(ax); } r.render(s, cam);
+console.error(info.join(' | ')); window.__ready = true;
+</script></body></html>

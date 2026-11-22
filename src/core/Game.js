@@ -19,6 +19,7 @@ import { Dialogue } from '../story/Dialogue.js';
 import { Objectives } from '../story/Objectives.js';
 import { MissionRunner, Cinematics } from '../story/MissionRunner.js';
 import { loadCharacters } from '../ai/CharacterLib.js';
+import { loadGear } from '../gear/GearLib.js';
 import { missionById, nextMission } from '../missions/index.js';
 import { UI } from '../ui/UI.js';
 import { buildMenuScene } from '../world/MenuScene.js';
@@ -103,7 +104,7 @@ export class Game {
     this.pending = { id, meta, mod };
     // photographic textures + scanned props (CC0) — failures fall back to procedural assets
     await preloadPhotoTextures((p) => progress(0.05 + 0.2 * p, 'LOADING TEXTURES'));
-    progress(0.25, 'LOADING CHARACTERS'); await loadCharacters();
+    progress(0.25, 'LOADING CHARACTERS'); await Promise.all([loadCharacters(), loadGear()]);
     let n = 0; const ids = mod.PROPS || PROP_IDS;
     await Promise.all(ids.map((pid) => loadGLTF(`models/${pid}/${pid}.gltf`).catch(() => null).then(() => progress(0.3 + 0.3 * (++n / ids.length), 'LOADING MODELS'))));
     // pre-generate textures used by the level while the briefing is shown
@@ -128,7 +129,7 @@ export class Game {
     this.effects = new Effects(scene, this.renderer.camera);
     this.effects.groundFn = (x, z) => this.world.heightFn(x, z);
     this.props = new Props(scene, this.world);
-    await loadCharacters();
+    await Promise.all([loadCharacters(), loadGear()]);
     this.propLib = await new PropLibrary(this).load(p.mod.PROPS || PROP_IDS); this.props.lib = this.propLib;
     this.combat = new Combat({ world: this.world, effects: this.effects, audio });
     this.director = new AIDirector({ scene, world: this.world, effects: this.effects, audio, combat: this.combat });

@@ -9,7 +9,8 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { createActor } from './src/ai/Actor.js';
 import { loadCharacters } from './src/ai/CharacterLib.js';
-if (new URLSearchParams(location.search).get('proc') !== '1') await loadCharacters();
+import { loadGear } from './src/gear/GearLib.js';
+if (new URLSearchParams(location.search).get('proc') !== '1') await Promise.all([loadCharacters(), loadGear()]); { const { armorPart } = await import('./src/gear/GearLib.js'); for (const n of ['rig','olive','heavy','helmet']) { const a = armorPart(n); console.error(n, a ? a.geometry.attributes.position.count + ' ' + a.material.type + ' tr=' + a.material.transparent + ' op=' + a.material.opacity + ' at=' + a.material.alphaTest : 'none'); } }
 const q = new URLSearchParams(location.search); const close = q.get('view') === 'close';
 const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(innerWidth, innerHeight); r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; r.shadowMap.enabled = true; document.body.appendChild(r.domElement);
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0x6a7078);
@@ -25,7 +26,7 @@ const cast = [
 ];
 const actors = cast.map((c, i) => {
   const a = createActor(scene, { faction: c.faction, variant: c.variant, hat: c.hat || 'helmet', weapon: c.weapon !== false, look: c.look });
-  a.root.position.set((i - (cast.length - 1) / 2) * 1.05, 0, 0); a.root.rotation.y = 0.35;
+  a.root.position.set((i - (cast.length - 1) / 2) * 1.05, 0, 0); a.root.rotation.y = 0.35 + +(new URLSearchParams(location.search).get('spin') || 0);
   const t = a.target; if (c.pose === 'aim') t.aim = 1; if (c.pose === 'walk') t.speed = 1.6; if (c.pose === 'crouch') { t.crouch = 1; t.aim = 1; } if (c.pose === 'wounded') t.wounded = 1;
   if (c.pose === 'dead') a.die(new THREE.Vector3(0, 0, -1));
   return a;

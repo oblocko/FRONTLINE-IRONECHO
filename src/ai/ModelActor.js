@@ -99,7 +99,7 @@ export class ModelActor {
     if (weapon) {
       this.weaponPivot = new THREE.Group(); this.root.add(this.weaponPivot);
       this.weapon = buildNpcWeapon(weaponTypeFor(look)); this.weaponPivot.add(this.weapon);
-      this.muzzle = new THREE.Object3D(); this.muzzle.position.set(0, 0.005, this.weapon.userData.muzzleZ); this.weapon.add(this.muzzle);
+      this.muzzle = new THREE.Object3D(); this.muzzle.position.set(0, this.weapon.userData.muzzleY ?? 0.005, this.weapon.userData.muzzleZ); this.weapon.add(this.muzzle);
       this.gripR = new THREE.Vector3(0.0, -0.055, -0.035); this.gripL = new THREE.Vector3(0.0, -0.03, 0.25);
     }
     // animation

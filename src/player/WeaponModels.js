@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { pbr } from '../render/TextureFactory.js';
+import { cloneGun } from '../gear/GearLib.js';
 
 // ---------- materials ----------
 let M = null;
@@ -179,9 +180,47 @@ export function buildRifle() {
   g.add(rArm); rArm.position.set(0.045, -0.105, 0.115); rArm.rotation.set(0.55, 0.42, 0);
   g.add(lArm); lArm.position.set(-0.035, -0.07, -0.385); lArm.rotation.set(0.62, -0.62, 0);
 
+  let muzzle = new THREE.Vector3(0, 0.026, -0.78), sightDrop = 0;
+  const real = realK2C1();
+  if (real) {
+    // swap the procedural body for the real K2C1 model; keep the holo sight, hands, sleeves
+    const keep = new Set([sight, magG, right, left, rArm, lArm]);
+    for (const c of [...g.children]) if (!keep.has(c)) g.remove(c);
+    magG.clear(); magG.add(real.mag); g.add(real.body);
+    sightDrop = real.railTop - SY; sight.position.y = sightDrop;
+    muzzle = real.muzzle;
+    left.position.set(-0.03, -0.05, -0.34); lArm.position.z += 0.09; lArm.position.y += 0.006;
+    right.position.add(new THREE.Vector3(0, -0.016, -0.05)); rArm.position.add(new THREE.Vector3(0, -0.016, -0.05));
+  }
   g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; o.frustumCulled = false; } });
-  g.userData = { mag: magG, magBaseY: 0, muzzle: new THREE.Vector3(0, 0.026, -0.78), sightY: dotY, sightZ: -0.099, dot, ring, leftHand: left, leftHandBase: left.position.clone(), rightHand: right };
+  g.userData = { mag: magG, magBaseY: 0, muzzle, sightY: dotY + sightDrop, sightZ: -0.099, dot, ring, leftHand: left, leftHandBase: left.position.clone(), rightHand: right };
   return g;
+}
+
+// Real K2C1 (Sketchfab, CC-BY) in the viewmodel frame (muzzle −Z, grip centre ≈ (0,-0.1,0.055)).
+// The magazine triangles are split off into their own mesh so the reload animation can drop it.
+function realK2C1() {
+  const src = cloneGun('k2c1'); if (!src) return null;
+  src.rotation.y = Math.PI; src.position.set(0, -0.045, 0.02); src.updateMatrixWorld(true);
+  const body = new THREE.Group(), mag = new THREE.Group();
+  const v = new THREE.Vector3(), c = new THREE.Vector3();
+  src.traverse((o) => {
+    if (!o.isMesh) return;
+    const geo = (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone()).applyMatrix4(o.matrixWorld);
+    const pos = geo.attributes.position, keepA = [], magA = [];
+    for (let t = 0; t < pos.count; t += 3) {
+      c.set(0, 0, 0); for (let k = 0; k < 3; k++) c.add(v.fromBufferAttribute(pos, t + k)); c.divideScalar(3);
+      // magazine: below the receiver, ahead of the trigger guard (viewmodel frame: z −0.15..−0.03)
+      if (c.y > 0.045 && c.z > -0.03 && c.z < 0.09) continue;   // fixed rear aperture sight: removed (an optic rides on the rail)
+      (c.y < -0.085 && c.z < -0.03 && c.z > -0.17 ? magA : keepA).push(t);
+    }
+    const pick = (list) => { const g2 = new THREE.BufferGeometry(); for (const [name, a] of Object.entries(geo.attributes)) { const arr = new a.array.constructor(list.length * 3 * a.itemSize); list.forEach((t, i) => { for (let k = 0; k < 3; k++) for (let j = 0; j < a.itemSize; j++) arr[(i * 3 + k) * a.itemSize + j] = a.getComponent(t + k, j); }); g2.setAttribute(name, new THREE.BufferAttribute(arr, a.itemSize, a.normalized)); } return g2; };
+    const mat = o.material.clone(); if (!mat.map) { mat.color.setHex(0x1c1d1e); mat.roughness = 0.5; mat.metalness = 0.35; }
+    if (keepA.length) body.add(new THREE.Mesh(pick(keepA), mat));
+    if (magA.length) mag.add(new THREE.Mesh(pick(magA), mat));
+  });
+  const bb = new THREE.Box3().setFromObject(body);
+  return { body, mag, railTop: 0.037, muzzle: new THREE.Vector3(0, -0.005, -0.625), size: bb.getSize(new THREE.Vector3()) };
 }
 
 // ======================================================================

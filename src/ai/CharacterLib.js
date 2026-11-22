@@ -6,6 +6,9 @@
 // → trousers, feet → boots, hands → gloves); cloth zones are slightly inflated,
 // lose the muscle normal map and take a camo/fabric texture. Rigid gear (helmet,
 // plate carrier, pouches, belt, knee pads, soles) is attached to bones.
+import { cloneGun, armorPart } from '../gear/GearLib.js';
+// vertical / forward offset of the armour centre from the spine_03 rest position, per look
+const ARMOR_FIT = { def: [-0.01, -0.015], kpa: [0.0, 0.005] };
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -363,8 +366,13 @@ export function gearFor(kind, key, hat, variant, sex = 'm') {
     P('spine_03', M.leather, T(roundedBox(0.03, 0.62, 0.012, 0.004), 0.02, chest.y - 0.02, cz + 0.13, 0, 0, -0.5));
     P('pelvis', M.leather, T(roundedBox(0.07, 0.15, 0.05, 0.015), pel.x - 0.17, pel.y + 0.0, pel.z + 0.06));
   } else if (soldier) {
-    const carrier = key !== 'kpa_sfb' || true;
-    if (carrier) {
+    const real = armorPart({ kpa: 'rig', us: 'heavy' }[key] || 'olive');
+    if (real) {
+      const fit = ARMOR_FIT[key] || ARMOR_FIT.def;
+      P('spine_03', real.material, real.geometry.clone().translate(0, chest.y + fit[0], cz + fit[1]));
+      if (key !== 'kpa') { P('spine_03', M.pouch, T(roundedBox(0.08, 0.16, 0.06, 0.015), -0.09, chest.y - 0.02, cz - 0.21)); P('spine_03', M.dark, T(cyl(0.005, 0.004, 0.42, 5), -0.11, chest.y + 0.25, cz - 0.22)); }
+      if (variant % 3 === 1 && key !== 'kpa_sf') P('spine_03', M.pouch, T(roundedBox(0.28, 0.34, 0.13, 0.03), 0, chest.y - 0.03, cz - 0.26)); // assault pack
+    } else {
       P('spine_03', M.vest, T(roundedBox(0.31, 0.34, 0.06, 0.02), 0, chest.y - 0.02, cz + 0.125));
       P('spine_03', M.vest, T(roundedBox(0.31, 0.36, 0.06, 0.02), 0, chest.y - 0.01, cz - 0.155));
       for (const sx of [-1, 1]) { P('spine_03', M.vest, T(roundedBox(0.05, 0.16, 0.27, 0.015), sx * 0.175, chest.y - 0.1, cz - 0.015)); P('spine_03', M.vest, T(roundedBox(0.07, 0.03, 0.3, 0.01), sx * 0.11, chest.y + 0.17, cz - 0.015)); }
@@ -451,10 +459,13 @@ function weaponParts(type) {
 export function weaponTypeFor(look) {
   return { rok: 'k2c1', rok_sf: 'k13', rok_707: 'k13', us: 'k13', kpa: 'ak88', kpa_officer: 'ak88', kpa_sf: 'ak88s', kpa_sfb: 'aknew' }[look] || 'k2c1';
 }
+// real models (src/gear) per procedural type; the procedural rifle stays as the fallback
+const GEAR_FOR = { k2c1: 'k2c1', k13: 'm4a1', ak88: 'ak74', ak88s: 'ak74m', aknew: 'ak74m' };
 export function buildNpcWeapon(type) {
+  const real = cloneGun(GEAR_FOR[type]); if (real) return real;
   const w = weaponParts(type); const g = new THREE.Group();
   for (const [k, geo] of Object.entries(w.geos)) { const m = new THREE.Mesh(geo, w.mats[k]); m.castShadow = true; g.add(m); }
-  g.userData.muzzleZ = w.muzzle;
+  g.userData.muzzleZ = w.muzzle; g.userData.muzzleY = 0.005;
   return g;
 }
 export const buildNpcAK = () => buildNpcWeapon('ak88');

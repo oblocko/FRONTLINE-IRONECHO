@@ -38,3 +38,14 @@ Characters use Quaternius packs, CC0 1.0 public domain (attribution not required
 |---|---|---|---|---|---|
 | model | `characters/body_m.glb`, `body_f.glb`, `hair_*.glb`, `eyebrows_*.glb` | Universal Base Characters (Standard) | Quaternius | CC0 1.0 | https://quaternius.com/packs/universalbasecharacters.html |
 | animation | `characters/anims.glb` (22 clips) | Universal Animation Library 1 & 2 (Standard) | Quaternius | CC0 1.0 | https://quaternius.com/packs/universalanimationlibrary.html |
+
+## Weapons & armour — Sketchfab (CC BY 4.0 / CC Attribution)
+Downloaded with `tools/sketchfab_get.py`, converted by `tools/prepare_gear.py` (textures resized/re-encoded, meshes merged/simplified; the AK-74M's loose cartridge props removed; the K2C1 viewmodel drops the fixed rear sight and splits the magazine for the reload animation).
+
+- **Daewoo K2C1** by Dingustavo — CC Attribution — https://sketchfab.com/3d-models/daewoo-k2c1-bef177d77892495083202f7c656a2586 → `assets/gear/k2c1.glb` (국군 K2C1 (1인칭·NPC))
+- **AK-74 (Wooden Furniture) Gameready Free** by rwroclav — CC Attribution — https://sketchfab.com/3d-models/ak-74-wooden-furniture-gameready-free-87a76b087e044b60ba9e9bf7ae814fb6 → `assets/gear/ak74.glb` (북한군 88식 (일반))
+- **AK-74M Assault Rifle** by FJH — CC Attribution — https://sketchfab.com/3d-models/ak-74m-assault-rifle-9084c3bae8224d338103997bc3101480 → `assets/gear/ak74m.glb` (북한군 88식 개량 (특수부대))
+- **Assault rifle M4A1** by bobeer — CC Attribution — https://sketchfab.com/3d-models/assault-rifle-m4a1-1b858701dd7142d9b82bbe3fd121a97b → `assets/gear/m4a1.glb` (국군 특수부대·미군 카빈)
+- **Tactical Plate Carrier Vest - Game Ready** by Exactly — CC Attribution — https://sketchfab.com/3d-models/tactical-plate-carrier-vest-game-ready-3b51e6329dbb4b0aa14e43f12eb6c42a → `assets/gear/carrier.glb` (미군 플레이트 캐리어)
+- **Vest Armor Holster LowPoly GameReady Pack** by 00amza — CC Attribution — https://sketchfab.com/3d-models/vest-armor-holster-lowpoly-gameready-pack-7c41d35e505c4057abe60f89537408bd → `assets/gear/vestpack.glb` (국군·북한군 특수부대 플레이트 캐리어, 북한군 가슴 조끼(체스트 리그))
+- **Tactical Helmet with Headset (Game-Ready)** by Exactly — CC Attribution — https://sketchfab.com/3d-models/tactical-helmet-with-headset-game-ready-82adf376164f4d99a4e0b2949930e2ad → `assets/gear/helmet_hs.glb` ((예비) 헤드셋 고속 헬멧)
