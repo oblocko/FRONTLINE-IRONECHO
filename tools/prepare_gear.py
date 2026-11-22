@@ -23,6 +23,10 @@ ITEMS = {
   'helmet_hs': ('82adf376164f4d99a4e0b2949930e2ad', 1024, 0.5),
   'g17':       ('e8e582e71ee946098c2a65fc60bf8d38', 1024, None, r'^Bullet'),   # Sketchfab Standard licence (user-chosen)
   'eotech':    ('45e4fcdfb1b34756ab9e866564a12f66', 512, None),
+  'ssh60':     ('13ab594b900342b8814c101568c8dc4f', 512, 0.04),     # KPA steel helmet (Soviet SSh-60 pattern)
+  'fast_cam':  ('9a3c806f705342c98e782204742caf5a', 512, None),     # FAST helmet, digital camo (ROK SF)
+  'fast_blk':  ('c80875fc588344448e92eefed460540e', 512, None),     # FAST helmet, black (707)
+  'ushanka':   ('1046cd56a67d4b79902e47aa0daf3ccb', 512, None),     # fur winter hat (KPA officers)
 }
 def gt(*a): subprocess.run(GT + list(a), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 meta = json.load(open(os.path.join(SRC, 'meta.json'))); sources = {}

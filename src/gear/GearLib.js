@@ -53,7 +53,12 @@ export const ARMOR = {
   rig:     { file: 'gear/vestpack.glb', mesh: /Vest_T0/, size: [0.40, 0.50, 0.37] },        // chest rig (KPA)
   olive:   { file: 'gear/vestpack.glb', mesh: /^Vest_Vest_0/, size: [0.40, 0.46, 0.33] },   // plate carrier (ROK)
   heavy:   { file: 'gear/carrier.glb', basis: XFWD, size: [0.42, 0.44, 0.36] },        // loaded carrier (SF / US)
-  helmet:  { file: 'gear/helmet_hs.glb', basis: XFWD, size: [0.30, 0.22, 0.30] },       // high-cut helmet + headset
+  // helmets: fit 'top' = uniform scale to the given outer width, top of the shell at y 0, centred in x/z
+  helmet:   { file: 'gear/helmet_hs.glb', basis: XFWD, fit: 'top', width: 0.30 },          // FAST + headset (US)
+  ssh60:    { file: 'gear/ssh60.glb', largest: true, fit: 'top', width: 0.30 },           // steel helmet (KPA)
+  fast_cam: { file: 'gear/fast_cam.glb', fit: 'top', width: 0.285 },                        // FAST, digital camo (ROK)
+  fast_blk: { file: 'gear/fast_blk.glb', basis: XFWD, fit: 'top', width: 0.285 },           // FAST, black (707)
+  ushanka:  { file: 'gear/ushanka.glb', fit: 'top', width: 0.30, tint: 0x6e604e },           // fur hat (KPA officers)
 };
 const armorCache = {};
 export async function loadArmor(names = Object.keys(ARMOR)) {
@@ -64,15 +69,17 @@ export async function loadArmor(names = Object.keys(ARMOR)) {
     g.scene.updateMatrixWorld(true);
     for (const n of list) {
       const c = ARMOR[n]; let mesh = null;
-      g.scene.traverse((o) => { if (o.isMesh && !mesh && (!c.mesh || c.mesh.test(o.name))) mesh = o; });
+      let bestR = -1; g.scene.traverse((o) => { if (!o.isMesh || (c.mesh && !c.mesh.test(o.name)) || (c.mat && !c.mat.test(o.material.name))) return;
+        if (!c.largest) { if (!mesh) mesh = o; return; } const r = new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3()).length(); if (r > bestR) { bestR = r; mesh = o; } });
       if (!mesh) { console.warn('armour mesh missing', n); continue; }
       const geo = mesh.geometry.clone().applyMatrix4(mesh.matrixWorld);
       if (c.basis) { const [a, b, d] = c.basis; geo.applyMatrix4(new THREE.Matrix4().makeBasis(new THREE.Vector3(...a), new THREE.Vector3(...b), new THREE.Vector3(...d))); }
       geo.computeBoundingBox(); const bb = geo.boundingBox, sz = bb.getSize(new THREE.Vector3()), ctr = bb.getCenter(new THREE.Vector3());
-      geo.translate(-ctr.x, -ctr.y, -ctr.z); geo.scale(c.size[0] / sz.x, c.size[1] / sz.y, c.size[2] / sz.z);
+      if (c.fit === 'top') { geo.translate(-ctr.x, -bb.max.y, -ctr.z); const k = c.width / sz.x; geo.scale(k, k, k); }
+      else { geo.translate(-ctr.x, -ctr.y, -ctr.z); geo.scale(c.size[0] / sz.x, c.size[1] / sz.y, c.size[2] / sz.z); }
       for (const k of Object.keys(geo.attributes)) if (!['position', 'normal', 'uv'].includes(k)) geo.deleteAttribute(k);
       geo.computeVertexNormals();
-      const mat = mesh.material.clone(); mat.side = THREE.DoubleSide;
+      const mat = mesh.material.clone(); mat.side = THREE.DoubleSide; if (c.tint) mat.color.setHex(c.tint);
       armorCache[n] = { geometry: geo, material: mat };
     }
   }));

@@ -65,6 +65,8 @@ export class ModelActor {
     const lk = lookFor(look, variant); const shells = {}; this.model.traverse((o) => { if (o.name?.startsWith('shell_')) shells[o.name.slice(6)] = o; });
     const sleeve = (lk.sleeve ?? 1) ? 'long' : 'short';
     if (shells[sleeve]) { shells[sleeve].visible = true; shells[sleeve].material = garmentMaterial(look, variant); }
+    // the body's own brow cards: their texture lost its alpha in the JPEG pack → solid dark brows
+    this.model.traverse((o) => { if (o.isSkinnedMesh && /hair/i.test(o.material?.name || '') && !o.userData.browFixed) { o.material = o.material.clone(); o.material.map = null; o.material.alphaMap = null; o.material.transparent = false; o.material.color.setHex(0x1c150f); o.material.roughness = 0.95; o.userData.browFixed = true; } });
     if (lk.mask && shells.mask) { shells.mask.visible = true; shells.mask.material = maskMaterial(lk.mask, look); this.model.traverse((o) => { if (o.isSkinnedMesh && /hair/i.test(o.material?.name || '')) o.visible = false; }); }
     else if (lk.gaiter && vhash(variant * 13 + 5) < lk.gaiter && shells.gaiter) { shells.gaiter.visible = true; shells.gaiter.material = maskMaterial('camo', look); }
     for (const [k, o] of Object.entries(shells)) if (!o.visible) o.parent.remove(o);
@@ -75,6 +77,7 @@ export class ModelActor {
     const addHair = (id, color) => {
       const src = lib.hairs[id]; if (!src) return;
       const mat = src.material.clone(); if (color != null) mat.color.setHex(color);
+      if (id.startsWith('eyebrows')) { mat.map = null; mat.alphaMap = null; mat.transparent = false; mat.roughness = 0.95; mat.metalness = 0; }   // the brow texture lost its alpha in the JPEG pack → solid brows
       const m = new THREE.Mesh(src.geometry, mat); m.matrixAutoUpdate = false; m.matrix.multiplyMatrices(headInv, src.matrixWorld); m.castShadow = true; B.Head.add(m);
     };
     const HAIRC = [0x1a1410, 0x2a1d14, 0x0f0d0b, 0x3a2a1c, 0x55463a];

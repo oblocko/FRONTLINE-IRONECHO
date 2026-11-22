@@ -273,6 +273,41 @@ const gearMats = (key) => GM[key] ||= {
 };
 
 
+// ---- sleeve patches (canvas): Taegukgi in official proportions, subdued / IR-style colours ----
+const PATCH_TEX = {};
+export function patchTexture(kind) {
+  if (PATCH_TEX[kind]) return PATCH_TEX[kind];
+  const W = 300, H = 200, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+  const pal = kind === 'flag_ir' ? { bg: '#6e6c5e', red: '#2b2a25', blue: '#45443c', bar: '#1f1e1a', edge: '#4a493f' }
+    : kind === 'flag_color' ? { bg: '#f4f4f0', red: '#cd2e3a', blue: '#0047a0', bar: '#111', edge: '#9a9a90' }
+    : { bg: '#5b5e45', red: '#3b3326', blue: '#2c3528', bar: '#22241b', edge: '#3c3f2e' };
+  if (kind === 'unit') {   // left sleeve: subdued division mark (shield + star)
+    g.fillStyle = '#4d5039'; g.fillRect(0, 0, W, H); g.fillStyle = '#25271d';
+    g.beginPath(); g.moveTo(W * 0.3, H * 0.15); g.lineTo(W * 0.7, H * 0.15); g.lineTo(W * 0.7, H * 0.55); g.quadraticCurveTo(W * 0.7, H * 0.8, W * 0.5, H * 0.88); g.quadraticCurveTo(W * 0.3, H * 0.8, W * 0.3, H * 0.55); g.closePath(); g.fill();
+    g.fillStyle = '#5d6045'; g.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 0.07 * H : 0.17 * H; g.lineTo(W * 0.5 + Math.cos(a) * r, H * 0.47 + Math.sin(a) * r); } g.fill();
+  } else {
+    // flag: width 3 : height 2; taeguk diameter = H/2; trigrams 1/4 diameter from the circle
+    g.fillStyle = pal.bg; g.fillRect(0, 0, W, H);
+    const D = H / 2, r = D / 2, a = Math.atan2(2, 3);
+    g.save(); g.translate(W / 2, H / 2); g.rotate(a);
+    g.fillStyle = pal.blue; g.beginPath(); g.arc(0, 0, r, 0, Math.PI * 2); g.fill();
+    g.fillStyle = pal.red; g.beginPath(); g.arc(0, 0, r, Math.PI, 0); g.fill();
+    g.beginPath(); g.arc(-r / 2, 0, r / 2, 0, Math.PI * 2); g.fill();
+    g.fillStyle = pal.blue; g.beginPath(); g.arc(r / 2, 0, r / 2, 0, Math.PI * 2); g.fill();
+    g.restore();
+    // trigrams: bar length D/2, thickness D/12, gaps D/24; 1 = solid, 0 = broken (inner bar first)
+    const T3 = { geon: [1, 1, 1], gon: [0, 0, 0], gam: [0, 1, 0], ri: [1, 0, 1] };
+    const bl = D / 2, bt = D / 12, gap = D / 24, dist = r + D / 4;
+    for (const [name, ang] of [['geon', Math.PI + a], ['gon', a], ['gam', -a], ['ri', Math.PI - a]]) {
+      g.save(); g.translate(W / 2, H / 2); g.rotate(ang); g.fillStyle = pal.bar;
+      T3[name].forEach((solid, k) => { const x = dist + k * (bt + gap); if (solid) g.fillRect(x, -bl / 2, bt, bl); else { g.fillRect(x, -bl / 2, bt, bl / 2 - gap / 2); g.fillRect(x, gap / 2, bt, bl / 2 - gap / 2); } });
+      g.restore();
+    }
+  }
+  g.strokeStyle = pal.edge || '#3c3f2e'; g.lineWidth = 8; g.strokeRect(4, 4, W - 8, H - 8);   // merrowed edge
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  return (PATCH_TEX[kind] = new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 }));
+}
 // eyewear built around the face: curved lens band with rims and a strap
 function goggles(P, M, lensMat, x, y, cz, R, strapBack) {
   P('Head', lensMat, new THREE.CylinderGeometry(R, R, 0.046, 24, 1, true, -0.78, 1.56).translate(x, y, cz));
@@ -319,7 +354,17 @@ export function gearFor(kind, key, hat, variant, sex = 'm') {
   const hc = new THREE.Vector3(head.x, head.y + 0.105, head.z + 0.01);          // skull centre
   const soldier = kind === 'soldier';
   // ---- headgear ----
-  if (key === 'kpa_officer') {
+  const HELMET = { kpa: 'ssh60', kpa_officer: 'ushanka', rok: 'fast_cam', rok_sf: 'fast_cam', rok_707: 'fast_blk', us: 'helmet' };
+  const realHat = (hat === 'helmet' || key === 'kpa_officer') && armorPart(HELMET[key]);
+  if (realHat) {
+    // real helmet / hat model: shell top above the skull, centred on the head (offsets: top, forward)
+    const fit = { ssh60: [0.205, -0.01], ushanka: [0.17, -0.005], fast_cam: [0.158, 0.0], fast_blk: [0.158, 0.0], helmet: [0.19, -0.01] }[HELMET[key]];
+    P('Head', realHat.material, realHat.geometry.clone().translate(hc.x, hc.y + fit[0], hc.z + fit[1]));
+    const ey = LIB[sex].eyeY, fz = LIB[sex].faceZ;
+    if (key === 'rok_707') goggles(P, M, M.tint, 0, ey + 0.004, fz + 0.016 - 0.105, 0.105, false);
+    else if (key === 'rok_sf') glasses(P, M, M.smoke, ey + 0.002, fz + 0.012);
+    if (key === 'kpa_officer') P('Head', M.gold, T(cyl(0.017, 0.017, 0.006, 12), hc.x, hc.y + 0.075, hc.z + 0.155, Math.PI / 2));   // cap badge
+  } else if (key === 'kpa_officer') {
     // fur winter hat with ear flaps tied up, small badge
     P('Head', M.fur, T(cyl(0.128, 0.122, 0.12, 20), hc.x, hc.y + 0.06, hc.z - 0.005));
     P('Head', M.fur, T(sphere(0.124, 1, 0.45, 1, 18, 6, Math.PI / 2), hc.x, hc.y + 0.12, hc.z - 0.005));
@@ -384,7 +429,12 @@ export function gearFor(kind, key, hat, variant, sex = 'm') {
     }
     if (key === 'rok' || key === 'rok_sf') {
       // low-visibility patches on the upper arms: subdued flag (right), unit mark (left)
-      for (const [sd, mat] of [['r', M.subdued], ['l', M.subdued2]]) { const u = R[`upperarm_${sd}`]; const sx = u.x > 0 ? 1 : -1; P(`upperarm_${sd}`, mat, T(roundedBox(0.075, 0.006, 0.055, 0.003), u.x + sx * 0.09, u.y + 0.078, u.z - 0.005)); }
+      for (const [sd, kind] of [['r', key === 'rok_sf' ? 'flag_ir' : 'flag'], ['l', 'unit']]) {
+        const u = R[`upperarm_${sd}`]; const sx = u.x > 0 ? 1 : -1;
+        P(`upperarm_${sd}`, M.subdued2, T(roundedBox(0.056, 0.004, 0.078, 0.003), u.x + sx * 0.09, u.y + 0.076, u.z - 0.005));          // backing
+        const pl = new THREE.PlaneGeometry(0.075, 0.05).rotateX(-Math.PI / 2).rotateY(sx < 0 ? Math.PI / 2 : -Math.PI / 2);   // faces out; width runs front-back so the flag reads landscape with the arm down
+        P(`upperarm_${sd}`, patchTexture(kind), pl.translate(u.x + sx * 0.09, u.y + 0.0785, u.z - 0.005));
+      }
     }
     // collar of the field jacket
     P('spine_03', M.camo, T(new THREE.TorusGeometry(0.075, 0.018, 5, 18).scale(1.1, 1, 1), 0, R.neck_01.y - 0.03, R.neck_01.z + 0.01, Math.PI / 2 - 0.25));
