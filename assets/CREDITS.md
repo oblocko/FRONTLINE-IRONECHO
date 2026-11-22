@@ -59,3 +59,6 @@ Downloaded with `tools/sketchfab_get.py`, converted by `tools/prepare_gear.py` (
 - **Kamaz 5330** by Brout — CC Attribution — https://sketchfab.com/3d-models/kamaz-5330-e86a62f4b8c84e03b2c6e32c51474bc7 → `assets/gear/kamaz.glb` (북한군 기관총 트럭)
 - **SPz Puma** by 42manako — CC Attribution — https://sketchfab.com/3d-models/spz-puma-8e7d946d4b3d4fdeaf458a3fc4226e1b → `assets/gear/puma.glb` (국군 장갑차 (K21 대용, 적용 예정))
 - **M997A2 HMMWV communications vehicle** by 42manako — CC Attribution — https://sketchfab.com/3d-models/m997a2-hmmwv-communications-vehicle-597e28fd34cb4177847058b06940243e → `assets/gear/m997.glb` (군 구급차 (적용 예정))
+- **US Army UH-60M Black Hawk low poly model** by Yi Tsung Lee — CC Attribution — https://sketchfab.com/3d-models/us-army-uh-60m-black-hawk-low-poly-model-854bf0feee5b42dc92ac5329976f7942 → `assets/gear/uh60.glb` (UH-60M 헬기 (M01·M04, 도어건))
+- **1:1 Low poly US NAVY DDG-51 USS Arleigh Burke.** by Yi Tsung Lee — CC Attribution — https://sketchfab.com/3d-models/11-low-poly-us-navy-ddg-51-uss-arleigh-burke-17be09c31c6047e4a5969b68c29eba03 → `assets/gear/ddg51.glb` (연합 함대 구축함 (M04))
+- **US Marine Landing Craft Utility** by LM3D — CC Attribution — https://sketchfab.com/3d-models/us-marine-landing-craft-utility-726157b72da347549dab62e590f4d06c → `assets/gear/lcu.glb` (상륙정 (M04 엔딩))

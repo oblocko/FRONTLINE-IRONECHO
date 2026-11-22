@@ -31,10 +31,18 @@ ITEMS = {
   'puma':      ('8e7d946d4b3d4fdeaf458a3fc4226e1b', 1024, None),    # ROK IFV stand-in for the K21 (SPz Puma)
   'm997':      ('597e28fd34cb4177847058b06940243e', 1024, None),    # military ambulance (HMMWV M997A2 body)
   'mansv':     ('dc7d9a2aecd84a1c97ae3534dbfc6354', 1024, None),    # ROK truck stand-in for the KMTV (MAN SV; Sketchfab Standard licence, user-chosen)
+  'uh60':      ('854bf0feee5b42dc92ac5329976f7942', 1024, None),    # UH-60M (fuselage, door, main + tail rotor kept as separate nodes)
+  'ddg51':     ('17be09c31c6047e4a5969b68c29eba03', 1024, None),    # US destroyer (fleet, naval fire support)
+  'lcu':       ('726157b72da347549dab62e590f4d06c', 512, 0.06),     # landing craft utility
 }
+NOJOIN = {'uh60'}   # keep moving parts as separate meshes
 def gt(*a): subprocess.run(GT + list(a), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 meta = json.load(open(os.path.join(SRC, 'meta.json'))); sources = {}
+ONLY = set(os.environ.get('ONLY', '').split(',')) - {''}
 for name, (uid, size, ratio, *drop) in ITEMS.items():
+    if ONLY and name not in ONLY:
+        if os.path.exists(os.path.join(OUT, 'sources.json')): sources[name] = json.load(open(os.path.join(OUT, 'sources.json'))).get(name, {})
+        continue
     with tempfile.TemporaryDirectory() as t:
         g = os.path.join(t, 'm.gltf'); gt('copy', os.path.join(SRC, uid + '.glb'), g)
         j = json.load(open(g))
@@ -54,7 +62,8 @@ for name, (uid, size, ratio, *drop) in ITEMS.items():
         for im in j.get('images', []): im.pop('_done', None)
         json.dump(j, open(g, 'w'))
         o = os.path.join(OUT, name + '.glb'); gt('copy', g, o)
-        for step in (['flatten'], ['join'], ['weld'], ['prune'], ['dedup']): gt(step[0], o, o)
+        if 'KHR_materials_pbrSpecularGlossiness' in j.get('extensionsUsed', []): gt('metalrough', o, o)   # three.js only renders metal/rough
+        for step in ((['weld'], ['prune'], ['dedup']) if name in NOJOIN else (['flatten'], ['join'], ['weld'], ['prune'], ['dedup'])): gt(step[0], o, o)
         if ratio: gt('simplify', o, o, '--ratio', str(ratio), '--error', '0.0008')
     m = meta[uid]; sources[name] = dict(title=m['name'], author=m['author'], license=m['license'], url=m['url'])
     print(name, os.path.getsize(o) // 1024, 'KB')

@@ -124,7 +124,7 @@ export const SEGMENTS = [
       const heli = lv.helicopter(V(-300, 34, 160)); lv.heli = heli;
       seatIn(game, heli, [[game.squad.yoon, -0.45, -1.05, 0.9, Math.PI / 2], [game.squad.jung, -0.45, -1.05, -0.5, Math.PI / 2]]);
       const mg = new MountedWeapon(game, { kind: 'mg', pos: V(0, 0, 0), yaw: 0, yawRange: 1.35, pitchRange: [-0.8, 0.3], prompt: '도어건', interactable: false, def: { damage: 60 } });
-      heli.add(mg.root); mg.root.position.set(1.05, -0.2, 0.3); mg.root.rotation.y = -Math.PI / 2; game.mounted.push(mg); lv.doorGun = mg;
+      heli.add(mg.root); mg.root.position.set(1.12, -0.2, -0.35); mg.root.rotation.y = -Math.PI / 2; game.mounted.push(mg); lv.doorGun = mg;
       mg.mount(); mg.locked = true; game.weapons.lowered = false;
       lv.rotor = game.audio.rotorLoop?.(); lv.rotor?.set(0.9);
       game.audio.setMusic('cinematic');

@@ -9,6 +9,7 @@ import { pbr } from '../../render/TextureFactory.js';
 import { Sky } from '../../render/Sky.js';
 import { settings } from '../../core/Settings.js';
 import { buildTruck, buildHelicopter } from '../Props.js';
+import { cloneRaw } from '../../gear/GearLib.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -41,6 +42,25 @@ function heightAt(x, z) {
   const land = P.quay + bluff + rough + hill;
   // the coast: vertical quay in the port, a steep cliff below the bluff
   return x >= P.coastX ? land : -9;
+}
+
+// Fit a ship model: long axis along Z with the bow (the narrower end) toward +Z, scaled to `length`,
+// keel `draft` metres below the waterline (y = 0).
+function fitShip(src, length, draft) {
+  if (!src) return null; src.updateMatrixWorld(true);
+  const bb = new THREE.Box3().setFromObject(src), sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3());
+  const alongX = sz.x > sz.z; const v = new THREE.Vector3(); let wA = 0, nA = 0, wB = 0, nB = 0; const L = alongX ? sz.x : sz.z;
+  src.traverse((o) => { if (!o.isMesh) return; const p = o.geometry.attributes.position; const step = Math.max(1, Math.floor(p.count / 4000));
+    for (let i = 0; i < p.count; i += step) { v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld); const a = alongX ? v.x - c.x : v.z - c.z, w = Math.abs(alongX ? v.z - c.z : v.x - c.x);
+      if (a > L * 0.38) { wA += w; nA++; } else if (a < -L * 0.38) { wB += w; nB++; } } });
+  const bowPositive = (nA ? wA / nA : 0) < (nB ? wB / nB : 0);   // narrower end = bow
+  const yaw = alongX ? (bowPositive ? Math.PI / 2 : -Math.PI / 2) : (bowPositive ? 0 : Math.PI);
+  const k = length / L; const inner = new THREE.Group(); inner.add(src); src.position.sub(c);
+  inner.rotation.y = yaw; inner.scale.setScalar(k);
+  const g = new THREE.Group(); g.add(inner); g.updateMatrixWorld(true);
+  const b2 = new THREE.Box3().setFromObject(inner); inner.position.y = -draft - b2.min.y;
+  src.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
+  return g;
 }
 
 export class CoastalPort {
@@ -278,15 +298,18 @@ export class CoastalPort {
       scene.add(g); return g;
     };
     this.ships = [];
-    for (let i = 0; i < 14; i++) { const x = -280 - Math.random() * 420, z = -500 + i * 75 + (Math.random() - 0.5) * 40; this.ships.push(ship(x, z, 90 + Math.random() * 120, 14 + Math.random() * 14)); }
-    this.ships.push(ship(-240, -40, 240, 30));                                    // big amphibious ship
+    // destroyers (Sketchfab DDG-51, CC-BY) for the nearer half of the fleet, silhouettes further out
+    const ddg = (x, z) => { const g = fitShip(cloneRaw('ddg51'), 154, 6.2); if (!g) return ship(x, z, 150, 24); g.position.set(x, 0, z); g.rotation.y = Math.PI / 2 + (Math.random() - 0.5) * 0.5; g.userData.dynamic = true; scene.add(g); return g; };
+    for (let i = 0; i < 14; i++) { const x = -280 - Math.random() * 420, z = -500 + i * 75 + (Math.random() - 0.5) * 40; this.ships.push(ddg(x, z)); }
+    for (const [x, z] of [[-240, -40], [-300, 20]]) this.ships.push(ddg(x, z));                 // close escorts off the port
     // landing craft for the ending
     this.craft = [];
     const cm = new THREE.MeshStandardMaterial({ color: 0x55605a, roughness: 0.7 });
     for (let i = 0; i < 6; i++) {
       const g = new THREE.Group(); g.userData.dynamic = true; g.visible = false;
-      const b = new THREE.Mesh(new THREE.BoxGeometry(5, 2, 14), cm); b.position.y = 0.6; g.add(b);
-      const ramp = new THREE.Mesh(new THREE.BoxGeometry(5, 2.2, 0.3), cm); ramp.position.set(0, 1.2, 7); g.add(ramp);
+      const real = fitShip(cloneRaw('lcu'), 41, 1.4);   // landing craft utility (Sketchfab, CC-BY)
+      if (real) g.add(real);
+      else { const b = new THREE.Mesh(new THREE.BoxGeometry(5, 2, 14), cm); b.position.y = 0.6; g.add(b); const ramp = new THREE.Mesh(new THREE.BoxGeometry(5, 2.2, 0.3), cm); ramp.position.set(0, 1.2, 7); g.add(ramp); }
       const wake = new THREE.Mesh(new THREE.PlaneGeometry(6, 18), new THREE.MeshBasicMaterial({ color: 0xd0d8d8, transparent: true, opacity: 0.4, depthWrite: false })); wake.rotation.x = -Math.PI / 2; wake.position.set(0, 0.05, -14); g.add(wake);
       g.position.set(-360 - i * 20, 0, -60 + i * 28); g.rotation.y = Math.PI / 2; scene.add(g); this.craft.push(g);
     }

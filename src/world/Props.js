@@ -557,7 +557,43 @@ export function buildAPC({ legacy = false } = {}) {
   return g;
 }
 
+// UH-60M (Sketchfab, CC-BY) in the game's helicopter frame: nose +Z, cabin centred at the origin with the
+// floor at y ≈ -1.1 (seats / door gun offsets stay valid), main rotor and tail rotor re-pivoted on their hubs.
+function realHelicopter() {
+  const src = cloneRaw('uh60'); if (!src) return null;
+  src.updateMatrixWorld(true);
+  const find = (re) => { let f = null; src.traverse((o) => { if (!f && re.test(o.name || '')) f = o; }); return f; };
+  const rotorN = find(/main.?rotor/i), tailN = find(/tail.?rotor/i), bodyN = find(/fuselage/i);
+  const bb = (o) => new THREE.Box3().setFromObject(o);
+  const fb = bb(bodyN || src), fs = fb.getSize(new THREE.Vector3());
+  const longX = fs.x > fs.z;
+  const tc = tailN ? bb(tailN).getCenter(new THREE.Vector3()) : fb.max.clone();
+  const fc = fb.getCenter(new THREE.Vector3());
+  // yaw so the long axis is Z with the nose (away from the tail rotor) toward +Z
+  const yaw = longX ? (tc.x > fc.x ? Math.PI / 2 : -Math.PI / 2) : (tc.z > fc.z ? Math.PI : 0);
+  const scale = 15.3 / Math.max(fs.x, fs.z);                                  // UH-60 fuselage length
+  const root = new THREE.Group(); const inner = new THREE.Group(); root.add(inner); inner.add(src);
+  inner.rotation.y = yaw; inner.scale.setScalar(scale); root.updateMatrixWorld(true);
+  // cabin under the main rotor hub (z), floor (= bottom of the cabin door) at y -1.15 where the seats/door gun expect it
+  const rc = rotorN ? bb(rotorN).getCenter(new THREE.Vector3()) : bb(src).getCenter(new THREE.Vector3());
+  const doorN = find(/door/i); const floorY = doorN ? bb(doorN).min.y + 0.05 : bb(src).min.y + 1.0;
+  inner.position.set(-rc.x, -1.15 - floorY, -0.4 - rc.z); root.updateMatrixWorld(true);
+  // re-pivot the rotors on their hub centres so they can spin in place
+  const pivot = (node) => { if (!node) return null; const c = bb(node).getCenter(new THREE.Vector3()); const p = new THREE.Group(); p.position.copy(c); root.add(p); p.attach(node); return p; };
+  const rotor = pivot(rotorN), tail = pivot(tailN);
+  src.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.material = o.material.clone(); o.material.side = THREE.DoubleSide; o.material.envMapIntensity = 0.7; } });
+  return { root, rotor, tail };
+}
 export function buildHelicopter() {
+  const real = realHelicopter();
+  if (real) {
+    const g = real.root; g.userData.dynamic = true;
+    const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 4), new THREE.MeshBasicMaterial({ color: 0xff2010 })); beacon.position.set(0, -1.35, -2.5); g.add(beacon);
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(8.1, 40), new THREE.MeshBasicMaterial({ color: 0x111111, transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide }));
+    disc.rotation.x = -Math.PI / 2; disc.position.set(0, 0.05, 0); real.rotor?.add(disc);
+    g.userData = { dynamic: true, rotor: real.rotor || new THREE.Group(), tail: real.tail || new THREE.Group(), beacon, real: true };
+    return g;
+  }
   const g = new THREE.Group(); g.userData.dynamic = true;
   const paint = pbr('paintedMetal', { color: 0x4f5a48, repeat: [2, 2] });
   const dark = new THREE.MeshStandardMaterial({ color: 0x171816, roughness: 0.8 });
