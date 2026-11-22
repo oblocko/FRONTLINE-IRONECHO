@@ -50,6 +50,14 @@ npm run preview
 
 https://oblocko.github.io/FRONTLINE-IRONECHO/ — 빌드 없이 원본 소스를 그대로 제공합니다. `index.html`의 import map이 `vendor/three`(three.js r187, MIT)를 가리킵니다. three.js 버전을 올리면 `vendor/three`도 함께 갱신해야 합니다.
 
+### 성능 확인 (실제 GPU)
+
+게임 주소 뒤에 `?bench`를 붙여 열면(예: `https://oblocko.github.io/FRONTLINE-IRONECHO/?bench`) M01–M05의 무거운 장면 10곳을 차례로 불러와 장면마다 10초씩 측정합니다(`?bench=quick`은 4초). 끝나면 평균 FPS, 하위 1% FPS, 가장 긴 프레임, 드로우콜, 삼각형 수, GPU 이름, 현재 그래픽 설정이 표와 JSON으로 나옵니다. 자동 테스트는 소프트웨어 렌더링(SwiftShader)이라 실제 GPU 프레임은 이 벤치마크로 확인해야 합니다.
+
+### 음성
+
+녹음된 성우 음성은 없습니다. 설정 → 오디오 → "대사 음성: 음성 합성"이면 운영체제에 설치된 한국어 음성(Windows: Microsoft Heami 등, macOS: Yuna)으로 대사를 읽습니다. 한국어 음성이 없으면 합성 웅얼거림으로 대체됩니다.
+
 ## 조작 (기본값, 설정에서 변경 가능)
 
 | 동작 | 키보드/마우스 | 게임패드 |
