@@ -8,7 +8,7 @@ const require = createRequire(import.meta.url);
 let pw; try { pw = require('playwright'); } catch { pw = require(execSync('npm root -g').toString().trim() + '/playwright'); }
 const OUT = new URL('./output/', import.meta.url).pathname; mkdirSync(OUT, { recursive: true });
 const PORT = 4195;
-const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], { stdio: 'pipe' });
+const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort', '--outDir', process.env.OUTDIR || 'dist'], { stdio: 'pipe' });
 await new Promise((r) => { server.stdout.on('data', (d) => { if (String(d).includes('Local')) r(); }); setTimeout(r, 6000); });
 const browser = await pw.chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
 const CPS = { m01: ['truck', 'gp', 'op_move', 'op_radio', 'fallback', 'extraction'], m02: ['convoy', 'jam', 'avenue', 'station', 'escort', 'busrun'], m03: ['convoy', 'command', 'assault', 'demolition', 'casevac'], m04: ['insertion', 'batteries', 'descent', 'crane', 'lz'] };
