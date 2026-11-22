@@ -259,10 +259,10 @@ export const SEGMENTS = [
       await m.say('yoon', '민재. 네가 직접 봤다. 명령대로 서쪽으로 가냐, 여기 남냐.', { priority: 3 });
       const k = hintKeys(game); const box = document.createElement('div'); box.className = 'choice-box';
       box.innerHTML = `<div class="tag">결정 // 윤태호 중사에게</div><div class="opt">${k('weapon1')} 명령대로 서쪽 여울로 가야 합니다</div><div class="opt">${k('weapon2')} 저건 가짜입니다. 교량에 남아야 합니다</div>`;
-      game.ui.hud.appendChild(box);
+      game.ui.hud.appendChild(box); game.weapons.switchLock = true;
       let choice = null; const t0 = m.time;
       await m.until(() => { if (game.input.pressed('weapon1')) choice = 'follow'; else if (game.input.pressed('weapon2')) choice = 'stay'; return choice || m.time - t0 > 20; });
-      choice ||= 'stay'; box.remove(); saves.setFlag('m03_choice', choice);
+      choice ||= 'stay'; box.remove(); saves.setFlag('m03_choice', choice); m.spawn(async () => { await m.wait(0.3); game.weapons.switchLock = false; });
       if (choice === 'follow') await m.talk([
         ['minjae', '…명령은 명령입니다, 중사님.', { priority: 3 }],
         ['yoon', '그래. 맞는 말이다. 군인은 그래야지.', { priority: 3 }],

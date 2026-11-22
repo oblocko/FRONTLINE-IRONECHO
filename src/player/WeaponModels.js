@@ -64,8 +64,8 @@ function mesh(geo, mat, parent) { const m = new THREE.Mesh(geo, mat); parent.add
 function merged(list, mat, parent) { return mesh(mergeGeometries(list.map((g) => g.index ? g.toNonIndexed() : g)), mat, parent); }
 
 // ======================================================================
-export function buildRifle() {
-  const m = mats(); const g = new THREE.Group(); g.name = 'rifle';
+export function buildRifle(gun = 'k2c1') {
+  const m = mats(); const g = new THREE.Group(); g.name = gun === 'k2c1' ? 'rifle' : gun;
   // --- upper receiver ---
   mesh(profile([[-0.205, 0.0], [0.112, 0.0], [0.112, 0.046], [0.098, 0.056], [-0.205, 0.056]], 0.052), m.anod, g);
   // --- picatinny rail (full length) + teeth ---
@@ -190,7 +190,7 @@ export function buildRifle() {
   g.add(lArm); lArm.position.set(-0.035, -0.07, -0.385); lArm.rotation.set(0.62, -0.62, 0);
 
   let muzzle = new THREE.Vector3(0, 0.026, -0.78), sightDrop = 0;
-  const real = realK2C1();
+  const real = realK2C1(gun);
   if (real) {
     // swap the procedural body for the real K2C1 model; keep the holo sight, hands, sleeves
     const keep = new Set([sight, magG, right, left, rArm, lArm]);
@@ -228,8 +228,8 @@ function eotech(railTop) {
 }
 // Real K2C1 (Sketchfab, CC-BY) in the viewmodel frame (muzzle −Z, grip centre ≈ (0,-0.1,0.055)).
 // The magazine triangles are split off into their own mesh so the reload animation can drop it.
-function realK2C1() {
-  const src = cloneGun('k2c1'); if (!src) return null;
+function realK2C1(name = 'k2c1') {
+  const src = cloneGun(name); if (!src) return null;
   src.rotation.y = Math.PI; src.position.set(0, -0.045, 0.02); src.updateMatrixWorld(true);
   const body = new THREE.Group(), mag = new THREE.Group();
   const v = new THREE.Vector3(), c = new THREE.Vector3();
@@ -240,7 +240,7 @@ function realK2C1() {
     for (let t = 0; t < pos.count; t += 3) {
       c.set(0, 0, 0); for (let k = 0; k < 3; k++) c.add(v.fromBufferAttribute(pos, t + k)); c.divideScalar(3);
       // magazine: below the receiver, ahead of the trigger guard (viewmodel frame: z −0.15..−0.03)
-      if (c.y > 0.045 && c.z > -0.03 && c.z < 0.09) continue;   // fixed rear aperture sight: removed (an optic rides on the rail)
+      if (name === 'k2c1' && c.y > 0.045 && c.z > -0.03 && c.z < 0.09) continue;   // fixed rear aperture sight: removed (an optic rides on the rail)
       (c.y < -0.085 && c.z < -0.03 && c.z > -0.17 ? magA : keepA).push(t);
     }
     const pick = (list) => { const g2 = new THREE.BufferGeometry(); for (const [name, a] of Object.entries(geo.attributes)) { const arr = new a.array.constructor(list.length * 3 * a.itemSize); list.forEach((t, i) => { for (let k = 0; k < 3; k++) for (let j = 0; j < a.itemSize; j++) arr[(i * 3 + k) * a.itemSize + j] = a.getComponent(t + k, j); }); g2.setAttribute(name, new THREE.BufferAttribute(arr, a.itemSize, a.normalized)); } return g2; };
@@ -254,7 +254,13 @@ function realK2C1() {
     body.traverse((o) => { if (!o.isMesh) return; const p = o.geometry.attributes.position; for (let i = 0; i < p.count; i++) { vv.fromBufferAttribute(p, i); if (vv.z < -0.35 && vv.z > -0.62) { sx += vv.x; n++; } } });
     const off = n ? sx / n : 0; for (const grp of [body, mag]) grp.traverse((o) => { if (o.isMesh) o.geometry.translate(-off, 0, 0); }); }
   const bb = new THREE.Box3().setFromObject(body);
-  return { body, mag, railTop: 0.040, muzzle: new THREE.Vector3(0, -0.005, -0.625), size: bb.getSize(new THREE.Vector3()) };
+  if (name === 'k2c1') return { body, mag, railTop: 0.040, muzzle: new THREE.Vector3(0, -0.005, -0.625), size: bb.getSize(new THREE.Vector3()) };
+  // other carbines: measure the top of the receiver rail over the optic's footprint and the muzzle
+  const ys = []; let mz = Infinity, my = 0, mn = 0; const vv = new THREE.Vector3();
+  body.traverse((o) => { if (!o.isMesh) return; const p = o.geometry.attributes.position; for (let i = 0; i < p.count; i++) { vv.fromBufferAttribute(p, i); if (Math.abs(vv.x) < 0.012 && vv.z > -0.14 && vv.z < -0.03) ys.push(vv.y); if (vv.z < mz) mz = vv.z; } });
+  body.traverse((o) => { if (!o.isMesh) return; const p = o.geometry.attributes.position; for (let i = 0; i < p.count; i++) { vv.fromBufferAttribute(p, i); if (vv.z < mz + 0.01) { my += vv.y; mn++; } } });
+  ys.sort((a, b) => b - a); const railTop = ys.length ? ys[Math.floor(ys.length * 0.03)] : 0.04;
+  return { body, mag, railTop, muzzle: new THREE.Vector3(0, mn ? my / mn : 0, mz - 0.005), size: bb.getSize(new THREE.Vector3()) };
 }
 
 // ======================================================================

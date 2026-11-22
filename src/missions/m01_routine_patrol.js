@@ -222,16 +222,16 @@ export const SEGMENTS = [
       await m.talk([
         ['driver', '소초 도착 5분 전입니다.'],
         ['doyun', '민재야, 첫 GOP 순찰 소감 한마디 해 봐라. 춥제?'],
-        ['minjae', '…손이 좀 시립니다.'],
+        ['minjae', '…손이 좀 시립니다.', { voice: 'm01/minjae_001' }],
         ['doyun', '핫팩 아끼지 마라. 여기 3월은 3월이 아이다.'],
         ['jung', '전역 D-38. 3월은 그냥 지나가면 된다.'],
         ['doyun', '정 병장님은 매일 숫자만 세십니다.'],
         ['yoon', '잡담 그만. 오늘은 3구역 감지 센서 세 군데 점검한다. 어젯밤부터 오경보가 계속 떴어.'],
         ['doyun', '또 고라니 아입니까?'],
         ['yoon', '고라니든 뭐든, 확인하는 게 우리 일이다. 한민재.'],
-        ['minjae', '이병 한민재.'],
+        ['minjae', '이병 한민재.', { voice: 'm01/minjae_002' }],
         ['yoon', '센서는 네가 직접 확인해. 눈으로 보고, 손으로 확인하고, 보고한다. 알겠나.'],
-        ['minjae', '예, 알겠습니다.'],
+        ['minjae', '예, 알겠습니다.', { voice: 'm01/minjae_003' }],
       ]);
       await m.talk([
         ['seoyeon', '3소초 순찰조, 여기 지휘통제실. 현재 위치 보고 바람.', { radio: true }],
@@ -296,7 +296,7 @@ export const SEGMENTS = [
           await m.wait(4);
           await m.talk([
             ['doyun', '민재 니 고향이 연서시라 했제? 거 바다 보이는 카페 많다 아이가. 나 전역하면 거기서 카페 할 끼다.'],
-            ['minjae', '…저희 어머니 가게 옆에 자리 하나 비어 있습니다.'],
+            ['minjae', '…저희 어머니 가게 옆에 자리 하나 비어 있습니다.', { voice: 'm01/minjae_004' }],
             ['doyun', '오, 계약하자. 니는 커피 평생 공짜다.'],
             ['jung', '박도윤 커피는 공짜여도 안 마신다.'],
           ]);
@@ -550,7 +550,7 @@ export const SEGMENTS = [
       sq.doyun.unpose(); sq.doyun.limp = true; sq.doyun.follow(game.player, V(-1.0, 0, 1.6)); sq.doyun.setPassive(true);
       m.spawn(() => m.talk([
         ['doyun', '괜찮다… 괜찮다 캤제… 아, 씨. 커피 못 내리면 우짜노.', { priority: 2 }],
-        ['minjae', '말하지 마십시오. 갑니다.'],
+        ['minjae', '말하지 마십시오. 갑니다.', { voice: 'm01/minjae_005' }],
       ]));
       sq.yoon.lead(game.player); sq.jung.follow(game.player, V(2, 0, 2));   // Jung stays with the private helping Do-yun
       game.objectives.add('clear', '마을의 적 제압', { count: amb.length });

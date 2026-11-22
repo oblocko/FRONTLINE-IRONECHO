@@ -15,15 +15,16 @@ export class Dialogue {
     try { if (typeof speechSynthesis !== 'undefined') { speechSynthesis.getVoices(); speechSynthesis.addEventListener?.('voiceschanged', () => speechSynthesis.getVoices()); } } catch {}
   }
   bindSpeaker(id, agent) { this.speakers.set(id, agent); }
-  clear() { try { if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel(); } catch {} for (const q of this.queue) q.resolve(); this.queue = []; if (this.current) this.current.resolve(); this.current = null; events.emit('subtitle', null); this.audio.duck(false); }
+  clear() { try { if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel(); } catch {} this.audio.stopVoice?.(); for (const q of this.queue) q.resolve(); this.queue = []; if (this.current) this.current.resolve(); this.current = null; events.emit('subtitle', null); this.audio.duck(false); }
 
   // returns a promise resolved when the line finishes
-  say(speaker, text, { radio = false, priority = 2, duration = null, delay = 0, lang = null } = {}) {
+  say(speaker, text, { radio = false, priority = 2, duration = null, delay = 0, lang = null, voice = null } = {}) {
     return new Promise((resolve) => {
       const dur = duration ?? Math.max(1.8, 0.75 + text.length * 0.065);
       // lines spoken in another language are shown translated, tagged with the language: "[영어] ..."
       const lg = lang ?? CHARACTERS[speaker]?.lang; if (lg && lg !== 'ko' && LANG_LABEL[lg]) text = `[${LANG_LABEL[lg]}] ${text}`;
-      const line = { speaker, text, radio, priority, dur, resolve, delay };
+      const line = { speaker, text, radio, priority, dur, resolve, delay, voice };
+      if (voice) this.audio.loadVoice?.(voice);   // start decoding early
       if (priority >= 3 && this.current && this.current.priority < 3) { this.current.resolve(); this.end(); this.queue.unshift(line); }
       else if (priority <= 1) {
         if (this.current || this.queue.length) return resolve();
@@ -40,7 +41,10 @@ export class Dialogue {
     this.current = line; line.t = 0;
     const c = CHARACTERS[line.speaker] || {};
     if (line.radio) this.audio.radio(true, line.dur);
-    if (!this.speak(line, c)) this.audio.voiceMurmur(line.dur * 0.9, c.pitch ?? 1, line.radio);
+    if (line.voice) {
+      // recorded voice: the line stays up for the whole clip
+      this.audio.playVoice(line.voice, line.radio).then((len) => { if (len > 0) { line.dur = Math.max(line.dur, len + 0.25); line.voiced = true; } else if (this.current === line && !this.speak(line, c)) this.audio.voiceMurmur(line.dur * 0.9, c.pitch ?? 1, line.radio); });
+    } else if (!this.speak(line, c)) this.audio.voiceMurmur(line.dur * 0.9, c.pitch ?? 1, line.radio);
     this.audio.duck(true);
     const agent = this.speakers.get(line.speaker); if (agent && !line.radio) agent.actor.startTalk(line.dur);
     if (agent && line.radio) agent.actor.gesture('radio', line.dur);
@@ -76,6 +80,7 @@ export class Dialogue {
     return true;
   }
   end() {
+    if (this.current?.voiced && this.current.t < this.current.dur - 0.3) this.audio.stopVoice?.();
     if (this.current?.tts && this.current.t < this.current.dur - 0.2) { try { speechSynthesis.cancel(); } catch {} }
     if (!this.current) return;
     if (this.current.radio) this.audio.radio(false);

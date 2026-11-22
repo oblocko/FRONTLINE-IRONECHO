@@ -62,3 +62,7 @@ Downloaded with `tools/sketchfab_get.py`, converted by `tools/prepare_gear.py` (
 - **US Army UH-60M Black Hawk low poly model** by Yi Tsung Lee — CC Attribution — https://sketchfab.com/3d-models/us-army-uh-60m-black-hawk-low-poly-model-854bf0feee5b42dc92ac5329976f7942 → `assets/gear/uh60.glb` (UH-60M 헬기 (M01·M04, 도어건))
 - **1:1 Low poly US NAVY DDG-51 USS Arleigh Burke.** by Yi Tsung Lee — CC Attribution — https://sketchfab.com/3d-models/11-low-poly-us-navy-ddg-51-uss-arleigh-burke-17be09c31c6047e4a5969b68c29eba03 → `assets/gear/ddg51.glb` (연합 함대 구축함 (M04))
 - **US Marine Landing Craft Utility** by LM3D — CC Attribution — https://sketchfab.com/3d-models/us-marine-landing-craft-utility-726157b72da347549dab62e590f4d06c → `assets/gear/lcu.glb` (상륙정 (M04 엔딩))
+
+## 음성 (Voice)
+
+- **한민재 대사 (M01, 5줄)** — 프로젝트 소유자가 제작·제공한 녹음 → `assets/voice/m01/minjae_001–005.mp3`. 녹음 파일이 있는 대사는 이 음성으로 재생되고, 없는 대사는 설정에 따라 음성 합성(TTS) 또는 웅얼거림으로 대체됩니다.

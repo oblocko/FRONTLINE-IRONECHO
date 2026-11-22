@@ -52,11 +52,11 @@ export function EPILOGUE() {
 // helpers
 function daniel(game, { rifle = false } = {}) {
   setSleeveLook('jacket');
-  const w = game.weapons; w.clear(); w.setSuppressed(true); w.setRifleName('카빈 (회수)');
-  if (rifle || flag('m05_hasRifle')) w.give('rifle', { mag: 30, reserve: 60 });
-  w.give('pistol', { mag: 17, reserve: 51 }); w.grenades = 0; w.equip(rifle || flag('m05_hasRifle') ? 'rifle' : 'pistol', true); w.emitAmmo();
+  const w = game.weapons; w.clear(); w.setSuppressed(true);
+  if (rifle || flag('m05_hasRifle')) w.give('carbine', { mag: 30, reserve: 60 });
+  w.give('pistol', { mag: 17, reserve: 51 }); w.grenades = 0; w.equip(rifle || flag('m05_hasRifle') ? 'carbine' : 'pistol', true); w.emitAmmo();
 }
-function giveRifle(game) { if (game.weapons.inventory.rifle) return; game.weapons.give('rifle', { mag: 30, reserve: 60 }); saves.setFlag('m05_hasRifle', true); game.ui.hint(`<b>카빈 획득</b> — ${k(game, 'weapon1')} 카빈 · ${k(game, 'weapon2')} 소음 권총`, 4); }
+function giveRifle(game) { if (game.weapons.inventory.carbine) return false; game.weapons.give('carbine', { mag: 30, reserve: 60 }); game.weapons.equip('carbine'); saves.setFlag('m05_hasRifle', true); game.ui.hint(`<b>M4A1 카빈 획득</b> — ${k(game, 'weapon1')} 카빈 · ${k(game, 'weapon2')} 소음 권총`, 4); return true; }
 function spawnPmc(game, x, z, extra = {}) { return game.director.spawn({ team: 'enemy', faction: 'pmc', hat: 'headset', pos: V(x, 0, z), accuracy: 0.85, state: 'idle', ...extra }); }
 function umbrella(a, color) {
   const g = new THREE.Group(); const m = new THREE.MeshStandardMaterial({ color, roughness: 0.6, side: THREE.DoubleSide });
@@ -123,10 +123,28 @@ function takedowns(game, m, guards, { canUse = () => true, onUse = null, radius 
 }
 function fade(game, m, mid) { return (async () => { events.emit('ui:fade', { to: 1, dur: 0.6 }); await m.wait(0.7); await mid(); events.emit('ui:fade', { to: 0, dur: 0.9 }); })(); }
 function trackShots(game, m, onShot) { let last = null; m.every(() => { const s = game.weapons.lastShot; if (s && s !== last) { last = s; onShot(s); } }); }
+// A downed contractor's carbine lies where it fell: walk up to it and pick it up (that exact gun leaves the
+// ground and becomes the viewmodel). Magazines from the dead top up ammo automatically.
 function ammoFromDead(game, m) {
-  const d = game.director;
-  m.every(() => { const p = game.player.position; for (const a of d.agents) { if (a.team !== 'enemy' || !a.dead) continue; if (a.ammoDrop === undefined) a.ammoDrop = true;
-    if (a.ammoDrop && a.position.distanceTo(p) < 1.8) { a.ammoDrop = false; if (!game.weapons.inventory.rifle) giveRifle(game); else { const got = game.weapons.addAmmo('rifle', 30); if (got > 0) game.ui.hint(`탄약 +${got}`, 1.5); } game.weapons.addAmmo('pistol', 17); } } });
+  const d = game.director, p = game.player;
+  m.every(() => {
+    for (const a of d.agents) {
+      if (a.team !== 'enemy' || !a.dead) continue;
+      const gun = a.actor.droppedWeapon;
+      if (gun && !a.gunOffered && gun.parent) {
+        a.gunOffered = true;
+        const it = p.addInteractable({ pos: () => gun.getWorldPosition(new THREE.Vector3()).add(V(0, 0.3, 0)), prompt: 'M4A1 카빈 줍기', radius: 1.8, onUse: () => {
+          const had = !!game.weapons.inventory.carbine;
+          gun.parent?.remove(gun); a.actor.droppedWeapon = null; it.enabled = false; p.removeInteractable(it);
+          game.audio.click(0.3, 1500, 0.05);
+          if (!giveRifle(game) && had) { const got = game.weapons.addAmmo('carbine', 30); game.ui.hint(`탄약 +${got}`, 1.5); }
+        } });
+        m.bind(() => p.removeInteractable(it));
+      }
+      if (a.ammoDrop === undefined) a.ammoDrop = true;
+      if (a.ammoDrop && a.position.distanceTo(p.position) < 1.8) { a.ammoDrop = false; let got = game.weapons.addAmmo('pistol', 17); if (game.weapons.inventory.carbine) got += game.weapons.addAmmo('carbine', 30); if (got > 0) game.ui.hint(`탄약 +${got}`, 1.5); }
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -155,34 +173,87 @@ export const SEGMENTS = [
         ['daniel', '보관소는.'],
         ['maya', '두 블록 남쪽. 그런데 서두르지 마. 네가 역에서 나온 뒤로 같은 사람이 세 번 찍혔어. 확인해 봐 — 쇼윈도 유리를 거울처럼 써.', { radio: true }],
       ]);
-      // the tail: plainclothes, keeps pace on the other pavement; two pedestrians as decoys
+      // ---- who is the tail? (observation, not a quiz) ----
+      // Four people on the far pavement: a man waiting at the bus stop on his phone, a smoker at the café
+      // terrace who glances over now and then, a woman with a red umbrella walking up and down, and the
+      // tail — who keeps level with Daniel, stops a moment after he stops and moves when he moves. Daniel
+      // can only watch them in the shop windows' reflections (turning round and staring burns him), and
+      // points the tail out by holding his gaze on that person's reflection and pressing the interact key.
+      const civ = (x, z, extra = {}) => game.director.spawn({ team: 'civilian', faction: 'civ', hat: 'none', weapon: false, passive: true, invulnerable: true, name: '행인', pos: V(x, 0, z), ...extra });
       const tail = game.director.spawn({ team: 'enemy', faction: 'pmc', hat: 'none', weapon: false, passive: true, name: '미행자', pos: V(-8.4, 0, 112), visionRange: 0.1 });
-      const decoyA = game.director.spawn({ team: 'civilian', faction: 'civ', hat: 'none', weapon: false, passive: true, invulnerable: true, name: '행인', pos: V(-7.6, 0, 80) }); umbrella(decoyA, 0x9a1c1c);
-      const decoyB = game.director.spawn({ team: 'civilian', faction: 'civ', hat: 'none', weapon: false, passive: true, invulnerable: true, name: '행인', pos: V(-8.6, 0, 58) });
+      const umbrellaWoman = civ(-7.6, 80); umbrella(umbrellaWoman, 0x9a1c1c);
+      const phoneMan = civ(-8.9, 63); phoneMan.hold(V(-8.9, 0, 63)); phoneMan.lookAt(V(-13, 1.2, 63));
+      const smoker = civ(-8.2, 71); smoker.hold(V(-8.2, 0, 71)); smoker.lookAt(V(-12, 1.6, 71));
       lv.tail = tail;
-      m.every(() => { if (tail.dead || lv.tailFree) return false; const tz = p.position.z + 9; if (Math.abs(tail.position.z - tz) > 1.2) tail.moveTo(V(-8.4, 0, tz), { run: Math.abs(tail.position.z - tz) > 8 }); else { tail.path = null; tail.lookAt(p.position); } });
-      m.spawn(async () => { for (;;) { decoyA.moveTo(V(-7.6, 0, 40)); await m.until(() => decoyA.position.z < 41, 60); decoyA.moveTo(V(-7.6, 0, 100)); await m.until(() => decoyA.position.z > 99, 60); } });
-      decoyB.hold(V(-8.6, 0, 58)); decoyB.lookAt(V(-12, 1.6, 58));
-      // the shop window: the one nearest z 66 on the east pavement
-      const win = lv.shopWindows.filter((w) => w.normal.x < 0).sort((a, b) => Math.abs(a.pos.z - 66) - Math.abs(b.pos.z - 66))[0];
-      const at = win.pos.clone().addScaledVector(win.normal, 1.1).setY(0.14);
-      game.objectives.add('window', '쇼윈도 반사로 미행 확인', { marker: win.pos.clone().setY(2.2) });
-      await interact(game, { pos: at.clone().setY(1.2), prompt: '쇼윈도 앞에 멈춰 서기', radius: 2.0 });
-      // live reflection on the glass
-      const mirror = new Reflector(new THREE.PlaneGeometry(win.w, 2.8), { clipBias: 0.003, textureWidth: 768, textureHeight: 512, color: 0x8a9496 });
-      mirror.position.copy(win.pos).addScaledVector(win.normal, 0.06); mirror.rotation.y = Math.atan2(win.normal.x, win.normal.z); scene.add(mirror); m.bind(() => scene.remove(mirror));
-      p.teleport(at, -Math.PI / 2); p.pitch = 0.02; p.fovOverride = 55; game.weapons.lowered = true;
-      decoyB.hold(V(-8.6, 0, at.z - 1.5)); decoyB.lookAt(V(-12, 1.6, at.z));
+      // the tail keeps level with Daniel ~8 m behind on the other pavement; stops shortly after he stops
+      let still = 0;
+      m.every((dt) => {
+        if (tail.dead || lv.tailFree) return false;
+        still = p.speed < 0.4 ? still + dt : 0;
+        const tz = p.position.z + 8;
+        const level = Math.abs(tail.position.z - tz) < 3;   // he first catches up, then mirrors Daniel's stops
+        if (level && (still > 0.7 || Math.abs(tail.position.z - tz) < 1.0)) { tail.path = null; tail.script = { kind: 'hold', pos: tail.position.clone() }; tail.lookAt(still > 2.5 && Math.sin(m.time * 0.7) > 0.6 ? p.position : V(-13, 1.4, tail.position.z)); }
+        else if (tail.script?.kind !== 'move' || Math.abs(tail.script.pos.z - tz) > 2) tail.moveTo(V(-8.4, 0, tz), { run: Math.abs(tail.position.z - tz) > 9 });   // re-target only when Daniel has moved on
+      });
+      m.spawn(async () => { for (;;) { umbrellaWoman.moveTo(V(-7.6, 0, 40)); await m.until(() => umbrellaWoman.position.z < 41, 60); await m.wait(rand(1, 4)); umbrellaWoman.moveTo(V(-7.6, 0, 100)); await m.until(() => umbrellaWoman.position.z > 99, 60); } });
+      m.spawn(async () => { for (;;) { await m.wait(rand(3, 7)); smoker.lookAt(p.position.clone()); await m.wait(rand(1, 2)); smoker.lookAt(V(-12, 1.6, 71)); } });   // a red herring: he looks over
+      m.spawn(async () => { for (;;) { await m.wait(rand(6, 12)); phoneMan.hold(V(-8.9 + rand(-0.6, 0.6), 0, 63 + rand(-1.5, 1.5))); } });
+      const suspects = [tail, phoneMan, smoker, umbrellaWoman];
+      // two shop windows with live reflections
+      const wins = lv.shopWindows.filter((w) => w.normal.x < 0).sort((a, b) => Math.abs(a.pos.z - 66) - Math.abs(b.pos.z - 66)).slice(0, 2);
+      const mirrors = wins.map((win) => { const mr = new Reflector(new THREE.PlaneGeometry(win.w, 2.8), { clipBias: 0.003, textureWidth: 640, textureHeight: 420, color: 0x8a9496 });
+        mr.position.copy(win.pos).addScaledVector(win.normal, 0.06); mr.rotation.y = Math.atan2(win.normal.x, win.normal.z); scene.add(mr); m.bind(() => scene.remove(mr)); return { mr, win }; });
+      game.objectives.add('window', '쇼윈도에 비친 길 건너편에서 미행자 찾기', { markers: wins.map((w) => w.pos.clone().setY(2.2)) });
+      await m.until(() => wins.some((w) => p.position.distanceTo(w.pos.clone().setY(p.position.y)) < 3.2), 240);
+      game.weapons.lowered = true;
       await m.talk([
-        ['daniel', '(유리 속) …정류장 옆에 휴대폰 보는 남자. 빨간 우산. 그리고 내 뒤 맞은편에 서 있는 회색 코트.', { priority: 3 }],
-        ['maya', '내가 멈추면 같이 멈추는 사람이 누구야?', { radio: true, priority: 3 }],
+        ['maya', '유리에 비친 길 건너편을 봐. 돌아서서 쳐다보면 끝이야.', { radio: true, priority: 3 }],
+        ['maya', '걸었다가 멈춰 봐. 너랑 같이 움직이고 같이 서는 사람이 있으면 그 사람이야.', { radio: true, priority: 3 }],
       ]);
-      const id = await choose(game, m, { flag: 'm05_tail_id', tag: '판단 // 미행자는 누구인가', title: '유리에 비친 길 건너편을 살펴보라. 다니엘이 멈추면 같이 멈추는 사람.', timeout: 30, fallback: 1,
-        options: [{ key: 'wrong_a', text: '정류장 옆, 휴대폰을 보는 남자' }, { key: 'right', text: '맞은편에서 함께 멈춘 회색 옷의 남자' }, { key: 'wrong_b', text: '빨간 우산을 쓰고 지나가는 행인' }] });
-      const right = id === 'right'; saves.setFlag('m05_tail_id', right ? 'right' : 'wrong');
-      if (right) await m.talk([['daniel', '회색. 내가 서면 서고, 걸으면 걷는다.', { priority: 3 }], ['maya', '…맞아. 위치 데이터도 같아. 그 사람이야.', { radio: true, priority: 3 }]]);
-      else await m.talk([['daniel', '저 사람이다.', { priority: 3 }], ['maya', '아니야 — 그 사람은 그냥 지나갔어. 회색 옷이야! 그리고… 네가 너무 오래 쳐다봤어. 들켰어.', { radio: true, priority: 3 }]]);
-      p.fovOverride = null; game.weapons.lowered = false; scene.remove(mirror);
+      game.ui.hint(`유리에 비친 사람을 화면 가운데에 두고 잠시 지켜본 뒤 ${k(game, 'interact')} 로 지목`, 7);
+      // focus HUD
+      const fe = document.createElement('div'); fe.className = 'stealth-meter'; fe.innerHTML = '<div class="lbl">관찰</div><div class="bar"><i></i></div><div class="st"></div>'; game.ui.hud.appendChild(fe); m.bind(() => fe.remove());
+      const cam = game.renderer.camera; const v = new THREE.Vector3(), ndc = new THREE.Vector3();
+      let watched = null, watchT = 0, stare = 0, verdict = null; const t0 = m.time;
+      const auto = game.autoChoices?.m05_tail_id;
+      if (auto) verdict = auto === 'right' ? 'right' : 'wrong';
+      m.every((dt) => {
+        if (verdict) return false;
+        // whose reflection is in the middle of the view?
+        let best = null, bestD = 0.09;
+        cam.updateMatrixWorld(); const C = cam.getWorldPosition(new THREE.Vector3());
+        for (const { win } of mirrors) {
+          const n = win.normal, W = win.pos;
+          if (C.clone().sub(W).dot(n) <= 0) continue;
+          for (const s of suspects) {
+            const P = s.position.clone().add(V(0, 1.45, 0)); const P2 = P.clone().addScaledVector(n, -2 * P.clone().sub(W).dot(n));   // mirror image
+            const dir = P2.clone().sub(C); const t = W.clone().sub(C).dot(n) / dir.dot(n); if (!(t > 0 && t < 1)) continue;
+            const hit = C.clone().addScaledVector(dir, t); if (Math.abs(hit.z - W.z) > win.w / 2 || Math.abs(hit.y - 1.6) > 1.4) continue;
+            ndc.copy(P2).project(cam); const d = Math.hypot(ndc.x, ndc.y); if (ndc.z < 1 && d < bestD) { bestD = d; best = s; }
+          }
+        }
+        // staring straight at someone across the street gets Daniel made
+        const f = new THREE.Vector3(); cam.getWorldDirection(f);
+        const direct = suspects.find((s) => { const to = s.position.clone().add(V(0, 1.5, 0)).sub(C); const dd = to.length(); return dd < 30 && to.normalize().dot(f) > 0.99 && game.world.lineOfSight(C, s.position.clone().add(V(0, 1.5, 0))); });
+        stare = direct ? stare + dt : Math.max(0, stare - dt * 0.5);
+        if (stare > 1.3) { verdict = 'burned'; return false; }
+        if (best !== watched) { watched = best; watchT = 0; } else if (best) watchT += dt;
+        const k2 = Math.min(1, watchT / 1.2); fe.querySelector('i').style.width = `${Math.round(k2 * 100)}%`;
+        fe.classList.toggle('danger', stare > 0.5);
+        fe.querySelector('.st').textContent = stare > 0.5 ? '너무 대놓고 보고 있다!' : !best ? '유리에 비친 사람을 가운데에 두고 지켜본다' : k2 < 1 ? '지켜보는 중…' : '지목할 수 있다';
+        if (best && k2 >= 1 && game.input.pressed('interact')) { verdict = best === tail ? 'right' : 'wrong'; return false; }
+        if (m.time - t0 > 90) { verdict = 'timeout'; return false; }
+      });
+      m.spawn(async () => { await m.wait(45); if (!verdict) await m.say('maya', '…다니엘, 오래 서 있으면 그쪽도 이상하게 생각해.', { radio: true, priority: 2 }); });
+      await m.until(() => verdict, 1e9);
+      fe.remove();
+      const right = verdict === 'right'; saves.setFlag('m05_tail_id', right ? 'right' : 'wrong');
+      (game.choiceLog ||= []).push({ flag: 'm05_tail_id', key: right ? 'right' : 'wrong', text: right ? '미행자를 반사로 정확히 지목' : verdict === 'burned' ? '돌아서서 쳐다보다 미행자에게 들킴' : verdict === 'timeout' ? '미행자를 가려내지 못함' : '엉뚱한 사람을 지목 — 진짜 미행자가 눈치챔' });
+      if (right) await m.talk([['daniel', '맞은편 그 남자. 내가 서면 서고, 걸으면 걷는다.', { priority: 3 }], ['maya', '…맞아. 역에서 찍힌 사람이랑 같아.', { radio: true, priority: 3 }]]);
+      else if (verdict === 'burned') await m.talk([['maya', '돌아보지 말랬잖아! …너랑 같이 움직이던 남자가 방금 눈을 피했어. 이제 알아.', { radio: true, priority: 3 }]]);
+      else if (verdict === 'timeout') await m.talk([['maya', '못 찾겠으면 움직여. …너랑 같이 서 있던 남자, 눈치챈 것 같아.', { radio: true, priority: 3 }]]);
+      else await m.talk([['daniel', '저 사람이다.', { priority: 3 }], ['maya', '아니야 — 그 사람은 아까부터 그 자리였어. 진짜는 너랑 같이 움직이던 남자야. 네가 두리번거리는 걸 그쪽이 봤어.', { radio: true, priority: 3 }]]);
+      game.weapons.lowered = false; for (const { mr } of mirrors) scene.remove(mr);
       game.objectives.complete('window');
       await m.say('maya', '어떻게 떼어 낼 거야? 메트로 입구가 광장에 있고, 왼쪽 건너편엔 안뜰로 이어지는 통로가 있어.', { radio: true, priority: 3 });
       const route = await choose(game, m, { flag: 'm05_route', tag: '결정 // 미행 따돌리기', timeout: 30, fallback: 0,
@@ -464,7 +535,6 @@ async function alleyRoute(game, m) {
   }
   let tailFate = 'killed';
   if (outcome === 'taken') {
-    giveRifle(game);
     await m.talk([
       ['daniel', '누가 보냈지.', { priority: 3 }],
       ['tail', '…헉… 브레넌. 콜 브레넌. 당신이 보관소로 갈 거라고 했어.', { priority: 3 }],

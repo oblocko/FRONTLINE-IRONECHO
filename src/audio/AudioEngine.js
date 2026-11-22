@@ -271,6 +271,20 @@ export class AudioEngine {
   }
   // speech presence: a soft formant murmur under subtitles so lines don't feel silent
   // (no recorded voice acting exists in this build — subtitles carry the dialogue)
+  // recorded dialogue (assets/voice/<id>.mp3): decoded once, played on the dialogue bus (radio lines
+  // band-limited). Returns the clip length in seconds, or 0 if the file is missing.
+  async loadVoice(id) {
+    this.voices ||= new Map(); if (this.voices.has(id)) return this.voices.get(id);
+    const pr = (async () => { try { const r = await fetch(new URL(`assets/voice/${id}.mp3`, document.baseURI)); if (!r.ok) return null; const buf = await r.arrayBuffer(); return await this.ctx.decodeAudioData(buf); } catch { return null; } })();
+    this.voices.set(id, pr); return pr;
+  }
+  async playVoice(id, radio = false) {
+    if (!this.ready) return 0; const buf = await this.loadVoice(id); if (!buf) return 0;
+    const c = this.ctx; const src = c.createBufferSource(); src.buffer = buf; const g = c.createGain(); g.gain.value = 1.0;
+    if (radio) { const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 400; const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3200; src.connect(hp).connect(lp).connect(g); } else src.connect(g);
+    g.connect(this.dlgBus); src.start(); this.voiceSrc = src; return buf.duration;
+  }
+  stopVoice() { try { this.voiceSrc?.stop(); } catch {} this.voiceSrc = null; }
   voiceMurmur(dur, pitch = 1, radio = false) {
     if (!this.ready) return; const c = this.ctx, t = c.currentTime;
     const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 110 * pitch;

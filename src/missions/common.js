@@ -54,7 +54,7 @@ export async function choose(game, m, { flag, tag = '결정', title = '', option
   box.innerHTML = `<div class="tag">${tag}</div>${title ? `<div class="ttl">${title}</div>` : ''}` +
     options.map((o, i) => `<div class="opt"><kbd>${label(i)}</kbd> ${o.text}${o.note ? `<span class="note">${o.note}</span>` : ''}</div>`).join('') +
     '<div class="timer"><i></i></div>';
-  game.ui.hud.appendChild(box);
+  game.ui.hud.appendChild(box); game.weapons.switchLock = true;
   const bar = box.querySelector('.timer i'); let pick = -1; const t0 = m.time;
   const auto = game.autoChoices?.[flag];   // test hook: preset answers
   await m.until(() => {
@@ -67,6 +67,7 @@ export async function choose(game, m, { flag, tag = '결정', title = '', option
     return pick >= 0 || m.time - t0 > timeout;
   });
   if (pick < 0) pick = fallback;
+  m.spawn(async () => { await m.wait(0.3); game.weapons.switchLock = false; });
   const o = options[pick];
   box.classList.add('picked'); box.querySelectorAll('.opt')[pick]?.classList.add('on');
   game.audio.click(0.25, 1800, 0.03);

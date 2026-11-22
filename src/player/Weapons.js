@@ -23,6 +23,9 @@ export function reloadPlan(id, empty) {
 export const WEAPON_DEFS = {
   rifle: { id: 'rifle', name: 'K2C1 소총', short: 'RIFLE', mag: 30, reserve: 180, interval: 0.085, auto: true, damage: 34, headMult: 2.6, range: 300,
     hipSpread: 0.03, adsSpread: 0.003, moveSpread: 0.025, kick: 0.010, kickYaw: 0.004, reload: 2.2, reloadEmpty: 2.7, adsTime: 0.22, adsZoom: 0.3, sound: 'rifle' },
+  // the carbine Voss takes off a contractor (M4A1 pattern, real model from the ground)
+  carbine: { id: 'carbine', name: 'M4A1 카빈 (회수)', short: 'CARBINE', mag: 30, reserve: 90, interval: 0.075, auto: true, damage: 32, headMult: 2.6, range: 280,
+    hipSpread: 0.03, adsSpread: 0.003, moveSpread: 0.025, kick: 0.0105, kickYaw: 0.0045, reload: 2.1, reloadEmpty: 2.6, adsTime: 0.2, adsZoom: 0.3, sound: 'rifle' },
   pistol: { id: 'pistol', name: 'G17 권총', short: 'PISTOL', mag: 17, reserve: 51, interval: 0.16, auto: false, damage: 30, headMult: 2.4, range: 120,
     hipSpread: 0.025, adsSpread: 0.006, moveSpread: 0.015, kick: 0.02, kickYaw: 0.006, reload: 1.6, reloadEmpty: 1.9, adsTime: 0.15, adsZoom: 0.15, sound: 'pistol' },
 };
@@ -102,7 +105,7 @@ export class WeaponSystem {
     this.vmKey = new THREE.DirectionalLight(0xdde4ff, 1.4); this.vmKey.position.set(1, 2, 1); vmScene.add(this.vmKey);
     this.vmFlashLight = new THREE.PointLight(0xffaa55, 0, 2, 2); this.vmFlashLight.position.set(0.1, 0, -0.7); vmScene.add(this.vmFlashLight);
     // weapons carry their own hands; the legacy separate arm rig is kept hidden
-    this.models = { rifle: buildRifle(), pistol: buildPistol() };
+    this.models = { rifle: buildRifle(), pistol: buildPistol(), carbine: buildRifle('m4a1') };
     this.arms = buildArms(); this.arms.visible = false;
     this.holder = new THREE.Group(); this.vmRoot.add(this.holder);
     for (const m of Object.values(this.models)) { m.visible = false; this.holder.add(m); const u = m.userData; if (u.mag) { m.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(u.mag); if (!b.isEmpty()) u.magCenter = b.getCenter(new THREE.Vector3()); } }
@@ -152,7 +155,7 @@ export class WeaponSystem {
     if (empty) a.click(0.18, 500, 0.05, (P.out + 0.08) * T);          // empty mag hits the ground
     a.click(0.1, 600, 0.1, P.pouch * T);                              // pouch
     a.click(0.38, 2300, 0.03, P.seat * T); a.click(0.2, 1100, 0.04, (P.seat + 0.02) * T);   // seat + slap
-    if (empty && d.id === 'rifle') { a.click(0.3, 2800, 0.02, P.chargeBack * T); a.click(0.34, 1900, 0.03, P.chargeFwd * T); }
+    if (empty && d.id !== 'pistol') { a.click(0.3, 2800, 0.02, P.chargeBack * T); a.click(0.34, 1900, 0.03, P.chargeFwd * T); }
     if (empty && d.id === 'pistol') a.click(0.36, 2600, 0.025, P.chargeFwd * T);
     events.emit('player:reload', {});
   }
@@ -179,8 +182,9 @@ export class WeaponSystem {
     // switching
     if (this.switching > 0) { this.switching = Math.max(0, this.switching - dt * 3.2); if (this.switching < 0.5 && this.pendingSwap) { this.pendingSwap(); this.pendingSwap = null; } }
     if (ctl) {
-      if (inp.pressed('weapon1') && this.order[0]) this.equip(this.order[0]);
-      if (inp.pressed('weapon2') && this.order[1]) this.equip(this.order[1]);
+      // number keys answer an open decision card instead of switching weapons
+      if (!this.switchLock && inp.pressed('weapon1') && this.order[0]) this.equip(this.order[0]);
+      if (!this.switchLock && inp.pressed('weapon2') && this.order[1]) this.equip(this.order[1]);
       if (inp.mouse.wheel !== 0 && this.order.length > 1) { const i = this.order.indexOf(this.currentId); this.equip(this.order[(i + (inp.mouse.wheel > 0 ? 1 : this.order.length - 1)) % this.order.length]); }
       if (inp.pad && inp.padPressed.has('weapon1') && this.order.length > 1) { const i = this.order.indexOf(this.currentId); this.equip(this.order[(i + 1) % this.order.length]); }
       if (inp.pressed('reload')) this.reload();
@@ -345,7 +349,7 @@ export class WeaponSystem {
         // (pistol, empty) — back to its grip
         let h = toMag.clone();
         if (this.reloadEmpty && !isPistol) {
-          const handle = new THREE.Vector3(0.075, 0.035, mc.z + 0.04).sub(u.leftHandBase);            // right side of the receiver
+          const handle = (this.currentId === 'carbine' ? new THREE.Vector3(-0.01, 0.075, mc.z + 0.2) : new THREE.Vector3(0.075, 0.035, mc.z + 0.04)).sub(u.leftHandBase);   // AR: T-handle at the rear of the upper; K2: right side of the receiver
           h.lerp(handle, ss(P.seat + 0.01, P.chargeBack - 0.03)); h.z += ss(P.chargeBack - 0.03, P.chargeBack) * (1 - ss(P.chargeBack, P.chargeFwd)) * 0.08;   // yank it back, let go
         }
         if (this.reloadEmpty && isPistol) h.lerp(new THREE.Vector3(0.01, 0.06, 0.08).sub(u.leftHandBase).add(u.leftHandBase.clone().multiplyScalar(0)), ss(P.seat + 0.01, P.chargeFwd - 0.02) * 0.6);
