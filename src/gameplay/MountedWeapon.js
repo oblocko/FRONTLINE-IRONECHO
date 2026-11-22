@@ -167,7 +167,7 @@ export class MountedWeapon {
       this.root.position.copy(opts.pos); this.root.rotation.y = opts.yaw ?? 0; game.renderer.scene.add(this.root);
       this.seat = new THREE.Object3D(); this.seat.position.set(0, 0.2, 0.62); this.pivot.add(this.seat);
       // gunner's eye: hip view just behind the stock; aimed view (right mouse) looks through the rear aperture
-      this.hipEye = new THREE.Vector3(0, 0.2, 0.62); this.adsEye = new THREE.Vector3(0, 0.115, 0.43);
+      this.hipEye = new THREE.Vector3(0, 0.2, 0.62); this.adsEye = new THREE.Vector3(0, 0.125, 0.43);   // on the sight line: aperture centre (y .125, z .13) → front post tip (y .125, z -.79)
       this.baseYaw = opts.yaw ?? 0;
     } else {
       // APC: drive an existing turret group (pivot = turret, tilt = gun mantlet)

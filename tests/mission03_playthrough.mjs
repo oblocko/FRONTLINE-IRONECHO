@@ -36,8 +36,8 @@ try {
   if (START) { await page.click('#menu [data-a=continue]'); await page.waitForSelector('#briefing .deploy .btn.primary:not([disabled])', { timeout: 300000 }); await page.click('#briefing .deploy .btn.primary'); await page.waitForFunction(() => window.__game?.state === 'playing', null, { timeout: 300000 }); await ev(() => { const g = window.__game; g.player.godMode = true; g.timeScale = 3; }); log('resumed at ' + START); }
   else {
     await ev(() => { const g = window.__game; g.ui.missionComplete(g.missions.byId('m02'), { time: 1500, kills: 30, accuracy: 40, headshots: 5, deaths: 0, epilogue: 'test' }, g.missions.next('m02')); });
-    await page.waitForSelector('#complete [data-a=next]', { timeout: 10000 }); log('M02 debrief offers M03');
-    await page.waitForSelector('#briefing', { timeout: 30000 }); await shot('m03_0_briefing.png'); log('auto-advanced to M03 briefing');
+    await page.waitForSelector('#transition:not(.hidden)', { timeout: 10000 }); await shot('mission03_0_transition.png'); log('M02 end rolls straight into the next operation title card (no menu/briefing)');
+    if (await page.$('#briefing:not(.hidden)')) errors.push('briefing screen shown during campaign transition');
     await page.waitForFunction(() => window.__game?.state === 'playing' && window.__game.missionId === 'm03', null, { timeout: 300000 }); log('auto-deployed into M03');
     await ev(() => { const g = window.__game; g.player.godMode = true; g.timeScale = 1; }); await page.waitForTimeout(9000); await shot('m03_a_convoy.png');
     await ev(() => { window.__game.timeScale = 3; });
@@ -77,7 +77,7 @@ try {
   await ev(() => { window.__game.timeScale = 1; }); await page.waitForTimeout(4000); await shot('m03_h_casevac.png'); await ev(() => { window.__game.timeScale = 3; });
   for (let i = 0; i < 300 && !(await objDone('hold')); i++) { await killAll(); await page.waitForTimeout(2000); }
   await ev(() => { window.__game.timeScale = 1; }); await page.waitForTimeout(6000); await shot('m03_i_ending.png'); await ev(() => { window.__game.timeScale = 4; });
-  await page.waitForSelector('#complete', { timeout: 400000 }); await page.waitForTimeout(800); await shot('m03_j_complete.png');
+  await page.waitForSelector('#complete:not(.hidden), #transition:not(.hidden)', { timeout: 400000 }); await page.waitForTimeout(800); await shot('m03_j_complete.png');
   const save = await ev(() => JSON.parse(localStorage.getItem('fie.save.v1')));
   log('save: ' + JSON.stringify({ unlocked: save.unlocked, completed: Object.keys(save.completed), flags: save.storyFlags }));
   if (!save.completed.m03) errors.push('M03 completion not saved');

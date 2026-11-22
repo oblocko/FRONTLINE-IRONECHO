@@ -35,8 +35,8 @@ try {
   else {
   // ---- campaign continuity: M01 debrief -> M02 briefing -> auto deploy (no clicks) ----
   await ev(() => { const g = window.__game; g.ui.missionComplete(g.missions.byId('m01'), { time: 1500, kills: 30, accuracy: 40, headshots: 5, deaths: 0, epilogue: 'test' }, g.missions.next('m01')); });
-  await page.waitForSelector('#complete [data-a=next]', { timeout: 10000 }); await shot('m02_0_debrief.png'); log('debrief shows next-operation countdown');
-  await page.waitForSelector('#briefing', { timeout: 30000 }); log('auto-advanced to M02 briefing');
+  await page.waitForSelector('#transition:not(.hidden)', { timeout: 10000 }); await shot('mission02_0_transition.png'); log('M01 end rolls straight into the next operation title card (no menu/briefing)');
+  if (await page.$('#briefing:not(.hidden)')) errors.push('briefing screen shown during campaign transition');
   await page.waitForFunction(() => window.__game?.state === 'playing' && window.__game.missionId === 'm02', null, { timeout: 300000 }); log('auto-deployed into M02 (no clicks)');
   await ev(() => { const g = window.__game; g.player.godMode = true; g.timeScale = 3; });
   await shot('m02_a_convoy.png');
@@ -81,7 +81,7 @@ try {
   await ev(() => { window.__game.timeScale = 3; });
   for (let i = 0; i < 300 && !(await ev(() => window.__game.objectives.get('escort')?.done)); i++) { await killAll(); await page.waitForTimeout(2500); }
   await ev(() => { window.__game.timeScale = 1; }); await page.waitForTimeout(6000); await shot('m02_i_ending.png'); await ev(() => { window.__game.timeScale = 4; });
-  await page.waitForSelector('#complete', { timeout: 300000 }); await page.waitForTimeout(800); await shot('m02_j_complete.png');
+  await page.waitForSelector('#complete:not(.hidden), #transition:not(.hidden)', { timeout: 300000 }); await page.waitForTimeout(800); await shot('m02_j_complete.png');
   const save = await ev(() => JSON.parse(localStorage.getItem('fie.save.v1')));
   log('save: ' + JSON.stringify({ unlocked: save.unlocked, completed: Object.keys(save.completed) }));
   if (!save.completed.m02) errors.push('M02 completion not saved');

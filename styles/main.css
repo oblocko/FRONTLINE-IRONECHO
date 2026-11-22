@@ -356,3 +356,18 @@ html.js #about { display: none; }
 .stealth-meter.danger { animation: pulse 0.4s infinite; }
 .stealth-meter .st { font-size: 13px; color: #e8eee8; text-shadow: 0 1px 2px #000; }
 #hud .obj .o.failed { color: #ff8a78; text-decoration: line-through; opacity: 0.8; }
+
+/* campaign transition: black title card between operations */
+#transition { background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px; animation: tr-in .6s ease both; }
+#transition .done { position: absolute; top: 34px; left: 0; right: 0; text-align: center; font-size: 12px; letter-spacing: .22em; color: var(--muted); }
+#transition .card { text-align: center; animation: tr-card 1.2s .3s ease both; }
+#transition .num { font-size: 13px; letter-spacing: .5em; color: var(--accent); margin-bottom: 10px; }
+#transition h1 { font-size: 64px; letter-spacing: .16em; margin: 0; font-weight: 800; }
+#transition .ko { font-size: 18px; letter-spacing: .3em; color: #c3ccc6; margin-top: 6px; }
+#transition .meta { margin-top: 22px; font-size: 13px; letter-spacing: .14em; line-height: 1.9; color: var(--muted); }
+#transition .bar { width: 260px; height: 2px; background: rgba(255,255,255,.08); }
+#transition .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .25s; }
+#transition .ls { font-size: 11px; letter-spacing: .3em; color: var(--muted); }
+#transition .menu-btn { position: absolute; bottom: 28px; right: 32px; opacity: .55; }
+@keyframes tr-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tr-card { from { opacity: 0; transform: translateY(8px); letter-spacing: .1em; } to { opacity: 1; transform: none; } }

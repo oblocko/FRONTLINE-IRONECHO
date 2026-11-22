@@ -320,8 +320,28 @@ export class UI {
     $('[data-a=menu]', el).onclick = () => { off(); this.game.quitToMenu(); };
   }
 
+  // Campaign flow: straight from one operation into the next on a black title card — no results/briefing
+  // screens. Shows the outcome in one line, the next operation's title card while it loads, then deploys.
+  campaignTransition(meta, stats, next) {
+    const el = this.mount('transition', h(`<div class="op-transition">
+      <div class="done">MISSION ${meta.num} COMPLETE // ${esc(meta.title)} · ${fmtTime(stats.time)} · KILLS ${stats.kills} · ACC ${stats.accuracy}%</div>
+      <div class="card"><div class="num">MISSION ${next.num}</div><h1>${esc(next.title)}</h1><div class="ko">${esc(next.ko)}</div>
+        <div class="meta">${esc(next.date)} · ${esc(next.time)}<br>${esc(next.location)}</div></div>
+      <div class="bar"><i></i></div><div class="ls">LOADING</div>
+      <button class="btn small menu-btn" data-snd="back">메인 메뉴</button></div>`));
+    this.show('transition');
+    const bar = $('.bar i', el), ls = $('.ls', el);
+    $('.menu-btn', el).onclick = () => { this.game.cancelLoad(); this.game.quitToMenu(); };
+    const t0 = performance.now();
+    this.game.prepareMission(next.id, (p, msg) => { bar.style.width = `${Math.round(p * 100)}%`; ls.textContent = msg; }).then(async () => {
+      bar.style.width = '100%'; ls.textContent = 'DEPLOYING';
+      const wait = Math.max(0, 2500 - (performance.now() - t0)); await new Promise((r) => setTimeout(r, wait));   // let the title card read
+      if (document.body.contains(el)) this.game.startMission(next.id, null);
+    }).catch((e) => { if (e?.cancelled) return; console.error(e); ls.textContent = '로딩 실패: ' + e.message; });
+  }
   missionComplete(meta, stats, next) {
     const playableNext = next && next.status === 'playable';
+    if (playableNext) return this.campaignTransition(meta, stats, next);
     const el = this.mount('complete', h(`<div class="overlay grid-bg"><div class="panel dialog" style="width:980px"><span class="corner tl"></span><span class="corner br"></span>
       <div class="head"><div><div class="tag">MISSION ${meta.num} COMPLETE // 임무 완료</div><h2>${meta.title} <span style="color:var(--muted);font-weight:400">${meta.ko}</span></h2></div><div class="tag">${esc(meta.location)}</div></div>
       <div class="stats">

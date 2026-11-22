@@ -66,7 +66,7 @@ function driver(game, m, obj, pts, { speed = 8, accel = 0.6, onStep = null } = {
   m.every((dt, t) => {
     st.v += (st.target - st.v) * Math.min(1, dt * accel); st.u = Math.min(1, st.u + st.v * dt / len);
     const p = curve.getPoint(st.u), q = curve.getPoint(Math.min(1, st.u + 0.01));
-    obj.position.set(p.x, Math.abs(Math.sin(t * 7)) * 0.015, p.z);
+    obj.position.set(p.x, (Math.sin(t * 5.1) * 0.004 + Math.sin(t * 8.3) * 0.002) * Math.min(1, st.v / 4), p.z);
     obj.rotation.y += wrap(Math.atan2(q.x - p.x, q.z - p.z) - obj.rotation.y) * Math.min(1, dt * 2);
     obj.userData.sway = Math.sin(t * 2.1) * 0.01 * (st.v / Math.max(1, speed));
     for (const w of obj.userData.wheels || []) w.rotation.x += st.v * dt / 0.55;
@@ -347,6 +347,15 @@ export const SEGMENTS = [
       const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 1.2, 10), new THREE.MeshStandardMaterial({ color: 0x2a2c28, metalness: 0.5, roughness: 0.5 })); ped.position.set(0, 1.9, -2.2); esc.add(ped);
       const mg = new MountedWeapon(game, { kind: 'mg', pos: V(0, 0, 0), yaw: 0, yawRange: 2.6, pitchRange: [-0.35, 0.55], prompt: '호송 트럭 기관총 사용' });
       esc.add(mg.root); mg.root.position.set(0, 2.95, -2.2); mg.root.rotation.y = Math.PI; game.mounted.push(mg);
+      // our truck burned on the avenue: battalion sends a gun truck — it drives up behind the bus before you board
+      esc.position.set(-6.5, 0, 6); mg.it && (mg.it.enabled = false);
+      await m.say('seoyeon', '대대에서 기관총 트럭 한 대 보냈습니다. 지금 버스 뒤로 붙습니다.', { radio: true, priority: 3 });
+      const arrive = driver(game, m, esc, [[-6.5, 6], [-6.5, 30], [-6.5, 56]], { speed: 7, accel: 0.8 });
+      const engIn = game.audio.engineLoop('truck'); engIn?.set(0.55, 0.4);
+      m.every(() => { engIn?.setPos(esc.position); if (arrive.done) return false; });
+      await m.until(() => arrive.done, 25);
+      engIn?.stop?.(); esc.position.set(-6.5, 0, 56); esc.rotation.y = 0; esc.userData.sway = 0;
+      mg.it && (mg.it.enabled = true);
       game.objectives.add('mount', '호송 트럭 기관총에 탑승', { marker: mg.seatWorld() });
       await m.say('yoon', '민재, 트럭 기관총 잡아. 버스 뒤에 붙어서 간다!', { priority: 3 });
       await m.until(() => mg.manned, 120);

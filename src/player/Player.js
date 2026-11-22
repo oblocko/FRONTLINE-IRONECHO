@@ -216,6 +216,17 @@ export class Player {
     this.regenDelay -= dt; if (this.regenDelay <= 0 && this.health < this.maxHealth) this.health = Math.min(this.maxHealth, this.health + 28 * dt);
   }
 
+  // re-place the seated camera after the mounted gun has turned this frame (the eye rides on the gun pivot)
+  refreshSeatCamera() {
+    if (!this.seat || !this.alive || this.cameraOverride) return;
+    const s = this.seat; s.object3d.updateMatrixWorld(true);
+    const p = s.object3d.localToWorld(s.offset.clone()); this.position.copy(p).setY(p.y - this.eye);
+    const q = new THREE.Quaternion(); (s.yawFrom || s.object3d).getWorldQuaternion(q);
+    this.yaw = new THREE.Euler().setFromQuaternion(q, 'YXZ').y + s.yawBase + (this.lookYawLocal || 0);
+    const cam = this.camera, right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
+    cam.position.copy(this.position).setY(this.position.y + this.eye + this.bob.y - this.landDip).addScaledVector(right, this.bob.x);
+    cam.rotation.y = this.yaw + (this._shakeX || 0);
+  }
   updateCamera(dt, time) {
     const cam = this.camera;
     if (this.cameraOverride) return; // cinematic system drives the camera
@@ -239,7 +250,7 @@ export class Player {
     const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
     cam.position.copy(this.position).setY(this.position.y + this.eye + this.bob.y - this.landDip).addScaledVector(right, this.bob.x);
     cam.rotation.order = 'YXZ';
-    cam.rotation.set(this.pitch + sy, this.yaw + sx, sr + roll - (this.leanRoll || 0));
+    cam.rotation.set(this.pitch + sy, this.yaw + sx, sr + roll - (this.leanRoll || 0)); this._shakeX = sx;
     // FOV
     const base = settings.data.graphics.fov; const ads = this.weapons?.adsAmount ?? 0;
     const target = this.fovOverride ?? (base * (1 - ads * (this.weapons?.current?.adsZoom ?? 0.22)) + (this.sprinting ? 6 : 0) + this.fovKick);

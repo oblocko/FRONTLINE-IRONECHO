@@ -32,7 +32,7 @@ function driver(game, m, obj, pts, { speed = 8, accel = 0.6, onStep = null } = {
   m.every((dt, t) => {
     st.v += (st.target - st.v) * Math.min(1, dt * accel); st.u = Math.min(1, st.u + st.v * dt / len);
     const p = curve.getPoint(st.u), q = curve.getPoint(Math.min(1, st.u + 0.01));
-    obj.position.set(p.x, gy(game, p.x, p.z) + Math.abs(Math.sin(t * 7)) * 0.015, p.z);
+    obj.position.set(p.x, gy(game, p.x, p.z) + (Math.sin(t * 5.1) * 0.004 + Math.sin(t * 8.3) * 0.002) * Math.min(1, st.v / 4), p.z);
     obj.rotation.y += wrap(Math.atan2(q.x - p.x, q.z - p.z) - obj.rotation.y) * Math.min(1, dt * 2);
     obj.userData.sway = Math.sin(t * 2.1) * 0.012 * (st.v / Math.max(1, speed));
     for (const w of obj.userData.wheels || []) w.rotation.x += st.v * dt / 0.55;

@@ -350,11 +350,13 @@ export class Game {
   updateWorld(dt) {
     this.time += dt; if (this.state === 'playing') this.stats.time += dt;
     const t = this.time;
-    if (this.state === 'playing') { this.player.update(dt, t); for (const m of this.mounted) m.update(dt, t); this.support?.update(dt); this.gadget?.update(dt); this.weapons.update(dt, t); }
+    // mission scripts move vehicles: run them before the player/seat camera and mounted guns so a seated view
+    // follows the vehicle in the same frame (otherwise the view lags one frame and the vehicle jitters)
+    this.mission?.update(dt);
+    if (this.state === 'playing') { this.player.update(dt, t); for (const m of this.mounted) m.update(dt, t); if (this.player.seat && this.mounted.some((m) => m.manned)) this.player.refreshSeatCamera(); this.support?.update(dt); this.gadget?.update(dt); this.weapons.update(dt, t); }
     else { this.player.updateCamera(dt, t); this.weapons.updateViewmodel(dt, t); }
     this.director.update(dt, t);
     for (const v of this.director.vehicles) v.update(dt);
-    this.mission?.update(dt);
     this.dialogue.update(dt);
     this.effects.update(dt);
     this.level?.update?.(dt, t);

@@ -94,7 +94,7 @@ try {
   await ev(() => { window.__game.timeScale = 3; });
   await page.waitForFunction(() => window.__game.objectives.get('turret')?.done, null, { timeout: 400000, polling: 1000 });
   await ev(() => { window.__game.timeScale = 1; }); await page.waitForTimeout(9000); await shot('m01_i_ending.png'); await ev(() => { window.__game.timeScale = 4; });
-  await page.waitForSelector('#complete', { timeout: 400000 }); await page.waitForTimeout(800); await shot('m01_j_complete.png');
+  await page.waitForSelector('#complete:not(.hidden), #transition:not(.hidden)', { timeout: 400000 }); await page.waitForTimeout(800); await shot('m01_j_complete.png');
   const save = await ev(() => JSON.parse(localStorage.getItem('fie.save.v1')));
   log('save: ' + JSON.stringify({ unlocked: save.unlocked, completed: Object.keys(save.completed), checkpoint: save.checkpoint }));
   if (!save.completed.m01) errors.push('mission completion not saved');
