@@ -26,6 +26,7 @@ export class EnemyVehicle {
     const gm = new THREE.MeshStandardMaterial({ color: 0x1d1e1e, metalness: 0.6, roughness: 0.45 });
     const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, postH, 8), gm); post.position.set(gunAt.x, gunAt.y - postH / 2 - 0.05, gunAt.z); this.root.add(post);
     if (real) { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.04, 6, 20), gm); ring.rotation.x = Math.PI / 2; ring.position.set(gunAt.x, gunAt.y - postH, gunAt.z); this.root.add(ring); }
+    this.root.userData.dynamic = true;
     this.gun = new THREE.Group(); this.gun.position.copy(gunAt); this.root.add(this.gun);
     const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 1.1), gm); barrel.position.z = 0.35; this.gun.add(barrel);
     this.muzzle = new THREE.Object3D(); this.muzzle.position.set(0, 0, 0.95); this.gun.add(this.muzzle);

@@ -57,6 +57,7 @@ const cx = (r, len, seg = 10) => new THREE.CylinderGeometry(r, r, len, seg).rota
 export function buildMG() {
   const M = mgMats();
   const g = new THREE.Group();
+  g.userData.dynamic = true;   // never merged by the static batcher: the gun traverses and elevates
   const pivot = new THREE.Group(); g.add(pivot);                          // traverse (yaw)
   const tilt = new THREE.Group(); tilt.position.y = 0.05; pivot.add(tilt); // elevation (pitch)
 
@@ -167,7 +168,7 @@ export class MountedWeapon {
       this.root.position.copy(opts.pos); this.root.rotation.y = opts.yaw ?? 0; game.renderer.scene.add(this.root);
       this.seat = new THREE.Object3D(); this.seat.position.set(0, 0.2, 0.62); this.pivot.add(this.seat);
       // gunner's eye: hip view just behind the stock; aimed view (right mouse) looks through the rear aperture
-      this.hipEye = new THREE.Vector3(0, 0.2, 0.62); this.adsEye = new THREE.Vector3(0, 0.125, 0.43);   // on the sight line: aperture centre (y .125, z .13) → front post tip (y .125, z -.79)
+      this.hipEye = new THREE.Vector3(0, 0.15, 0.62); this.adsEye = new THREE.Vector3(0, 0.125, 0.43);   // on the sight line: aperture centre (y .125, z .13) → front post tip (y .125, z -.79)
       this.baseYaw = opts.yaw ?? 0;
     } else {
       // APC: drive an existing turret group (pivot = turret, tilt = gun mantlet)
@@ -226,8 +227,10 @@ export class MountedWeapon {
     if (this.kind === 'mg') {
       // right mouse: bring the eye down to the sights, narrow the view, tighten the cone of fire
       this.ads += ((inp.ads() ? 1 : 0) - this.ads) * Math.min(1, dt * 10);
-      this.tilt.updateMatrix(); const eye = this.adsEye.clone().applyMatrix4(this.tilt.matrix);
-      this.seat.position.lerpVectors(this.hipEye, eye, this.ads);
+      // both eye points live in the elevating gun's frame, so the head rides with the stock
+      // (otherwise the gun swings about the trunnion and the stock sweeps across the view)
+      this.tilt.updateMatrix();
+      this.seat.position.lerpVectors(this.hipEye, this.adsEye, this.ads).applyMatrix4(this.tilt.matrix);
       p.fovOverride = this.ads > 0.02 ? settingsFov() * (1 - 0.38 * this.ads) : null;
     }
     if (this.kind === 'mg' && !this.locked && this.mountT <= 0 && (inp.pressed('interact') || inp.pressed('jump'))) { this.dismount(); return; }

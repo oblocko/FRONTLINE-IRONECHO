@@ -14,7 +14,7 @@ const RANGE = 150;
 const LOCK_TIME = 1.0;                      // seconds inside the cone to break the link
 
 function buildModel() {
-  const g = new THREE.Group();
+  const g = new THREE.Group(); g.userData.dynamic = true;
   const body = new THREE.MeshStandardMaterial({ color: 0x4b5240, metalness: 0.2, roughness: 0.65 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x1b1c1c, metalness: 0.4, roughness: 0.55 });
   const metal = new THREE.MeshStandardMaterial({ color: 0x8a8d90, metalness: 0.9, roughness: 0.3 });

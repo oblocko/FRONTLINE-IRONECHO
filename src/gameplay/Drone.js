@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { events } from '../core/Events.js';
 
 function buildDrone() {
-  const g = new THREE.Group();
+  const g = new THREE.Group(); g.userData.dynamic = true;
   const body = new THREE.MeshStandardMaterial({ color: 0x3a3d38, metalness: 0.3, roughness: 0.6 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.7 });
   const b = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.09, 0.36), body); g.add(b);
