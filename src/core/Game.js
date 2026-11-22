@@ -74,9 +74,10 @@ export class Game {
     await preloadPhotoTextures((p) => b.progress(p * 0.4, 'LOADING PHOTO TEXTURES'));
     for (let i = 0; i < names.length; i++) { b.progress(0.4 + 0.6 * i / names.length, `GENERATING MATERIALS · ${names[i].toUpperCase()}`); await nextFrame(); getTextures(names[i]); }
     b.progress(1, 'SYSTEMS READY');
-    if (!this.debug.has('autostart')) await b.ready();
+    if (!this.debug.has('autostart') && !this.debug.has('bench')) await b.ready();
     audio.init();
     audio.menuTrackUrl = new URL('assets/audio/menu_theme.mp3', document.baseURI).href;
+    if (this.debug.has('bench')) { const { runBenchmark } = await import('./Benchmark.js'); await runBenchmark(this); this.enterMenu(); return; }
     this.enterMenu();
   }
 
@@ -313,13 +314,13 @@ export class Game {
   pause() {
     if (this.state !== 'playing') return;
     this.state = 'paused'; this.input.exitLock();
-    if (audio.ctx) audio.ctx.suspend();
+    if (audio.ctx) audio.ctx.suspend(); try { speechSynthesis?.pause(); } catch {}
     this.ui.pause();
   }
   resume() {
     if (this.state !== 'paused') return;
     this.ui.hideAll(); this.state = 'playing';
-    if (audio.ctx) audio.ctx.resume();
+    if (audio.ctx) audio.ctx.resume(); try { speechSynthesis?.resume(); } catch {}
     this.lockPointer(); this.last = performance.now();
   }
   lockPointer() { if (!this.noLock) this.input.requestLock(); }

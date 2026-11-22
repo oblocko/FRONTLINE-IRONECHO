@@ -249,7 +249,7 @@ export class UI {
         );
       } else if (tab === 'audio') {
         body.append(slider('마스터 볼륨', 'audio.master', 0, 1, 0.01, pct), slider('음악 볼륨', 'audio.music', 0, 1, 0.01, pct), slider('효과음 볼륨', 'audio.sfx', 0, 1, 0.01, pct), slider('대사 볼륨', 'audio.dialogue', 0, 1, 0.01, pct),
-          seg('자막', 'audio.subtitles', [[true, 'ON'], [false, 'OFF']], '이 빌드에는 녹음된 성우 음성이 없습니다. 자막을 끄면 필수 스토리 대사만 표시됩니다.'), seg('자막 크기', 'audio.subtitleSize', [['small', 'S'], ['medium', 'M'], ['large', 'L']]));
+          seg('대사 음성', 'audio.voice', [['tts', '음성 합성'], ['murmur', '웅얼거림']], '녹음된 성우 음성은 없습니다. "음성 합성"은 운영체제의 한국어 음성(예: Windows Microsoft Heami / SunHi, macOS Yuna)으로 대사를 읽습니다. 한국어 음성이 없으면 웅얼거림으로 대체됩니다.'), seg('자막', 'audio.subtitles', [[true, 'ON'], [false, 'OFF']], '자막을 끄면 필수 스토리 대사만 표시됩니다.'), seg('자막 크기', 'audio.subtitleSize', [['small', 'S'], ['medium', 'M'], ['large', 'L']]));
       } else if (tab === 'controls') {
         body.append(slider('마우스 감도', 'controls.sensitivity', 0.2, 3, 0.05, (v) => v.toFixed(2)), slider('조준 시 감도 배율', 'controls.adsSensitivity', 0.3, 1.2, 0.05, (v) => v.toFixed(2)),
           seg('마우스 Y축 반전', 'controls.invertY', [[true, 'ON'], [false, 'OFF']]), seg('조준 방식', 'controls.adsToggle', [[false, 'HOLD'], [true, 'TOGGLE']]),

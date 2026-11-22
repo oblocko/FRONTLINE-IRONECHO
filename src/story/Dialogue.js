@@ -12,9 +12,10 @@ export class Dialogue {
   constructor(audio) {
     this.audio = audio; this.queue = []; this.current = null; this.speakers = new Map();
     this.barkCD = new Map(); this.time = 0; this.log = [];
+    try { if (typeof speechSynthesis !== 'undefined') { speechSynthesis.getVoices(); speechSynthesis.addEventListener?.('voiceschanged', () => speechSynthesis.getVoices()); } } catch {}
   }
   bindSpeaker(id, agent) { this.speakers.set(id, agent); }
-  clear() { for (const q of this.queue) q.resolve(); this.queue = []; if (this.current) this.current.resolve(); this.current = null; events.emit('subtitle', null); this.audio.duck(false); }
+  clear() { try { if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel(); } catch {} for (const q of this.queue) q.resolve(); this.queue = []; if (this.current) this.current.resolve(); this.current = null; events.emit('subtitle', null); this.audio.duck(false); }
 
   // returns a promise resolved when the line finishes
   say(speaker, text, { radio = false, priority = 2, duration = null, delay = 0, lang = null } = {}) {
@@ -39,7 +40,7 @@ export class Dialogue {
     this.current = line; line.t = 0;
     const c = CHARACTERS[line.speaker] || {};
     if (line.radio) this.audio.radio(true, line.dur);
-    this.audio.voiceMurmur(line.dur * 0.9, c.pitch ?? 1, line.radio);
+    if (!this.speak(line, c)) this.audio.voiceMurmur(line.dur * 0.9, c.pitch ?? 1, line.radio);
     this.audio.duck(true);
     const agent = this.speakers.get(line.speaker); if (agent && !line.radio) agent.actor.startTalk(line.dur);
     if (agent && line.radio) agent.actor.gesture('radio', line.dur);
@@ -47,7 +48,30 @@ export class Dialogue {
     events.emit('subtitle', settings.data.audio.subtitles || line.priority >= 3 ? { name: speakerLabel(line.speaker), color: c.color || '#fff', text: line.text, radio: line.radio } : null);
     events.emit('radio:active', line.radio ? { speaker: speakerLabel(line.speaker) } : null);
   }
+  // Korean speech synthesis (Web Speech API) with a per-character pitch/rate. Speaks the Korean line
+  // (language tag and stage directions in parentheses removed). The line stays up until the voice has
+  // finished (capped), so long lines are not cut off. Returns false when no Korean voice is available.
+  speak(line, c) {
+    if (settings.data.audio.voice !== 'tts' || typeof speechSynthesis === 'undefined' || line.priority <= 1 && Math.random() < 0.5) return false;
+    const voices = speechSynthesis.getVoices(); const ko = voices.filter((v) => /^ko/i.test(v.lang));
+    if (!ko.length) return false;
+    const text = line.text.replace(/^\[[^\]]+\]\s*/, '').replace(/\([^)]*\)/g, '').replace(/[—–]/g, ', ').trim();
+    if (!text) return false;
+    const u = new SpeechSynthesisUtterance(text); u.lang = 'ko-KR';
+    // different characters get different voices where the OS has several (e.g. male / female)
+    const female = ['seoyeon', 'maya', 'nadia', 'pa'].includes(line.speaker);
+    const pickF = ko.find((v) => /heami|sunhi|yuna|female|여/i.test(v.name)), pickM = ko.find((v) => /injoon|male|남/i.test(v.name) && !/female/i.test(v.name));
+    u.voice = (female ? pickF : pickM) || ko[0];
+    u.pitch = Math.max(0.3, Math.min(2, (c.pitch ?? 1) * (female || u.voice === pickF ? 1 : 0.9)));
+    u.rate = line.priority >= 3 ? 1.05 : 1.15; u.volume = (settings.data.audio.dialogue ?? 1) * (settings.data.audio.master ?? 1) * (line.radio ? 0.85 : 1);
+    try { speechSynthesis.cancel(); } catch {}
+    line.dur = Math.max(line.dur, Math.min(14, text.length * 0.11 + 0.6)); line.tts = true;
+    u.onend = () => { if (this.current === line) line.t = Math.max(line.t, line.dur - 0.15); };
+    speechSynthesis.speak(u);
+    return true;
+  }
   end() {
+    if (this.current?.tts && this.current.t < this.current.dur - 0.2) { try { speechSynthesis.cancel(); } catch {} }
     if (!this.current) return;
     if (this.current.radio) this.audio.radio(false);
     this.current = null; events.emit('subtitle', null); events.emit('radio:active', null);

@@ -11,6 +11,15 @@ import { buildRifle, buildPistol } from './WeaponModels.js';
 const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
 
 // Fictional, gameplay-only equipment definitions.
+// reload phase plan (fractions of the reload duration)
+export function reloadPlan(id, empty) {
+  if (id === 'pistol') return empty
+    ? { release: 0.1, out: 0.2, pouch: 0.36, insert: 0.6, seat: 0.68, chargeBack: 0.68, chargeFwd: 0.8, back: 0.92 }
+    : { release: 0.12, out: 0.22, pouch: 0.4, insert: 0.66, seat: 0.74, chargeBack: 0.74, chargeFwd: 0.78, back: 0.94 };
+  return empty
+    ? { release: 0.1, out: 0.18, pouch: 0.32, insert: 0.52, seat: 0.6, chargeBack: 0.76, chargeFwd: 0.82, back: 0.95 }
+    : { release: 0.12, out: 0.24, pouch: 0.42, insert: 0.64, seat: 0.72, chargeBack: 0.72, chargeFwd: 0.76, back: 0.93 };
+}
 export const WEAPON_DEFS = {
   rifle: { id: 'rifle', name: 'K2C1 소총', short: 'RIFLE', mag: 30, reserve: 180, interval: 0.085, auto: true, damage: 34, headMult: 2.6, range: 300,
     hipSpread: 0.03, adsSpread: 0.003, moveSpread: 0.025, kick: 0.010, kickYaw: 0.004, reload: 2.2, reloadEmpty: 2.7, adsTime: 0.22, adsZoom: 0.3, sound: 'rifle' },
@@ -96,7 +105,7 @@ export class WeaponSystem {
     this.models = { rifle: buildRifle(), pistol: buildPistol() };
     this.arms = buildArms(); this.arms.visible = false;
     this.holder = new THREE.Group(); this.vmRoot.add(this.holder);
-    for (const m of Object.values(this.models)) { m.visible = false; this.holder.add(m); }
+    for (const m of Object.values(this.models)) { m.visible = false; this.holder.add(m); const u = m.userData; if (u.mag) { m.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(u.mag); if (!b.isEmpty()) u.magCenter = b.getCenter(new THREE.Vector3()); } }
     this.flash = new THREE.Sprite(new THREE.SpriteMaterial({ map: softSprite('flash'), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, toneMapped: false }));
     this.flash.scale.setScalar(0.22); this.flash.visible = false; this.holder.add(this.flash);
     this.time = 0;
@@ -116,7 +125,7 @@ export class WeaponSystem {
   clear() { this.inventory = {}; this.order = []; this.currentId = null; for (const m of Object.values(this.models)) m.visible = false; this.grenades = 0; }
   equip(id, instant = false) {
     if (!this.inventory[id] || (id === this.currentId && !instant)) return;
-    this.reloading = false;
+    this.reloading = false; this.reloadPlan = null;
     const doSwap = () => { for (const [k, m] of Object.entries(this.models)) m.visible = k === id; this.currentId = id; this.emitAmmo(); };
     if (instant) { doSwap(); this.switching = 0; }
     else { this.switching = 1; this.pendingSwap = doSwap; this.audio.switchWeapon(); }
@@ -128,10 +137,23 @@ export class WeaponSystem {
   serialize() { return { inventory: structuredClone(this.inventory), order: [...this.order], current: this.currentId, grenades: this.grenades }; }
   restore(d) { if (!d) return; this.inventory = structuredClone(d.inventory); this.order = [...d.order]; this.grenades = d.grenades; this.currentId = null; this.equip(d.current || this.order[0], true); }
 
+  // Reload: a tactical reload keeps the round in the chamber (mag swapped, partly spent mag stowed);
+  // an empty reload drops the empty mag, and after the new one seats the bolt is charged (rifle) or the
+  // slide released (pistol). Ammo is committed the moment the new magazine seats — cancelling after that
+  // (weapon switch) keeps it. Phase timings are shared by the animation and the sounds.
   reload() {
     const s = this.state, d = this.current; if (!s || this.reloading || s.mag >= d.mag || s.reserve <= 0) return;
-    this.reloading = true; this.reloadDur = s.mag === 0 ? d.reloadEmpty : d.reload; this.reloadT = 0;
-    this.audio.reload(d.id === 'rifle' ? 'rifle' : 'pistol', this.reloadDur);
+    const empty = s.mag === 0;
+    this.reloading = true; this.reloadEmpty = empty; this.reloadCommitted = false; this.reloadDur = empty ? d.reloadEmpty : d.reload; this.reloadT = 0;
+    this.reloadPlan = reloadPlan(d.id, empty);
+    const T = this.reloadDur, P = this.reloadPlan, a = this.audio;
+    a.click(0.22, 1700, 0.03, P.release * T);                         // mag release
+    a.click(0.12, 800, 0.07, P.out * T);                              // mag sliding out
+    if (empty) a.click(0.18, 500, 0.05, (P.out + 0.08) * T);          // empty mag hits the ground
+    a.click(0.1, 600, 0.1, P.pouch * T);                              // pouch
+    a.click(0.38, 2300, 0.03, P.seat * T); a.click(0.2, 1100, 0.04, (P.seat + 0.02) * T);   // seat + slap
+    if (empty && d.id === 'rifle') { a.click(0.3, 2800, 0.02, P.chargeBack * T); a.click(0.34, 1900, 0.03, P.chargeFwd * T); }
+    if (empty && d.id === 'pistol') a.click(0.36, 2600, 0.025, P.chargeFwd * T);
     events.emit('player:reload', {});
   }
   throwGrenade() {
@@ -180,8 +202,11 @@ export class WeaponSystem {
     // reload progress
     if (this.reloading) {
       this.reloadT += dt;
+      if (!this.reloadCommitted && this.reloadT >= this.reloadPlan.seat * this.reloadDur) {
+        this.reloadCommitted = true; const need = d.mag - s.mag; const take = Math.min(need, s.reserve); s.mag += take; s.reserve -= take; this.emitAmmo();
+      }
       if (this.reloadT >= this.reloadDur) {
-        const need = d.mag - s.mag; const take = Math.min(need, s.reserve); s.mag += take; s.reserve -= take; this.reloading = false; this.emitAmmo();
+        this.reloading = false; this.emitAmmo();
       }
     }
     // fire
@@ -268,21 +293,74 @@ export class WeaponSystem {
       this.kickRot * 0.06 + this.sway.y * 0.05 - sprint * 0.35 + this.switching * -0.8 + wall * 0.75,
       this.sway.x * 0.06 + sprint * 0.7,
       this.sway.x * 0.04 + sprint * 0.35 + (p.speed > 0.5 ? Math.sin(bt * 0.5) * 0.015 * bobAmp : 0));
-    // reload animation: tilt weapon, drop mag down, bring new mag
-    if (this.reloading) {
+    // reload animation (phases from reloadPlan): the weapon rolls toward the support hand, the hand goes to
+    // the magazine, pulls it (an empty one is dropped and falls away), goes to the pouch, brings a fresh one
+    // under the well and pushes it home (the weapon jolts as it seats), then on an empty reload charges the
+    // bolt (rifle) / thumbs the slide release (pistol) and returns to its grip
+    const handOff = new THREE.Vector3(); const magOff = new THREE.Vector3(); let magRot = 0, magVis = true;
+    const isPistol = this.currentId === 'pistol';
+    const P = this.reloading ? this.reloadPlan : null;
+    if (P) {
       const t = this.reloadT / this.reloadDur;
-      const tilt = Math.sin(Math.min(1, t * 1.15) * Math.PI);
-      rot.z += tilt * 0.55; rot.x += tilt * 0.18; pos.y -= tilt * 0.04; pos.x -= tilt * 0.03;
-      const mag = u.mag;
-      if (mag) { const mt = t < 0.3 ? t / 0.3 : t < 0.55 ? 1 : 1 - (t - 0.55) / 0.3; mag.position.y = (u.magBaseY ?? 0) - Math.max(0, Math.min(1, mt)) * 0.25; mag.visible = !(t > 0.3 && t < 0.42); }
-    } else if (u.mag) { u.mag.position.y = u.magBaseY ?? 0; u.mag.visible = true; }
-    if (u.slide && u.slideAxis === 'z') u.slide.position.z = u.slideBase + this.kick * 0.024;
-    // support hand: off the handguard to fetch a fresh magazine during reloads
-    if (u.leftHand && u.leftHandBase) {
-      const k = this.reloading ? Math.sin(Math.min(1, (this.reloadT / this.reloadDur) * 1.1) * Math.PI) : 0;
-      const reach = this.currentId === 'pistol' ? new THREE.Vector3(-0.03, -0.08, 0.04) : new THREE.Vector3(-0.04, -0.12, 0.28);
-      u.leftHand.position.copy(u.leftHandBase).addScaledVector(reach, k);
+      const ss = (a, b) => { const x = Math.min(1, Math.max(0, (t - a) / (b - a))); return x * x * (3 - 2 * x); };
+      const bump = (c, w) => Math.max(0, 1 - Math.abs(t - c) / w);
+      // whole-weapon motion
+      const tilt = ss(0, P.release + 0.04) * (1 - ss(P.back - 0.08, 1));
+      const charge = this.reloadEmpty && !isPistol ? ss(P.seat + 0.03, P.chargeBack - 0.02) * (1 - ss(P.chargeFwd, P.back)) : 0;
+      // cant clockwise (magwell turns toward the support hand), muzzle up a little, pulled in toward the centre;
+      // for the charging handle (right side) the cant reverses
+      rot.z += -tilt * (isPistol ? 0.4 : 0.55) + charge * 0.75; rot.x += tilt * (isPistol ? 0.06 : -0.04) + charge * 0.04; rot.y += tilt * (isPistol ? 0.12 : 0.22) - charge * 0.2;
+      pos.y += tilt * (isPistol ? 0.06 : 0.14) + charge * 0.0; pos.x -= tilt * (isPistol ? 0.05 : 0.11); pos.z += tilt * (isPistol ? -0.02 : 0.015);
+      rot.x += bump(P.seat, 0.035) * 0.05; pos.y += bump(P.seat, 0.035) * 0.008;              // the mag seats
+      if (this.reloadEmpty && !isPistol) { pos.z += bump(P.chargeFwd, 0.04) * 0.012; rot.x -= bump(P.chargeFwd, 0.04) * 0.03; }   // bolt slams home
+      if (this.reloadEmpty && isPistol) { rot.x += bump(P.chargeFwd, 0.04) * 0.06; }
+      // geometry: magazine axis (out of the well), grip point on the mag, the pouch on the belt
+      const magOut = isPistol ? new THREE.Vector3(0, -1, 0.3).normalize() : new THREE.Vector3(0, -1, -0.28).normalize();
+      const mc = u.magCenter || new THREE.Vector3(0, -0.15, -0.09);
+      const toMag = mc.clone().sub(u.leftHandBase).add(isPistol ? new THREE.Vector3(-0.025, -0.035, 0.02) : new THREE.Vector3(-0.035, -0.02, 0.01));
+      const pouch = isPistol ? new THREE.Vector3(-0.1, -0.46, 0.06) : new THREE.Vector3(-0.08, -0.52, 0.12);   // down to the belt, out of view
+      if (t < P.pouch) {
+        const toPouch = ss(P.out, P.pouch);
+        if (this.reloadEmpty) {
+          // empty mag drops free (gravity, tumbling); the hand goes straight for the pouch
+          const ft = Math.max(0, t - P.release) * this.reloadDur;
+          magOff.copy(magOut).multiplyScalar(0.03 * ss(P.release, P.release + 0.03) + 2.4 * ft * ft); magRot = ft * 3.5; magVis = magOff.length() < 0.45;
+          handOff.copy(toMag).multiplyScalar(0.6 * ss(0, P.release) * (1 - toPouch)).lerp(pouch, toPouch);
+        } else {
+          // tactical: grip, pull it out along the well, carry it to the pouch
+          const grip = toMag.clone().addScaledVector(magOut, 0.08 * ss(P.release, P.out));
+          handOff.copy(toMag).multiplyScalar(ss(0, P.release)); if (t >= P.release) handOff.copy(grip);
+          handOff.lerp(pouch, toPouch);
+          if (t >= P.release) magOff.copy(handOff).sub(toMag);
+          magRot = toPouch * 0.7; magVis = toPouch < 0.9;
+        }
+      } else if (t < P.seat) {
+        // fresh magazine from the pouch to just under the well, then pushed in
+        const come = ss(P.pouch + 0.03, P.insert), push = ss(P.insert, P.seat);
+        const below = toMag.clone().addScaledVector(magOut, 0.07);
+        handOff.copy(pouch).lerp(below, come).lerp(toMag, push);
+        magOff.copy(handOff).sub(toMag); magRot = (1 - come) * 0.7; magVis = come > 0.08;
+      } else {
+        // seated: the hand comes off the mag — via the charging handle (rifle, empty) or the slide release
+        // (pistol, empty) — back to its grip
+        let h = toMag.clone();
+        if (this.reloadEmpty && !isPistol) {
+          const handle = new THREE.Vector3(0.075, 0.035, mc.z + 0.04).sub(u.leftHandBase);            // right side of the receiver
+          h.lerp(handle, ss(P.seat + 0.01, P.chargeBack - 0.03)); h.z += ss(P.chargeBack - 0.03, P.chargeBack) * (1 - ss(P.chargeBack, P.chargeFwd)) * 0.08;   // yank it back, let go
+        }
+        if (this.reloadEmpty && isPistol) h.lerp(new THREE.Vector3(0.01, 0.06, 0.08).sub(u.leftHandBase).add(u.leftHandBase.clone().multiplyScalar(0)), ss(P.seat + 0.01, P.chargeFwd - 0.02) * 0.6);
+        handOff.copy(h).multiplyScalar(1 - ss(this.reloadEmpty ? P.chargeFwd : P.seat + 0.02, P.back));
+      }
     }
+    if (u.mag) { u.mag.position.set(0, u.magBaseY ?? 0, 0).add(magOff); u.mag.rotation.set(-magRot, 0, magRot * 0.4); u.mag.visible = magVis; }
+    if (u.slide && u.slideAxis === 'z') {
+      // slide cycles with each shot, locks back on the last round, goes forward on the slide release
+      const st = this.state;
+      const locked = isPistol && st && ((st.mag === 0 && !this.reloadCommitted) || (P && this.reloadEmpty && this.reloadT / this.reloadDur < P.chargeFwd));
+      u.slide.position.z = u.slideBase + Math.max(this.kick * 0.024, locked ? 0.026 : 0);
+    }
+    if (u.leftHand && u.leftHandBase) u.leftHand.position.copy(u.leftHandBase).add(handOff);
+    if (u.leftArm && u.leftArmBase) u.leftArm.position.copy(u.leftArmBase).addScaledVector(handOff, 0.85).add(new THREE.Vector3(0, Math.min(0, handOff.y) * 0.3, 0));   // the forearm goes with the hand (and drops a bit more)
     if (this.throwing > 0) { const t = 1 - this.throwing / 0.6; pos.y -= Math.sin(t * Math.PI) * 0.25; rot.x -= Math.sin(t * Math.PI) * 0.5; }
     this.holder.position.copy(pos); this.holder.rotation.copy(rot);
     m.position.set(0, 0, 0);

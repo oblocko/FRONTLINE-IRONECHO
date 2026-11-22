@@ -33,7 +33,7 @@ export const DEFAULT_SETTINGS = {
     frameLimit: 0,            // 0 = unlimited (display refresh)
     vsync: true,              // browsers always present on vblank; see docs
   },
-  audio: { master: 0.9, music: 0.6, sfx: 0.85, dialogue: 1.0, subtitles: true, subtitleSize: 'medium' },
+  audio: { master: 0.9, music: 0.6, sfx: 0.85, dialogue: 1.0, subtitles: true, subtitleSize: 'medium', voice: 'tts' },   // voice: 'tts' (OS Korean speech synthesis) | 'murmur'
   controls: {
     sensitivity: 1.0, adsSensitivity: 0.7, invertY: false, adsToggle: false,
     gamepadEnabled: true, gamepadSensitivity: 1.0, bindings: { ...DEFAULT_BINDINGS },

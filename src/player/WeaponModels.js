@@ -204,7 +204,7 @@ export function buildRifle() {
     right.position.add(new THREE.Vector3(0, -0.016, -0.05)); rArm.position.add(new THREE.Vector3(0, -0.016, -0.05));
   }
   g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; o.frustumCulled = false; } });
-  g.userData = { mag: magG, magBaseY: 0, muzzle, sightY: dotY + sightDrop, sightZ: dot.position.z, dot, ring, leftHand: left, leftHandBase: left.position.clone(), rightHand: right };
+  g.userData = { mag: magG, magBaseY: 0, muzzle, sightY: dotY + sightDrop, sightZ: dot.position.z, dot, ring, leftHand: left, leftHandBase: left.position.clone(), rightHand: right, leftArm: lArm, leftArmBase: lArm.position.clone() };
   return g;
 }
 
@@ -351,7 +351,7 @@ export function buildPistol() {
   for (const dz of [0.004, supLen - 0.004]) mesh(cylZ(supR + 0.0012, 0.006, sz0 - 0.012 - dz, { y: muzzleP.y, seg: 24 }), m.anodDark, sup);
   mesh(cylZ(0.005, 0.002, sz0 - 0.013 - supLen, { y: muzzleP.y, seg: 12 }), m.slot, sup);
   g.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; } });
-  g.userData = { mag: magG, magBaseY: 0, slide, slideAxis: 'z', slideBase: 0, muzzle: muzzleP, sightY, sightZ, leftHand: left, leftHandBase: left.position.clone(), rightHand: right,
+  g.userData = { mag: magG, magBaseY: 0, slide, slideAxis: 'z', slideBase: 0, muzzle: muzzleP, sightY, sightZ, leftHand: left, leftHandBase: left.position.clone(), rightHand: right, leftArm: lArm, leftArmBase: lArm.position.clone(),
     suppressor: sup, suppressedMuzzle: new THREE.Vector3(muzzleP.x, muzzleP.y, sz0 - 0.014 - supLen) };
   return g;
 }
