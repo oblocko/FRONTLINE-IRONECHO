@@ -60,9 +60,14 @@ export class Dialogue {
     const u = new SpeechSynthesisUtterance(text); u.lang = 'ko-KR';
     // different characters get different voices where the OS has several (e.g. male / female)
     const female = ['seoyeon', 'maya', 'nadia', 'pa'].includes(line.speaker);
-    const pickF = ko.find((v) => /heami|sunhi|yuna|female|여/i.test(v.name)), pickM = ko.find((v) => /injoon|male|남/i.test(v.name) && !/female/i.test(v.name));
+    // prefer natural (neural) voices where the browser offers them (Edge: SunHi / InJoon / Hyunsu …)
+    const nat = (v) => (/natural|online|neural/i.test(v.name) ? 0 : 1);
+    const F = ko.filter((v) => /heami|sunhi|yuna|sora|jimin|seohyeon|soonbok|yujin|google|female|여/i.test(v.name)).sort((x, y) => nat(x) - nat(y));
+    const Mv = ko.filter((v) => /injoon|hyunsu|bongjin|gookmin|minsu|jian|male|남/i.test(v.name) && !/female/i.test(v.name)).sort((x, y) => nat(x) - nat(y));
+    const pickF = F[0], pickM = Mv[0];
     u.voice = (female ? pickF : pickM) || ko[0];
-    u.pitch = Math.max(0.3, Math.min(2, (c.pitch ?? 1) * (female || u.voice === pickF ? 1 : 0.9)));
+    const single = !pickM || !pickF;   // only one Korean voice installed (e.g. Windows + Chrome: Heami) → spread the cast by pitch
+    u.pitch = Math.max(0.3, Math.min(2, single ? (female ? 1.15 : 0.55 + (c.pitch ?? 1) * 0.35) : (c.pitch ?? 1) * (female ? 1 : 0.9)));
     u.rate = line.priority >= 3 ? 1.05 : 1.15; u.volume = (settings.data.audio.dialogue ?? 1) * (settings.data.audio.master ?? 1) * (line.radio ? 0.85 : 1);
     try { speechSynthesis.cancel(); } catch {}
     line.dur = Math.max(line.dur, Math.min(14, text.length * 0.11 + 0.6)); line.tts = true;
