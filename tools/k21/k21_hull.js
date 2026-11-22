@@ -89,7 +89,7 @@ export function buildK21Hull() {
   }
 
   // ---- running gear: 6 road wheels (dual), front drive sprocket, rear idler, return rollers ----
-  const WZ = [-2.72, -1.82, -0.92, -0.02, 0.9, 1.82], WY = 0.31, WR = 0.3;
+  const WZ = [-2.55, -1.61, -0.67, 0.27, 1.21, 2.15], WY = 0.31, WR = 0.3;   // road wheels shifted forward (short free track run to the sprocket)
   for (const s of [-1, 1]) {
     const xo = s * 1.38;
     for (const z of WZ) {
@@ -108,7 +108,7 @@ export function buildK21Hull() {
     const iz = -3.22, iy = 0.8;
     P('steel', cylX(0.26, 0.26, xo, iy, iz, 40)); P('dark', cylX(0.09, 0.3, xo, iy, iz, 20));
     // return rollers
-    for (const z of [-2.2, -0.5, 1.4]) P('steel', cylX(0.07, 0.2, xo, 0.72, z, 20));
+    for (const z of [-1.95, -0.2, 1.65]) P('steel', cylX(0.07, 0.2, xo, 0.72, z, 20));
     // track: links laid along the loop around idler → road wheels → sprocket → return line
     const loop = new THREE.CurvePath();
     const L = (a, b) => loop.add(new THREE.LineCurve3(new THREE.Vector3(0, a[1], a[0]), new THREE.Vector3(0, b[1], b[0])));
