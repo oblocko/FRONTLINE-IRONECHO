@@ -90,7 +90,7 @@ export class Renderer {
     this.applySettings();
     addEventListener('resize', () => this.resize());
     events.on('settings:changed', () => this.applySettings());
-    this.info = this.renderer.info;
+    this.info = this.renderer.info; this.renderer.info.autoReset = false;   // counted over the whole frame (scene + post passes + viewmodel), reset in render()
   }
 
   applySettings() {
@@ -114,6 +114,7 @@ export class Renderer {
     this.vmCamera.aspect = this.camera.aspect; this.vmCamera.updateProjectionMatrix();
   }
   render(dt, time, showViewmodel = true) {
+    this.renderer.info.reset();
     const u = this.grade.uniforms;
     u.time.value = time; u.damage.value = this.fx.damage; u.flash.value = this.fx.flash; u.desat.value = this.fx.desat;
     u.letterbox.value = this.fx.letterbox; u.aberration.value = this.fx.aberration; u.blur.value = this.fx.blur;
