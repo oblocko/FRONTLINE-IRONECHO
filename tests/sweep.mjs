@@ -11,7 +11,7 @@ const PORT = 4195;
 const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort', '--outDir', process.env.OUTDIR || 'dist'], { stdio: 'pipe' });
 await new Promise((r) => { server.stdout.on('data', (d) => { if (String(d).includes('Local')) r(); }); setTimeout(r, 6000); });
 const browser = await pw.chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
-const CPS = { m01: ['truck', 'gp', 'op_move', 'op_radio', 'fallback', 'extraction'], m02: ['convoy', 'jam', 'avenue', 'station', 'escort', 'busrun'], m03: ['convoy', 'command', 'assault', 'demolition', 'casevac'], m04: ['insertion', 'batteries', 'descent', 'crane', 'lz'] };
+const CPS = { m01: ['truck', 'gp', 'op_move', 'op_radio', 'fallback', 'extraction'], m02: ['convoy', 'jam', 'avenue', 'station', 'escort', 'busrun'], m03: ['convoy', 'command', 'assault', 'demolition', 'tank', 'casevac'], m04: ['insertion', 'batteries', 'descent', 'crane', 'lz'] };
 if (process.env.ONLY) for (const k of Object.keys(CPS)) if (!process.env.ONLY.split(',').includes(k)) delete CPS[k];
 const RUN_MS = +(process.env.RUN_MS || 25000);
 const all = []; const T0 = Date.now(); const log = (s) => console.log(`[${((Date.now() - T0) / 1000).toFixed(0)}s] ${s}`);
