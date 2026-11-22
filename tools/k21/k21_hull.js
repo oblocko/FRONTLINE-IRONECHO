@@ -62,12 +62,12 @@ export function buildK21Hull() {
   const P = (k, g) => parts[k].push(clean(g));
 
   // ---- main hull body (side profile extruded across the hull width) ----
-  // rear: upper plate leans forward (top at -3.58), lower rear chamfer back down to the belly
-  const HULL = [[-3.3, 0.62], [-3.72, 0.78], [-3.92, 1.0], [-3.58, 1.9], [1.95, 1.9], [3.55, 1.44], [3.68, 1.32], [3.15, 0.74], [2.8, 0.62]];
+  // rear: the rear plate is undercut — top edge furthest back, sloping forward down to the belly
+  const HULL = [[-3.25, 0.62], [-3.5, 0.72], [-3.92, 1.86], [-3.88, 1.9], [1.95, 1.9], [3.55, 1.44], [3.68, 1.32], [3.15, 0.74], [2.8, 0.62]];
   P('paint', profileX(HULL, -1.24, 1.24, 0.03));
   // upper sponsons over the tracks (hull widens above the track line)
   // sponsons follow the same rear slope; ahead of the skirts they drop to 0.72 m and hide most of the sprocket
-  const SPON = [[-3.88, 0.98], [-3.92, 1.0], [-3.58, 1.9], [1.95, 1.9], [3.5, 1.45], [3.5, 1.32], [3.3, 0.86], [3.05, 0.72], [2.15, 0.72], [2.15, 0.98]];
+  const SPON = [[-3.6, 0.98], [-3.92, 1.86], [-3.88, 1.9], [1.95, 1.9], [3.5, 1.45], [3.5, 1.32], [3.3, 0.86], [3.05, 0.72], [2.15, 0.72], [2.15, 0.98]];
   for (const s of [-1, 1]) P('paint', s > 0 ? profileX(SPON, 1.22, 1.56, 0.02) : profileX(SPON, -1.56, -1.22, 0.02));
 
   // ---- side skirts: thick add-on armour panels with seams and bolts ----
@@ -81,9 +81,9 @@ export function buildK21Hull() {
       P('dark', box(0.075, 0.03, z1 - z0 - 0.03, x, 0.59, (z0 + z1) / 2));   // bottom edge
     }
     // rear skirt panel: its back edge follows the sloped rear plate
-    const rp = [[-3.86, 0.58], [-2.25, 0.58], [-2.25, 1.86], [-3.6, 1.86]];
-    P('paint', profileX(rp, x - 0.035, x + 0.035, 0.008)); P('dark', box(0.075, 0.03, 1.6, x, 0.59, -3.05));
-    for (const [zz, yy] of [[-2.37, 0.7], [-2.37, 1.22], [-2.37, 1.76], [-3.5, 1.76], [-3.75, 1.22], [-3.75, 0.7]]) P('steel', cylX(0.022, 0.03, x + s * 0.04, yy, zz, 8));
+    const rp = [[-3.55, 0.58], [-2.25, 0.58], [-2.25, 1.86], [-3.9, 1.86]];
+    P('paint', profileX(rp, x - 0.035, x + 0.035, 0.008)); P('dark', box(0.075, 0.03, 1.28, x, 0.59, -2.9));
+    for (const [zz, yy] of [[-2.37, 0.7], [-2.37, 1.22], [-2.37, 1.76], [-3.78, 1.76], [-3.6, 1.22], [-3.45, 0.7]]) P('steel', cylX(0.022, 0.03, x + s * 0.04, yy, zz, 8));
     // rail of tie-down loops along the roof edge
     for (let z = -3.4; z < 1.9; z += 0.75) P('steel', box(0.05, 0.05, 0.12, s * 1.5, 1.93, z));
   }
@@ -105,7 +105,7 @@ export function buildK21Hull() {
     P('steel', cylX(0.25, 0.26, xo, sy, sz, 40)); P('dark', cylX(0.1, 0.3, xo, sy, sz, 20));
     for (let k = 0; k < 11; k++) { const a = k / 11 * Math.PI * 2; P('steel', box(0.22, 0.06, 0.06, xo, sy + Math.sin(a) * 0.27, sz + Math.cos(a) * 0.27, a, 0, 0)); }
     // idler (rear)
-    const iz = -3.38, iy = 0.78;
+    const iz = -3.22, iy = 0.8;
     P('steel', cylX(0.26, 0.26, xo, iy, iz, 40)); P('dark', cylX(0.09, 0.3, xo, iy, iz, 20));
     // return rollers
     for (const z of [-2.2, -0.5, 1.4]) P('steel', cylX(0.07, 0.2, xo, 0.72, z, 20));
@@ -167,16 +167,16 @@ export function buildK21Hull() {
     P('dark', cylY(0.05, 0.05, 0.08, s * 1.25, 1.94, -2.6, 8)); P('steel', cylY(0.006, 0.006, 1.6, s * 1.25, 2.75, -2.6, 4));   // antennas
   }
 
-  // ---- rear: ramp with door, hinges, lights — all lying on the forward-leaning rear plate ----
-  const RA = Math.atan2(0.34, 0.9);                 // rear plate lean (top forward)
-  const onRear = (y, out = 0.04) => -3.92 + (y - 1.0) * (0.34 / 0.9) - out;   // z of the plate surface at height y
-  P('paint', box(1.6, 0.92, 0.07, 0, 1.45, onRear(1.45, 0.03), RA, 0, 0));          // ramp
-  P('dark', box(0.55, 0.72, 0.02, 0.3, 1.45, onRear(1.45, 0.075), RA, 0, 0));        // door in the ramp
-  P('steel', box(0.06, 0.12, 0.05, 0.05, 1.45, onRear(1.45, 0.09), RA, 0, 0));       // handle
-  for (const dx of [-0.55, 0.55]) P('steel', cylX(0.05, 0.25, dx, 1.02, onRear(1.02, 0.03), 12));   // ramp hinges
+  // ---- rear: ramp with door, hinges, lights — all lying on the undercut rear plate ----
+  const RA = -Math.atan2(0.42, 1.14);               // rear plate lean (top further back)
+  const onRear = (y, out = 0.04) => -3.5 - (y - 0.72) * (0.42 / 1.14) - out;   // z of the plate surface at height y
+  P('paint', box(1.6, 1.0, 0.07, 0, 1.36, onRear(1.36, 0.03), RA, 0, 0));           // ramp
+  P('dark', box(0.55, 0.78, 0.02, 0.3, 1.36, onRear(1.36, 0.075), RA, 0, 0));        // door in the ramp
+  P('steel', box(0.06, 0.12, 0.05, 0.05, 1.36, onRear(1.36, 0.09), RA, 0, 0));       // handle
+  for (const dx of [-0.55, 0.55]) P('steel', cylX(0.05, 0.25, dx, 0.84, onRear(0.84, 0.03), 12));   // ramp hinges (bottom)
   for (const s of [-1, 1]) {
-    P('red', box(0.12, 0.08, 0.02, s * 1.22, 1.2, onRear(1.2, 0.02), RA, 0, 0)); P('lamp', box(0.08, 0.05, 0.02, s * 1.36, 1.2, onRear(1.2, 0.02), RA, 0, 0));
-    P('steel', box(0.08, 0.14, 0.12, s * 0.8, 0.86, -3.82));      // rear tow points on the lower chamfer
+    P('red', box(0.12, 0.08, 0.02, s * 1.22, 1.6, onRear(1.6, 0.02), RA, 0, 0)); P('lamp', box(0.08, 0.05, 0.02, s * 1.36, 1.6, onRear(1.6, 0.02), RA, 0, 0));
+    P('steel', box(0.08, 0.14, 0.12, s * 0.8, 0.8, onRear(0.8, 0.05)));      // rear tow points
     P('steel', new THREE.TorusGeometry(0.06, 0.015, 6, 12).translate(s * 0.95, 1.94, -3.4).toNonIndexed());   // lifting eyes
   }
 
