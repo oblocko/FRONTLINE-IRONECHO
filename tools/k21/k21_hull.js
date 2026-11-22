@@ -62,27 +62,28 @@ export function buildK21Hull() {
   const P = (k, g) => parts[k].push(clean(g));
 
   // ---- main hull body (side profile extruded across the hull width) ----
-  const HULL = [[-3.62, 0.9], [-3.86, 1.02], [-3.86, 1.86], [-3.80, 1.9], [1.95, 1.9], [3.55, 1.44], [3.68, 1.32], [3.15, 0.74], [2.8, 0.62], [-3.18, 0.62]];
+  // rear: upper plate leans forward (top at -3.58), lower rear chamfer back down to the belly
+  const HULL = [[-3.3, 0.62], [-3.72, 0.78], [-3.92, 1.0], [-3.58, 1.9], [1.95, 1.9], [3.55, 1.44], [3.68, 1.32], [3.15, 0.74], [2.8, 0.62]];
   P('paint', profileX(HULL, -1.24, 1.24, 0.03));
   // upper sponsons over the tracks (hull widens above the track line)
-  const SPON = [[-3.84, 0.98], [-3.84, 1.86], [-3.78, 1.9], [1.95, 1.9], [3.5, 1.45], [3.5, 1.32], [3.25, 0.98]];
+  // sponsons follow the same rear slope; ahead of the skirts they drop to 0.72 m and hide most of the sprocket
+  const SPON = [[-3.88, 0.98], [-3.92, 1.0], [-3.58, 1.9], [1.95, 1.9], [3.5, 1.45], [3.5, 1.32], [3.3, 0.86], [3.05, 0.72], [2.15, 0.72], [2.15, 0.98]];
   for (const s of [-1, 1]) P('paint', s > 0 ? profileX(SPON, 1.22, 1.56, 0.02) : profileX(SPON, -1.56, -1.22, 0.02));
 
   // ---- side skirts: thick add-on armour panels with seams and bolts ----
   for (const s of [-1, 1]) {
     const x = s * 1.6;
-    const panels = [[-3.7, -2.25], [-2.2, -0.75], [-0.7, 0.75], [0.8, 2.25], [2.3, 3.0]];
+    const panels = [[-2.2, -0.75], [-0.7, 0.75], [0.8, 2.2]];   // skirts stop before the glacis rake
     for (const [z0, z1] of panels) {
       P('paint', box(0.07, 1.28, z1 - z0 - 0.03, x, 1.22, (z0 + z1) / 2));
       P('paint', box(0.09, 0.05, z1 - z0 - 0.03, x + s * 0.01, 1.84, (z0 + z1) / 2));       // top lip
       for (const zz of [z0 + 0.12, z1 - 0.12]) for (const yy of [0.7, 1.22, 1.76]) P('steel', cylX(0.022, 0.03, x + s * 0.04, yy, zz, 8));   // bolts
       P('dark', box(0.075, 0.03, z1 - z0 - 0.03, x, 0.59, (z0 + z1) / 2));   // bottom edge
     }
-    // front skirt end follows the glacis rake
-    const fr = [[2.3, 0.58], [2.9, 0.58], [3.42, 1.18], [3.42, 1.55], [2.3, 1.86]];
-    P('paint', s > 0 ? profileX(fr, x - 0.035, x + 0.035, 0.008) : profileX(fr, x - 0.035, x + 0.035, 0.008));
-    // mud flap at the rear
-    P('rubber', box(0.05, 0.3, 0.3, x, 0.45, -3.72));
+    // rear skirt panel: its back edge follows the sloped rear plate
+    const rp = [[-3.86, 0.58], [-2.25, 0.58], [-2.25, 1.86], [-3.6, 1.86]];
+    P('paint', profileX(rp, x - 0.035, x + 0.035, 0.008)); P('dark', box(0.075, 0.03, 1.6, x, 0.59, -3.05));
+    for (const [zz, yy] of [[-2.37, 0.7], [-2.37, 1.22], [-2.37, 1.76], [-3.5, 1.76], [-3.75, 1.22], [-3.75, 0.7]]) P('steel', cylX(0.022, 0.03, x + s * 0.04, yy, zz, 8));
     // rail of tie-down loops along the roof edge
     for (let z = -3.4; z < 1.9; z += 0.75) P('steel', box(0.05, 0.05, 0.12, s * 1.5, 1.93, z));
   }
@@ -100,18 +101,18 @@ export function buildK21Hull() {
       P('dark', box(0.08, 0.08, 0.4, s * 1.24, WY + 0.1, z + 0.17, 0.45, 0, 0));
     }
     // drive sprocket (front, high) with teeth
-    const sz = 2.95, sy = 0.5;
+    const sz = 2.95, sy = 0.8;
     P('steel', cylX(0.25, 0.26, xo, sy, sz, 40)); P('dark', cylX(0.1, 0.3, xo, sy, sz, 20));
     for (let k = 0; k < 11; k++) { const a = k / 11 * Math.PI * 2; P('steel', box(0.22, 0.06, 0.06, xo, sy + Math.sin(a) * 0.27, sz + Math.cos(a) * 0.27, a, 0, 0)); }
     // idler (rear)
-    const iz = -3.4, iy = 0.47;
+    const iz = -3.38, iy = 0.78;
     P('steel', cylX(0.26, 0.26, xo, iy, iz, 40)); P('dark', cylX(0.09, 0.3, xo, iy, iz, 20));
     // return rollers
     for (const z of [-2.2, -0.5, 1.4]) P('steel', cylX(0.07, 0.2, xo, 0.72, z, 20));
     // track: links laid along the loop around idler → road wheels → sprocket → return line
     const loop = new THREE.CurvePath();
     const L = (a, b) => loop.add(new THREE.LineCurve3(new THREE.Vector3(0, a[1], a[0]), new THREE.Vector3(0, b[1], b[0])));
-    const bottom = 0.03, topY = 0.8;
+    const bottom = 0.03, topY = 0.82;
     const R = 0.3;   // sprocket / idler wrap radius incl. track
     L([iz, iy - R], [WZ[0], bottom]); L([WZ[0], bottom], [WZ[5], bottom]); L([WZ[5], bottom], [sz, sy - R]);
     for (let k = 0; k < 6; k++) { const a0 = -Math.PI / 2 + k * Math.PI / 6, a1 = a0 + Math.PI / 6; L([sz + Math.cos(a0) * R, sy + Math.sin(a0) * R], [sz + Math.cos(a1) * R, sy + Math.sin(a1) * R]); }
@@ -166,16 +167,17 @@ export function buildK21Hull() {
     P('dark', cylY(0.05, 0.05, 0.08, s * 1.25, 1.94, -2.6, 8)); P('steel', cylY(0.006, 0.006, 1.6, s * 1.25, 2.75, -2.6, 4));   // antennas
   }
 
-  // ---- rear: ramp with door, hinges, lights, stowage ----
-  P('paint', box(1.6, 1.05, 0.08, 0, 1.38, -3.9));               // ramp
-  P('dark', box(0.55, 0.85, 0.02, 0.3, 1.38, -3.945));            // door in ramp
-  P('steel', box(0.06, 0.12, 0.05, 0.05, 1.38, -3.96));           // handle
-  for (const dx of [-0.55, 0.55]) P('steel', cylX(0.05, 0.25, dx, 0.88, -3.9, 10));   // hinges
+  // ---- rear: ramp with door, hinges, lights — all lying on the forward-leaning rear plate ----
+  const RA = Math.atan2(0.34, 0.9);                 // rear plate lean (top forward)
+  const onRear = (y, out = 0.04) => -3.92 + (y - 1.0) * (0.34 / 0.9) - out;   // z of the plate surface at height y
+  P('paint', box(1.6, 0.92, 0.07, 0, 1.45, onRear(1.45, 0.03), RA, 0, 0));          // ramp
+  P('dark', box(0.55, 0.72, 0.02, 0.3, 1.45, onRear(1.45, 0.075), RA, 0, 0));        // door in the ramp
+  P('steel', box(0.06, 0.12, 0.05, 0.05, 1.45, onRear(1.45, 0.09), RA, 0, 0));       // handle
+  for (const dx of [-0.55, 0.55]) P('steel', cylX(0.05, 0.25, dx, 1.02, onRear(1.02, 0.03), 12));   // ramp hinges
   for (const s of [-1, 1]) {
-    P('paint', box(0.62, 0.55, 0.45, s * 1.22, 1.55, -3.6));      // stowage bins
-    P('steel', box(0.6, 0.02, 0.02, s * 1.22, 1.62, -3.83));
-    P('red', box(0.12, 0.08, 0.02, s * 1.22, 1.22, -3.85)); P('lamp', box(0.08, 0.05, 0.02, s * 1.22 + s * 0.12, 1.22, -3.85));
-    P('steel', box(0.08, 0.14, 0.12, s * 0.8, 0.98, -3.9));       // rear tow points
+    P('red', box(0.12, 0.08, 0.02, s * 1.22, 1.2, onRear(1.2, 0.02), RA, 0, 0)); P('lamp', box(0.08, 0.05, 0.02, s * 1.36, 1.2, onRear(1.2, 0.02), RA, 0, 0));
+    P('steel', box(0.08, 0.14, 0.12, s * 0.8, 0.86, -3.82));      // rear tow points on the lower chamfer
+    P('steel', new THREE.TorusGeometry(0.06, 0.015, 6, 12).translate(s * 0.95, 1.94, -3.4).toNonIndexed());   // lifting eyes
   }
 
   // ---- merge per material ----
