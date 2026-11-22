@@ -8,27 +8,33 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 
 // ---------- materials ----------
 export function camoTexture() {
-  // current ROK armour scheme (K21 photos): sand base, large dark-green fields, thin black streaks along the
-  // field edges and small cream "gull" marks
-  const N = 1024, c = document.createElement('canvas'); c.width = c.height = N; const g = c.getContext('2d');
+  // current ROK armour scheme (K21 photos): sand base, large olive-green fields with soft hand-sprayed edges,
+  // filled black and cream crescent / splash marks, plus fading, grime and chipped paint
+  const N = 2048, c = document.createElement('canvas'); c.width = c.height = N; const g = c.getContext('2d');
   let seed = 11; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  g.fillStyle = '#7c6644'; g.fillRect(0, 0, N, N);
-  // dark green fields: big soft-edged blobs (drawn 3x3 tiled so the texture repeats seamlessly)
-  const fields = [];
-  for (let i = 0; i < 8; i++) { const x = (i % 4 + 0.15 + rnd() * 0.7) * N / 4, y = (Math.floor(i / 4) + 0.15 + rnd() * 0.7) * N / 2, rx = 190 + rnd() * 120, ry = 120 + rnd() * 80, rot = rnd() * Math.PI, pts = []; const NP = 36, ph = rnd() * 6, ph2 = rnd() * 6; for (let k = 0; k < NP; k++) { const a = k / NP * Math.PI * 2; const r = 0.82 + 0.18 * Math.sin(a * 3 + ph) + 0.1 * Math.sin(a * 5 + ph2); pts.push([Math.cos(a) * rx * r, Math.sin(a) * ry * r]); } fields.push({ x, y, rot, pts }); }
-  const tp = (f, ox, oy, k) => { const [px, py] = f.pts[(k + f.pts.length) % f.pts.length]; return [f.x + ox + px * Math.cos(f.rot) - py * Math.sin(f.rot), f.y + oy + px * Math.sin(f.rot) + py * Math.cos(f.rot)]; };
-  const path = (f, ox, oy) => { const n = f.pts.length; g.beginPath(); const m0 = tp(f, ox, oy, 0), m1 = tp(f, ox, oy, 1); g.moveTo((m0[0] + m1[0]) / 2, (m0[1] + m1[1]) / 2); for (let k = 1; k <= n; k++) { const a = tp(f, ox, oy, k), b = tp(f, ox, oy, k + 1); g.quadraticCurveTo(a[0], a[1], (a[0] + b[0]) / 2, (a[1] + b[1]) / 2); } g.closePath(); };
   const tiled = (fn) => { for (const ox of [-N, 0, N]) for (const oy of [-N, 0, N]) fn(ox, oy); };
-  g.fillStyle = '#3a432d'; for (const f of fields) tiled((ox, oy) => { path(f, ox, oy); g.fill(); });
-  // thin black streaks hugging part of each field edge
-  g.strokeStyle = '#141512'; g.lineCap = 'round';
-  for (const f of fields) tiled((ox, oy) => { const n = f.pts.length, k0 = Math.floor(rnd() * n), len = 10 + Math.floor(rnd() * 10); g.lineWidth = 14 + rnd() * 10; g.beginPath(); const s0 = tp(f, ox, oy, k0); g.moveTo(s0[0], s0[1]); for (let k = 1; k <= len; k++) { const a = tp(f, ox, oy, k0 + k), b = tp(f, ox, oy, k0 + k + 1); g.quadraticCurveTo(a[0], a[1], (a[0] + b[0]) / 2, (a[1] + b[1]) / 2); } g.stroke(); });
-  // a few free black "crow" marks and cream "gull" marks
-  const gull = (x, y, s, col, w) => { g.strokeStyle = col; g.lineWidth = w; g.beginPath(); g.moveTo(x - s, y - s * 0.2); g.quadraticCurveTo(x - s * 0.4, y - s * 0.55, x, y + s * 0.15); g.quadraticCurveTo(x + s * 0.4, y - s * 0.55, x + s, y - s * 0.2); g.stroke(); };
-  for (let i = 0; i < 5; i++) { const x = rnd() * N, y = rnd() * N, sz = 24 + rnd() * 20; tiled((ox, oy) => gull(x + ox, y + oy, sz, '#d6ccb2', 9)); }
-  for (let i = 0; i < 9; i++) { const x = rnd() * N, y = rnd() * N, sz = 30 + rnd() * 34; tiled((ox, oy) => gull(x + ox, y + oy, sz, '#141512', 12)); }
-  // weathering: fine grime, dust toward the bottom
-  for (let i = 0; i < 9000; i++) { g.fillStyle = `rgba(${rnd() < 0.5 ? '40,36,28' : '170,160,130'},${0.03 + rnd() * 0.05})`; g.fillRect(rnd() * N, rnd() * N, 1 + rnd() * 3, 1 + rnd() * 3); }
+  // base: sand with large low-frequency tone variation
+  g.fillStyle = '#86704a'; g.fillRect(0, 0, N, N);
+  for (let i = 0; i < 60; i++) { const x = rnd() * N, y = rnd() * N, r = 120 + rnd() * 260; tiled((ox, oy) => { const gr = g.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r); const l = rnd() < 0.5; gr.addColorStop(0, l ? 'rgba(170,148,105,0.18)' : 'rgba(90,72,46,0.16)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x + ox - r, y + oy - r, r * 2, r * 2); }); }
+  // smooth closed blob through jittered radial points
+  const blob = (cx, cy, rx, ry, rot, np, wob) => { const ph = rnd() * 6, ph2 = rnd() * 6, pts = []; for (let k = 0; k < np; k++) { const a = k / np * Math.PI * 2; const r = 1 + wob * (0.6 * Math.sin(a * 3 + ph) + 0.4 * Math.sin(a * 5 + ph2)) + (rnd() - 0.5) * wob * 0.3; const px = Math.cos(a) * rx * r, py = Math.sin(a) * ry * r; pts.push([cx + px * Math.cos(rot) - py * Math.sin(rot), cy + px * Math.sin(rot) + py * Math.cos(rot)]); } return pts; };
+  const fillPts = (pts, ox, oy) => { const n = pts.length; g.beginPath(); const m = (i) => [(pts[i % n][0] + pts[(i + 1) % n][0]) / 2 + ox, (pts[i % n][1] + pts[(i + 1) % n][1]) / 2 + oy]; const s0 = m(0); g.moveTo(...s0); for (let k = 1; k <= n; k++) { const p = pts[k % n]; const q = m(k); g.quadraticCurveTo(p[0] + ox, p[1] + oy, q[0], q[1]); } g.closePath(); g.fill(); };
+  // green fields: soft overspray halo, then the solid field
+  const fields = []; for (let i = 0; i < 8; i++) fields.push(blob((i % 4 + 0.15 + rnd() * 0.7) * N / 4, (Math.floor(i / 4) + 0.15 + rnd() * 0.7) * N / 2, 250 + rnd() * 120, 150 + rnd() * 80, rnd() * Math.PI, 40, 0.24));
+  g.filter = 'blur(10px)'; g.fillStyle = 'rgba(64,74,50,0.55)'; for (const f of fields) tiled((ox, oy) => fillPts(f, ox, oy));
+  g.filter = 'blur(2.5px)'; g.fillStyle = '#46523a'; for (const f of fields) tiled((ox, oy) => fillPts(f, ox, oy));
+  // crescent marks: an outer ellipse minus an offset inner one (filled), black and cream
+  const crescent = (x, y, w, h, rot, col) => { const cv = document.createElement('canvas'); cv.width = cv.height = 256; const cg = cv.getContext('2d'); cg.translate(128, 128); cg.rotate(rot); cg.fillStyle = col; cg.beginPath(); cg.ellipse(0, 0, w, h, 0, 0, Math.PI * 2); cg.fill(); cg.globalCompositeOperation = 'destination-out'; cg.beginPath(); cg.ellipse(w * 0.18, -h * 0.45, w * 0.9, h * 0.85, 0.15, 0, Math.PI * 2); cg.fill(); tiled((ox, oy) => g.drawImage(cv, x + ox - 128, y + oy - 128)); };
+  g.filter = 'blur(1.5px)';
+  for (let i = 0; i < 14; i++) crescent(rnd() * N, rnd() * N, 70 + rnd() * 50, 30 + rnd() * 22, rnd() * Math.PI * 2, '#1a1b17');
+  for (let i = 0; i < 10; i++) crescent(rnd() * N, rnd() * N, 60 + rnd() * 45, 26 + rnd() * 18, rnd() * Math.PI * 2, '#ddd4bc');
+  // a few cream splash blobs
+  for (let i = 0; i < 6; i++) { const f = blob(rnd() * N, rnd() * N, 40 + rnd() * 40, 16 + rnd() * 14, rnd() * Math.PI, 16, 0.35); g.fillStyle = '#d8cfb7'; tiled((ox, oy) => fillPts(f, ox, oy)); }
+  g.filter = 'none';
+  // weathering: fine speckle, vertical grime streaks, paint chips with dark primer
+  for (let i = 0; i < 60000; i++) { g.fillStyle = `rgba(${rnd() < 0.55 ? '30,28,20' : '200,190,160'},${0.025 + rnd() * 0.05})`; g.fillRect(rnd() * N, rnd() * N, 1 + rnd() * 2.5, 1 + rnd() * 2.5); }
+  for (let i = 0; i < 160; i++) { const x = rnd() * N, y = rnd() * N, h = 40 + rnd() * 160; const gr = g.createLinearGradient(x, y, x, y + h); gr.addColorStop(0, 'rgba(40,34,24,0.16)'); gr.addColorStop(1, 'rgba(40,34,24,0)'); g.fillStyle = gr; g.fillRect(x, y, 2 + rnd() * 5, h); }
+  for (let i = 0; i < 500; i++) { const x = rnd() * N, y = rnd() * N, r = 1 + rnd() * 3.5; g.fillStyle = 'rgba(35,33,28,0.7)'; g.beginPath(); g.ellipse(x, y, r * (1 + rnd()), r, rnd() * 3, 0, Math.PI * 2); g.fill(); g.fillStyle = 'rgba(200,195,175,0.35)'; g.fillRect(x - r, y - r - 1, r * 1.5, 1); }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
   return t;
 }
@@ -48,7 +54,7 @@ export function mats() {
 }
 
 // box-projected UVs so the camo texture reads at the same scale on every face (1 texture = 2.4 m)
-export function boxUV(geo, scale = 1 / 4.2) {
+export function boxUV(geo, scale = 1 / 6.5) {
   const p = geo.attributes.position, n = geo.attributes.normal, uv = new Float32Array(p.count * 2);
   for (let i = 0; i < p.count; i++) {
     const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i));
@@ -172,7 +178,7 @@ export function buildK21Hull(M = mats()) { const parts = { paint: [], dark: [], 
   for (const s of [-1, 1]) P('steel', new THREE.TorusGeometry(0.06, 0.015, 6, 12).rotateY(Math.PI / 2).translate(s * 0.95, 1.92, 1.9).toNonIndexed());
 
   // ---- roof: turret ring (turret not modelled), troop compartment hatches, antenna bases ----
-  const tz = -1.15;
+  const tz = -0.7;
   P('steel', new THREE.TorusGeometry(1.0, 0.05, 6, 40).rotateX(Math.PI / 2).translate(0, 1.93, tz).toNonIndexed());
   P('dark', cylY(0.98, 0.98, 0.03, 0, 1.915, tz, 40));
   for (const s of [-1, 1]) {
