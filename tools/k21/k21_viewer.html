@@ -1,0 +1,19 @@
+<!doctype html><html><head><meta charset="utf-8"><title>K21 hull</title>
+<script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/examples/jsm/":"/node_modules/three/examples/jsm/"}}</script></head>
+<body style="margin:0;background:#20242a"><script type="module">
+import * as THREE from 'three'; import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'; import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
+import { buildK21Hull } from './k21_hull.js';
+const q = new URLSearchParams(location.search);
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); r.setSize(innerWidth, innerHeight); r.toneMapping = THREE.ACESFilmicToneMapping; r.shadowMap.enabled = true; r.autoClear = false; document.body.appendChild(r.domElement);
+const s = new THREE.Scene(); s.background = new THREE.Color(0x9aa3a8); s.environment = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), 0.04).texture;
+const sun = new THREE.DirectionalLight(0xfff4e0, 2.2); sun.position.set(6, 10, 7); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6 }); s.add(sun);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ color: 0x8b8a80, roughness: 1 })); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; s.add(ground);
+const hull = buildK21Hull(); s.add(hull);
+const views = [[[7.5, 3.4, 7.5], [0, 1.0, 0.2]], [[-7, 3.2, -7.5], [0, 1.0, -0.4]], [[11, 1.2, 0], [0, 1.0, 0]], [[0, 12, 0.01], [0, 0, 0]]];
+const W = innerWidth / 2, H = innerHeight / 2;
+views.forEach(([p, t], i) => { const cam = i === 3 ? new THREE.OrthographicCamera(-4.6 * W / H, 4.6 * W / H, 4.6, -4.6, 0.1, 50) : new THREE.PerspectiveCamera(i === 2 ? 30 : 34, W / H, 0.1, 100); if (i === 2) { cam.fov = 38; } cam.position.set(...p); if (i === 3) cam.up.set(0, 0, -1); cam.lookAt(...t); cam.updateProjectionMatrix(); const x = (i % 2) * W, y = (1 - Math.floor(i / 2)) * H; r.setViewport(x, y, W, H); r.setScissor(x, y, W, H); r.setScissorTest(true); r.render(s, cam); });
+let tris = 0; hull.traverse((o) => { if (o.isMesh) tris += o.geometry.attributes.position.count / 3; });
+window.__info = { tris, meshes: hull.children.length };
+window.exportGLB = () => new Promise((res) => new GLTFExporter().parse(hull, (buf) => { const b = new Uint8Array(buf); let s2 = ''; for (let i = 0; i < b.length; i += 0x8000) s2 += String.fromCharCode(...b.subarray(i, i + 0x8000)); res(btoa(s2)); }, (e) => res('ERR ' + e), { binary: true }));
+window.__ready = true;
+</script></body></html>
