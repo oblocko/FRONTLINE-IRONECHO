@@ -214,7 +214,7 @@ export const SEGMENTS = [
       await m.say('yoon', '앞에 적이다! 특수부대 복장 — 차량 사이로!', { priority: 3 });
       game.objectives.add('sof', '대로의 적 특수부대 제압', { count: sof.length });
       const offK = m.bind(events.on('ai:death', ({ agent }) => { if (sof.includes(agent)) game.objectives.progress('sof'); }));
-      await m.until(() => sof.every((e) => e.dead));
+      await m.until(() => sof.every((e) => e.dead), 180); for (const e of sof) if (!e.dead) e.kill(game.player.position);   // last-resort: never stall on a lost straggler
       offK(); game.objectives.complete('sof'); game.audio.setMusic('tension');
       await m.reach(CITY.stationExit, 6);
       game.objectives.complete('station');
@@ -385,9 +385,21 @@ export const SEGMENTS = [
       const tech = new EnemyVehicle(game, { path: [V(54, 0, 120), V(30, 0, 121), V(14, 0, 118)], speed: 8, hp: 450 });
       const inf = spawnEnemies(game, [[14, 128], [-14, 132], [16, 112], [-15, 116], [10, 136]], { state: 'combat' }); attackOrder(game, inf, game.player);
       game.objectives.add('tech', '교차로의 기관총 트럭 파괴', { marker: V(20, 1, 120) });
-      await m.until(() => (tech.dead && inf.filter((e) => !e.dead).length <= 1) || m.time > 1e9, 90);
+      game.objectives.add('inf', '교차로 적 보병 소탕', { count: inf.length - 1 });
+      // live markers: the truck while it moves, each remaining rifleman once only a few are left
+      let killed = 0, mkT = 0;
+      m.every((dt) => {
+        mkT -= dt; if (mkT > 0) return; mkT = 0.4;
+        if (!tech.dead) game.objectives.setMarker('tech', tech.position.clone().setY(1));
+        const alive = inf.filter((e) => !e.dead); const k = Math.min(inf.length - 1, inf.length - alive.length);
+        while (killed < k) { killed++; game.objectives.progress('inf'); }
+        if (alive.length <= 3) game.objectives.setMarkers('inf', alive.map((e) => e.position));
+        if (tech.dead && alive.length <= 1) return false;
+      });
+      await m.until(() => tech.dead && inf.filter((e) => !e.dead).length <= 1, 150);
       if (!tech.dead) tech.destroy();
-      game.objectives.complete('tech');
+      for (const e of inf) if (!e.dead) e.kill(game.player.position);
+      game.objectives.complete('tech'); game.objectives.complete('inf');
       busRun.target = 6.5;
       await m.say('convoy', '교차로 확보. 전진!', { radio: true, priority: 3 });
       // overpass comes down right behind the convoy

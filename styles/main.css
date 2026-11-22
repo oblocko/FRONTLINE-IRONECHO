@@ -371,3 +371,7 @@ html.js #about { display: none; }
 #transition .menu-btn { position: absolute; bottom: 28px; right: 32px; opacity: .55; }
 @keyframes tr-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes tr-card { from { opacity: 0; transform: translateY(8px); letter-spacing: .1em; } to { opacity: 1; transform: none; } }
+/* straggler enemies (last few of a fight) */
+#hud .markers .mk.enemy { color: #ff5a4a; }
+#hud .markers .mk.enemy::before { border: none; width: 0; height: 0; transform: none; border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 10px solid #ff5a4a; }
+#hud .compass .pin.enemy { border-color: #ff5a4a; background: rgba(255, 90, 74, .35); }

@@ -555,7 +555,7 @@ export const SEGMENTS = [
       sq.yoon.follow(game.player, V(-2.5, 0, 3)); sq.jung.follow(game.player, V(2, 0, 2));
       game.objectives.add('clear', '마을의 적 제압', { count: amb.length });
       const off = m.bind(events.on('ai:death', ({ agent }) => { if (amb.includes(agent)) game.objectives.progress('clear'); }));
-      await m.until(() => amb.every((e) => e.dead));
+      await m.until(() => amb.every((e) => e.dead), 180); for (const e of amb) if (!e.dead) e.kill(game.player.position);   // last-resort: never stall on a lost straggler
       off(); game.objectives.complete('clear'); game.objectives.complete('village');
       game.audio.setMusic('tension');
       await m.talk([['yoon', '정리됐다. 집결지까지 300미터. 멈추지 마.'], ['jung', '박도윤, 버텨라. 니 커피 마셔 준다 했다.']]);

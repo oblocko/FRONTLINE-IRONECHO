@@ -93,6 +93,7 @@ export class AIAgent {
     if (this.cover) { this.cover.occupant = null; this.cover = null; }
     this.actor.die(tmpA.copy(this.position).sub(fromPos || this.position.clone().add(new THREE.Vector3(0, 0, 1))));
     this.actor.target.speed = 0;
+    if (this.team === 'enemy') this.director.lastEnemyDeath = this.director.time;
     events.emit('ai:death', { agent: this, attacker });
     this.onDeath?.(this, attacker);
   }
@@ -107,6 +108,7 @@ export class AIAgent {
       if (this.lookAtPos) { const yawTo = Math.atan2(this.lookAtPos.x - this.position.x, this.lookAtPos.z - this.position.z); a.target.lookYaw = Math.max(-1, Math.min(1, angleDiff(this.yaw, yawTo))); }
       a.update(dt); return;
     }
+    if (!this._placed) { this._placed = true; this.ensureOpen(false); }
     this.suppression = Math.max(0, this.suppression - dt * 0.25);
     this.grenadeCD -= dt;
     this.perceiveT -= dt;
@@ -175,10 +177,33 @@ export class AIAgent {
     this.director.world.moveCylinder(this.position, delta, 0.32, 1.7, 0.5);
     this.position.y = this.director.world.groundHeight(this.position.x, this.position.z, this.position.y + 0.3, 0.6, 0);
     const moved = before.distanceTo(this.position);
-    if (moved < sp * dt * 0.2) { this.stuckT = (this.stuckT || 0) + dt; if (this.stuckT > 1.2) { this.stuckT = 0; if (this.moveGoal) this.setPath(this.moveGoal); } } else this.stuckT = 0;
+    if (moved < sp * dt * 0.2) {
+      this.stuckT = (this.stuckT || 0) + dt;
+      if (this.stuckT > 1.0) { this.stuckT = 0; this.stuckN = (this.stuckN || 0) + 1; this.unstick(); }
+    } else { this.stuckT = 0; if (moved > sp * dt * 0.6) this.stuckN = Math.max(0, (this.stuckN || 0) - dt * 0.5); }
     const yawTo = Math.atan2(dx, dz);
     if (!(this.target && this.actor.target.aim > 0.5)) this.yaw += angleDiff(this.yaw, yawTo) * Math.min(1, dt * 8);
     return false;
+  }
+  // stuck on a wall / door frame / prop: 1st re-plan, 2nd side-step, 3rd pop out to the nearest open cell
+  unstick() {
+    const w = this.director.world, goal = this.moveGoal;
+    if (this.stuckN <= 1) { if (goal) this.setPath(goal); return; }
+    if (this.stuckN === 2) {
+      const a = Math.random() * Math.PI * 2; const side = this.position.clone().add(new THREE.Vector3(Math.cos(a) * 1.6, 0, Math.sin(a) * 1.6));
+      const p = w.findPath(this.position, side); if (p && p.length > 1) { this.path = goal ? [...p, ...(w.findPath(side, goal) || [goal.clone()]).slice(1)] : p; this.pathIdx = 1; return; }
+    }
+    this.ensureOpen(true); this.stuckN = 0; if (goal) this.setPath(goal);
+  }
+  // inside a collider (or sealed in a tiny pocket): move to the nearest open walkable cell
+  ensureOpen(force) {
+    const w = this.director.world; if (!w.nav) return;
+    const c = w.navCompAt(this.position.x, this.position.z);
+    if (c && !(force && w.navCompSize(c) < 40)) { if (!force) return; }
+    const p = w.nearestOpen(this.position, force ? 40 : 1, 8); if (!p) return;
+    if (p.distanceTo(this.position) > 9) return;
+    this.position.x = p.x; this.position.z = p.z; this.position.y = w.groundHeight(p.x, p.z, p.y + 0.5);
+    this.actor.root.position.copy(this.position);
   }
   faceTowards(p, dt) { const yawTo = Math.atan2(p.x - this.position.x, p.z - this.position.z); this.yaw += angleDiff(this.yaw, yawTo) * Math.min(1, dt * 5); }
 
@@ -250,6 +275,9 @@ export class AIAgent {
       if (near) { this.target = near; this.lastSeenPos = near.position.clone(); }
       else return { desiredSpeed: 0, crouch: 1, aim: 0.3 };
     }
+    // stragglers: when only a couple of enemies are left in the fight they come for the player
+    const left = d.enemiesInCombat();
+    if (left <= 2 && this.target.isPlayer && time - (this.combatSince ?? (this.combatSince = time)) > 6) { if (this.cover) { this.cover.occupant = null; this.cover = null; } return this.rushBrain(dt, time); }
     // choose/validate cover
     this.coverCheckT = (this.coverCheckT ?? 0) - dt;
     if (this.coverCheckT <= 0) {
@@ -294,8 +322,25 @@ export class AIAgent {
         this.coverPhase = 'hide'; this.phaseT = rand(1.2, 2.8) + this.suppression * 2; this.cycles++; this.releaseToken();
       }
     }
-    if (!this.cover) { crouch = 0; aim = 1; this.combatFire(dt, time); }
+    if (!this.cover) {
+      // no usable cover: never stand still behind a wall — hunt the target until it is in sight
+      if (this.canSeeCached(time)) { crouch = 0; aim = 1; this.combatFire(dt, time); }
+      else { this.huntT = (this.huntT || 0) - dt; if (this.huntT <= 0 || !this.path) { this.huntT = 3; this.setPath(this.target.position); } this.followPath(dt, 3.6); desiredSpeed = this.moveSpeed; aim = 0.5; }
+    }
     return { desiredSpeed, crouch, aim };
+  }
+  // last few enemies push the player instead of hiding (stragglers can't be left sitting in a building)
+  rushBrain(dt, time) {
+    const t = this.target; const see = this.canSeeCached(time);
+    this.huntT = (this.huntT || 0) - dt;
+    if (!see || this.position.distanceTo(t.position) > 18) {
+      if (this.huntT <= 0 || !this.path) { this.huntT = 2.5; const off = new THREE.Vector3((Math.random() - 0.5) * 6, 0, (Math.random() - 0.5) * 6); this.setPath(t.position.clone().add(off)); }
+      this.followPath(dt, see ? 2.4 : 4.0);
+      if (see) { if (Math.random() < dt * 0.8) this.combatFire(dt, time, 0.6); return { desiredSpeed: this.moveSpeed, crouch: 0, aim: 1 }; }
+      return { desiredSpeed: this.moveSpeed, crouch: 0, aim: 0.4 };
+    }
+    this.path = null; this.combatFire(dt, time);
+    return { desiredSpeed: 0, crouch: this.suppression > 0.5 ? 1 : 0, aim: 1 };
   }
   canSeeCached(time) {
     if (this._seeT === undefined || time - this._seeT > 0.3) { this._seeT = time; this._see = this.target ? this.canSee(this.target, 200) : false; }
@@ -381,6 +426,16 @@ export class AIDirector {
     if (this.tokens < this.diff.tokens) { this.tokens++; agent.hasToken = true; return true; }
     return false;
   }
+  // the last few enemies of a fight are marked on the HUD once the player has gone a while without finding them
+  stragglers() {
+    if (this._strT === this.time) return this._str; this._strT = this.time;
+    const alive = this.agents.filter((a) => a.team === 'enemy' && !a.dead && !a.passive && !a.invisible);
+    const fighting = alive.filter((a) => a.state === 'combat');
+    const quiet = this.time - (this.lastEnemyDeath ?? -1e9);
+    this._str = fighting.length && alive.length <= 3 && (quiet > 10 || alive.length === 1) ? fighting : [];
+    return this._str;
+  }
+  enemiesInCombat() { if (this._eicT !== this.time) { this._eicT = this.time; let n = 0, all = 0; for (const a of this.agents) if (a.team === 'enemy' && !a.dead && !a.passive) { all++; if (a.state === 'combat') n++; } this._eic = all; } return this._eic; }
   alertSquad(agent, target) {
     for (const o of this.agents) if (o.team === agent.team && !o.dead && o !== agent && o.position.distanceTo(agent.position) < 35 && o.state !== 'combat' && !o.passive) {
       o.state = 'combat'; o.target = target; o.lastSeenPos = target.position.clone(); o.lastSeenT = this.time - 2;
@@ -434,7 +489,8 @@ export class AIDirector {
     const origin = near || agent.position;
     let best = null, bestScore = -Infinity; let checks = 0;
     const tDist = agent.position.distanceTo(threat);
-    const cands = this.covers.filter((c) => (!c.occupant || c.occupant === agent) && c.pos.distanceTo(origin) < radius).sort((a, b) => a.pos.distanceTo(origin) - b.pos.distanceTo(origin)).slice(0, 26);
+    const w = this.world; const myComp = w.nav ? w.navCompAt(agent.position.x, agent.position.z) : 0;
+    const cands = this.covers.filter((c) => (!c.occupant || c.occupant === agent) && c.pos.distanceTo(origin) < radius && (!myComp || w.navCompAt(c.pos.x, c.pos.z) === myComp)).sort((a, b) => a.pos.distanceTo(origin) - b.pos.distanceTo(origin)).slice(0, 26);
     for (const c of cands) {
       const d = c.pos.distanceTo(threat); if (d < 6) continue;
       if (++checks > 26) break;

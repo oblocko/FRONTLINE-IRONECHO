@@ -511,6 +511,13 @@ export class UI {
         if (Math.abs(rel) < 76) { const pin = document.createElement('div'); pin.className = 'pin'; pin.style.left = `${230 + rel * 3}px`; comp.appendChild(pin); }
       }
     }
+    // stragglers: the last enemies of a fight, marked after a quiet spell so a hidden one can't stall the mission
+    for (const e of g.director.stragglers?.() || []) {
+      const v = e.position.clone(); v.y += 2.1; const proj = v.clone().project(cam);
+      if (proj.z < 1 && Math.abs(proj.x) < 1.1 && Math.abs(proj.y) < 1.1) html += `<div class="mk enemy" style="left:${(proj.x * 0.5 + 0.5) * W}px;top:${(-proj.y * 0.5 + 0.5) * H}px">${Math.round(e.position.distanceTo(p.position))}m</div>`;
+      const ang = Math.atan2(e.position.x - p.position.x, -(e.position.z - p.position.z)) * 180 / Math.PI; const rel = ((ang - yawDeg + 540) % 360) - 180;
+      if (Math.abs(rel) < 76) { const pin = document.createElement('div'); pin.className = 'pin enemy'; pin.style.left = `${230 + rel * 3}px`; comp.appendChild(pin); }
+    }
     mk.innerHTML = html;
     // grenade warnings
     let gw = '';
