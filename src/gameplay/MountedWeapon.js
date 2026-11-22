@@ -172,12 +172,19 @@ export class MountedWeapon {
     } else {
       // APC: drive an existing turret group (pivot = turret, tilt = gun mantlet)
       this.root = opts.vehicle; this.pivot = opts.vehicle.userData.turret;
+      if (opts.vehicle.userData.gun) {
+        // K21: the model's own gun group elevates; muzzle and gunner's eye come with the model
+        this.tilt = opts.vehicle.userData.gun; this.muzzle = opts.vehicle.userData.muzzle;
+        this.seat = new THREE.Object3D(); this.seat.position.set(-0.08, 1.55, -1.0); this.pivot.add(this.seat);   // gunner's view over the roof optics
+        this.baseYaw = 0;
+      } else {
       this.tilt = new THREE.Group(); this.tilt.position.set(0, 0.35, 0.95); this.pivot.add(this.tilt);
       const gun = this.pivot.children.find((c) => c.geometry?.type === 'CylinderGeometry' && Math.abs(c.position.z - 2.1) < 0.01);
       if (gun) { this.pivot.remove(gun); gun.position.set(0, 0, 1.15); this.tilt.add(gun); }
       this.muzzle = new THREE.Object3D(); this.muzzle.position.set(0, 0, 2.35); this.tilt.add(this.muzzle);
       this.seat = new THREE.Object3D(); this.seat.position.set(0, 1.05, -0.35); this.pivot.add(this.seat);
       this.baseYaw = 0;
+      }
     }
     this.yawRange = opts.yawRange ?? 1.2; this.pitchRange = opts.pitchRange ?? [-0.35, 0.3];
     this.forward = this.kind === 'apc' ? 1 : -1; // model axis the barrel points along (+Z for the IFV, -Z for the MG)

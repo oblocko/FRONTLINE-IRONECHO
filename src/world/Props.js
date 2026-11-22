@@ -6,6 +6,8 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { pbr } from '../render/TextureFactory.js';
 import { cloneRaw } from '../gear/GearLib.js';
+import { buildK21Hull } from '../vehicles/K21Hull.js';
+import { buildK21 } from '../vehicles/K21Turret.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
@@ -505,7 +507,15 @@ export function buildTruck({ canopy = true, model = true } = {}) {
   return g;
 }
 
-export function buildAPC() {
+// ROK K21 IFV (original procedural model, src/vehicles). The legacy box APC stays available as buildAPC({ legacy: true }).
+export function buildAPC({ legacy = false } = {}) {
+  if (!legacy) {
+    const g = buildK21(buildK21Hull); g.userData.dynamic = true;
+    g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    // red troop-compartment light just inside the doorway (seen when the ramp is down)
+    const il = new THREE.PointLight(0xff4020, 1.5, 4, 2); il.position.set(0, 1.4, -3.2); g.add(il); g.userData.interiorLight = il;
+    return g;
+  }
   const g = new THREE.Group(); g.userData.dynamic = true;
   const paint = pbr('paintedMetal', { color: 0x6f7860, repeat: [2, 2] });
   const dark = new THREE.MeshStandardMaterial({ color: 0x1c1d1a, roughness: 0.95 });

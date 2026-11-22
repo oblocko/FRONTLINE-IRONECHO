@@ -2,7 +2,7 @@
 <script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/examples/jsm/":"/node_modules/three/examples/jsm/"}}</script></head>
 <body style="margin:0;background:#20242a"><script type="module">
 import * as THREE from 'three'; import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'; import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
-import { buildK21Hull } from './k21_hull.js'; import { buildK21 } from './k21_turret.js';
+import { buildK21Hull } from '../../src/vehicles/K21Hull.js'; import { buildK21 } from '../../src/vehicles/K21Turret.js';
 const q = new URLSearchParams(location.search);
 const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); r.setSize(innerWidth, innerHeight); r.toneMapping = THREE.ACESFilmicToneMapping; r.shadowMap.enabled = true; r.autoClear = false; document.body.appendChild(r.domElement);
 const s = new THREE.Scene(); s.background = new THREE.Color(0x9aa3a8); s.environment = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), 0.04).texture;

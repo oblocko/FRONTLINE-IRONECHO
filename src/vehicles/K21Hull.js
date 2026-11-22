@@ -189,9 +189,13 @@ export function buildK21Hull(M = mats()) { const parts = { paint: [], dark: [], 
   // ---- rear: ramp with door, hinges, lights — all lying on the undercut rear plate ----
   const RA = -Math.atan2(0.42, 1.14);               // rear plate lean (top further back)
   const onRear = (y, out = 0.04) => -3.5 - (y - 0.72) * (0.42 / 1.14) - out;   // z of the plate surface at height y
-  P('paint', box(1.6, 1.0, 0.07, 0, 1.36, onRear(1.36, 0.03), RA, 0, 0));           // ramp
-  P('dark', box(0.55, 0.78, 0.02, 0.3, 1.36, onRear(1.36, 0.075), RA, 0, 0));        // door in the ramp
-  P('steel', box(0.06, 0.12, 0.05, 0.05, 1.36, onRear(1.36, 0.09), RA, 0, 0));       // handle
+  // ramp as its own group hinged at the bottom (userData.ramp: rotation.x < 0 lowers it), doorway behind it
+  const hinge = new THREE.Vector3(0, 0.84, onRear(0.84, 0.03));
+  const rparts = { paint: [], dark: [], steel: [] }; const RP = (k, g2) => rparts[k].push(clean(g2.translate(-hinge.x, -hinge.y, -hinge.z)));
+  RP('paint', box(1.6, 1.0, 0.07, 0, 1.36, onRear(1.36, 0.03), RA, 0, 0));           // ramp
+  RP('dark', box(0.55, 0.78, 0.02, 0.3, 1.36, onRear(1.36, 0.075), RA, 0, 0));        // door in the ramp
+  RP('steel', box(0.06, 0.12, 0.05, 0.05, 1.36, onRear(1.36, 0.09), RA, 0, 0));       // handle
+  P('dark', box(1.5, 0.95, 0.04, 0, 1.36, onRear(1.36, -0.01), RA, 0, 0));          // doorway (troop compartment) behind the ramp
   for (const dx of [-0.55, 0.55]) P('steel', cylX(0.05, 0.25, dx, 0.84, onRear(0.84, 0.03), 12));   // ramp hinges (bottom)
   for (const s of [-1, 1]) {
     P('red', box(0.12, 0.08, 0.02, s * 1.22, 1.6, onRear(1.6, 0.02), RA, 0, 0)); P('lamp', box(0.08, 0.05, 0.02, s * 1.36, 1.6, onRear(1.6, 0.02), RA, 0, 0));
@@ -206,5 +210,8 @@ export function buildK21Hull(M = mats()) { const parts = { paint: [], dark: [], 
     const merged = mergeGeometries(list, false);
     const m = new THREE.Mesh(merged, M[k]); m.name = 'hull_' + k; m.castShadow = true; m.receiveShadow = true; g.add(m);
   }
+  const ramp = new THREE.Group(); ramp.name = 'ramp'; ramp.position.copy(hinge); g.add(ramp);
+  for (const [k, list] of Object.entries(rparts)) { const m = new THREE.Mesh(mergeGeometries(list, false), M[k]); m.castShadow = m.receiveShadow = true; ramp.add(m); }
+  g.userData.ramp = ramp;
   return g;
 }

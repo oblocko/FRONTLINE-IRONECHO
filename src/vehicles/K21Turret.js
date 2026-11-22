@@ -3,7 +3,7 @@
 // Axes: +Z = front, +Y = up, metres.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { mats, profileX, box, cylX, cylY, clean, boxUV } from './k21_hull.js';
+import { mats, profileX, box, cylX, cylY, clean, boxUV } from './K21Hull.js';
 
 const cylZ = (r0, r1, len, x, y, z, seg = 20) => { const g = new THREE.CylinderGeometry(r1, r0, len, seg); g.rotateX(Math.PI / 2); g.translate(x, y, z); return g.toNonIndexed(); };
 const tube = (pts, r, seg = 6) => new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p)), false, 'catmullrom', 0.01), pts.length * 6, r, seg, false).toNonIndexed();
@@ -106,6 +106,6 @@ export function buildK21(buildHull) {
   const M = mats(); const g = new THREE.Group(); g.name = 'K21';
   const hull = buildHull(M); g.add(hull);
   const t = buildK21Turret(M); t.position.set(0, 1.9, -0.7); g.add(t);
-  g.userData.turret = t; g.userData.gun = t.getObjectByName('gun');
+  g.userData.turret = t; g.userData.gun = t.getObjectByName('gun'); g.userData.muzzle = t.getObjectByName('muzzle'); g.userData.ramp = hull.userData.ramp;
   return g;
 }

@@ -10,4 +10,5 @@ reference model on Sketchfab; no geometry from it is used.
   the field edges, cream/black "gull" marks (generated texture, tiles seamlessly).
 - `k21_preview.png` — front 3/4, rear 3/4, side, top. `k21_side_vs_reference.png` — side silhouette check.
 
+Source: `src/vehicles/K21Hull.js`, `src/vehicles/K21Turret.js` (used in the game as the APC via `buildAPC()`).
 Rebuild: serve the repo root (`python3 -m http.server 5182`) and run `node tools/k21/export.mjs http://localhost:5182`.

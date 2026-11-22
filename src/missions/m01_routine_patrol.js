@@ -614,7 +614,7 @@ export const SEGMENTS = [
         m.flags.supT = (m.flags.supT || 0) - dt;
         if (m.flags.supT <= 0) {
           m.flags.supT = 1.6;
-          const muzzle = turret.localToWorld(V(0, 0.35, 3.3));
+          const muzzle = apc.userData.muzzle ? apc.userData.muzzle.getWorldPosition(V(0, 0, 0)) : turret.localToWorld(V(0, 0.35, 3.3));
           game.effects.muzzleFlash(muzzle, tgt.position.clone().sub(muzzle).normalize()); game.audio.shot(muzzle, { enemy: false });
           game.effects.tracer(muzzle, tgt.chestPos(new THREE.Vector3()));
           setTimeout(() => { if (!tgt.dead) game.combat.explode(tgt.position.clone(), { radius: 3.5, damage: 140, scale: 0.6, owner: 'world', playerSafe: true }); }, 180);
