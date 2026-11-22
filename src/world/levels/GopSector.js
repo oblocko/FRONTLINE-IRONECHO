@@ -346,7 +346,7 @@ export class GopSector {
     const poles = [[70, 30], [76, 52], [84, 74], [92, 98], [99, 112]].map(([x, z]) => p.utilityPole(x + 4, z));
     for (let i = 0; i < poles.length - 1; i++) { p.wire(poles[i], poles[i + 1]); p.wire(poles[i].clone().add(V(0.7, 0, 0)), poles[i + 1].clone().add(V(0.7, 0, 0))); }
     // abandoned civilian 1-ton truck and props
-    const civ = buildTruck(); civ.remove(civ.userData.cargoLamp); civ.scale.set(0.7, 0.7, 0.7); civ.position.set(88, this.hf(88, 60), 60); civ.rotation.y = 0.4; scene.add(civ);
+    const civ = buildTruck({ model: false }); civ.remove(civ.userData.cargoLamp); civ.scale.set(0.7, 0.7, 0.7); civ.position.set(88, this.hf(88, 60), 60); civ.rotation.y = 0.4; scene.add(civ);
     civ.traverse((o) => { if (o.isMesh && o.material?.color && o.material.map) { o.material = o.material.clone(); o.material.color.setHex(0x5a7aa8); } });
     this.game.world.addBoxCentered(V(88, this.hf(88, 60) + 1, 60), V(2.2, 2, 4.4), { surface: 'metal' });
     for (const [x, z] of [[70, 58], [71, 58.8], [92, 82]]) p.barrel(x, z, { color: 0x2f5a8a });

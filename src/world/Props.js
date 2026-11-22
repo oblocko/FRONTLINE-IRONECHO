@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { pbr } from '../render/TextureFactory.js';
+import { cloneRaw } from '../gear/GearLib.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
@@ -414,8 +415,53 @@ export class Props {
 
 // ======================= VEHICLE MODELS =======================
 // All vehicles are original designs (generic modern military silhouettes).
-export function buildTruck({ canopy = true } = {}) {
+// ROK transport: MAN SV 6x6 model (stand-in for the KMTV; Sketchfab, user-chosen) scaled so its bed floor sits at
+// the game's 1.31 m (seats and passenger views are laid out for that). The model's closed tarp is cut away —
+// the game's own roof with rolled-up sides goes on instead so passengers can see out.
+const TRUCK_S = 1.31 / 1.62;
+let truckGeo = null;
+function realTruckMeshes() {
+  if (!truckGeo) {
+    const src = cloneRaw('mansv'); if (!src) return null;
+    const root = new THREE.Group(); root.add(src); src.rotation.y = -Math.PI / 2; src.scale.setScalar(TRUCK_S); src.position.z = 0.1; root.updateMatrixWorld(true);
+    truckGeo = [];
+    src.traverse((o) => {
+      if (!o.isMesh) return;
+      const geo = (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone()).applyMatrix4(o.matrixWorld);
+      const pos = geo.attributes.position, keep = []; const c = new THREE.Vector3(), v = new THREE.Vector3();
+      for (let t = 0; t < pos.count; t += 3) {
+        c.set(0, 0, 0); for (let k = 0; k < 3; k++) c.add(v.fromBufferAttribute(pos, t + k)); c.divideScalar(3);
+        if (c.y > 2.3 * TRUCK_S && c.z < 1.45 * TRUCK_S + 0.1) continue;     // tarp over the bed
+        keep.push(t);
+      }
+      const out = new THREE.BufferGeometry();
+      for (const [name, a] of Object.entries(geo.attributes)) { const arr = new a.array.constructor(keep.length * 3 * a.itemSize); keep.forEach((t, i) => { for (let k = 0; k < 3; k++) for (let j = 0; j < a.itemSize; j++) arr[(i * 3 + k) * a.itemSize + j] = a.getComponent(t + k, j); }); out.setAttribute(name, new THREE.BufferAttribute(arr, a.itemSize, a.normalized)); }
+      truckGeo.push({ geo: out, mat: o.material });
+    });
+  }
+  return truckGeo.map(({ geo, mat }) => { const m = new THREE.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = true; return m; });
+}
+
+function finishRealTruck(g, meshes, canopy) {
+  for (const m of meshes) g.add(m);
+  const canvasMat = pbr('fabric', { color: 0x5f6448, repeat: [2, 2] });
+  // benches along the bed sides (passenger seat height unchanged)
+  for (const s of [-1, 1]) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.08, 4.0), pbr('wood', { color: 0x5c5040 })); b.position.set(s * 0.8, 1.75, -1.35); b.castShadow = true; g.add(b); }
+  // roof tarp on hoops with the sides rolled up (open view out for passengers)
+  const canGeo = new THREE.CylinderGeometry(1.08, 1.08, 4.7, 16, 1, true, Math.PI * 0.26, Math.PI * 0.48); canGeo.rotateX(Math.PI / 2); canGeo.rotateZ(Math.PI / 2);
+  const can = new THREE.Mesh(canGeo, canvasMat); can.position.set(0, 1.95, -1.4); can.scale.set(1, 1.1, 1); can.material.side = THREE.DoubleSide; can.castShadow = true; can.visible = canopy; g.add(can);
+  for (const s of [-1, 1]) { const roll = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 4.7, 8), canvasMat); roll.rotation.x = Math.PI / 2; roll.position.set(s * 0.73, 2.85, -1.4); roll.visible = canopy; g.add(roll); }
+  const hoopMat = new THREE.MeshStandardMaterial({ color: 0x2a2c26, roughness: 0.6, metalness: 0.5 });
+  for (let i = 0; i < 4; i++) { const hoop = new THREE.Mesh(new THREE.TorusGeometry(1.06, 0.025, 4, 18, Math.PI), hoopMat); hoop.position.set(0, 1.95, -3.5 + i * 1.4); hoop.scale.set(1, 1.1, 1); hoop.visible = canopy; g.add(hoop); }
+  g.userData.wheels = [];
+  for (const s of [-1, 1]) g.userData['headlight' + s] = null;
+  const lamp = new THREE.PointLight(0xffc890, 2.2, 5.5, 2); lamp.position.set(0, 2.55, -1.2); g.add(lamp); g.userData.cargoLamp = lamp;
+  return g;
+}
+export function buildTruck({ canopy = true, model = true } = {}) {
   const g = new THREE.Group(); g.userData.dynamic = true;
+  const real = model ? realTruckMeshes() : null;
+  if (real) return finishRealTruck(g, real, canopy);
   const paint = pbr('paintedMetal', { color: 0x8a9478, repeat: [1, 1] });
   const dark = new THREE.MeshStandardMaterial({ color: 0x1b1d1a, roughness: 0.9 });
   const canvasMat = pbr('fabric', { color: 0x6a6e52, repeat: [2, 2] });

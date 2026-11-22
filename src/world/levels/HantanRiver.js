@@ -197,7 +197,7 @@ export class HantanRiver {
     }
     p.sign(-7, 31, '한탄대교', { sub: 'HANTAN BRIDGE · 중량 40t', bg: '#1e4c7a', rotY: Math.PI, w: 2.6, h: 0.9, height: 2.2 });
     // abandoned cars on the bridge (cover for the enemy rush)
-    const car = (x, z, c, rot) => { const t = buildTruck({ canopy: false }); t.scale.setScalar(0.6); t.position.set(x, B.deck, z); t.rotation.y = rot; t.remove(t.userData.cargoLamp); t.traverse((o) => { if (o.isMesh && o.material?.map) { o.material = o.material.clone(); o.material.color.setHex(c); } }); scene.add(t); w.addBoxCentered(V(x, B.deck + 0.9, z), V(1.8, 1.8, 4.4), { surface: 'metal' }); return t; };
+    const car = (x, z, c, rot) => { const t = buildTruck({ canopy: false, model: false }); t.scale.setScalar(0.6); t.position.set(x, B.deck, z); t.rotation.y = rot; t.remove(t.userData.cargoLamp); t.traverse((o) => { if (o.isMesh && o.material?.map) { o.material = o.material.clone(); o.material.color.setHex(c); } }); scene.add(t); w.addBoxCentered(V(x, B.deck + 0.9, z), V(1.8, 1.8, 4.4), { surface: 'metal' }); return t; };
     car(-2, -22, 0x6a7a8a, 0.15); car(2.3, 17, 0x8a3a2a, Math.PI - 0.1);
   }
 

@@ -55,3 +55,5 @@ Downloaded with `tools/sketchfab_get.py`, converted by `tools/prepare_gear.py` (
 - **Fast Balistik** by tvanr4 — CC Attribution — https://sketchfab.com/3d-models/fast-balistik-9a3c806f705342c98e782204742caf5a → `assets/gear/fast_cam.glb` (국군 FAST 헬멧(디지털 위장))
 - **FAST Helmet** by FailureToComply — CC Attribution — https://sketchfab.com/3d-models/fast-helmet-c80875fc588344448e92eefed460540e → `assets/gear/fast_blk.glb` (707 FAST 헬멧(검정))
 - **Ushanka - Trapper Hat** by PeteDeee — CC Attribution — https://sketchfab.com/3d-models/ushanka-trapper-hat-1046cd56a67d4b79902e47aa0daf3ccb → `assets/gear/ushanka.glb` (북한군 장교 털모자(색 보정))
+- **MAN SV Truck – British Army (WARNO mod)** by rran81 — Free Standard (Sketchfab Standard licence: use inside the game is allowed; no redistribution of the model on its own) — https://sketchfab.com/3d-models/man-sv-truck-british-army-warno-mod-dc7d9a2aecd84a1c97ae3534dbfc6354 → `assets/gear/mansv.glb` (국군 수송 트럭 (KMTV 대용, 사용자 선택))
+- **Kamaz 5330** by Brout — CC Attribution — https://sketchfab.com/3d-models/kamaz-5330-e86a62f4b8c84e03b2c6e32c51474bc7 → `assets/gear/kamaz.glb` (북한군 기관총 트럭)

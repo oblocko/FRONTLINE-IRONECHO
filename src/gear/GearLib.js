@@ -88,7 +88,7 @@ export async function loadArmor(names = Object.keys(ARMOR)) {
 export function armorPart(n) { return armorCache[n] || null; }
 
 // ---- raw scenes for the first-person attachments / sidearm (fitted by the viewmodel builders) ----
-const RAW = { g17: 'gear/g17.glb', eotech: 'gear/eotech.glb' };
+const RAW = { g17: 'gear/g17.glb', eotech: 'gear/eotech.glb', kamaz: 'gear/kamaz.glb', mansv: 'gear/mansv.glb' };
 const rawCache = {};
 export async function loadRawGear() {
   await Promise.all(Object.entries(RAW).map(async ([n, f]) => { try { const g = await loadGLTF(f); g.scene.updateMatrixWorld(true); rawCache[n] = g.scene; } catch (e) { console.warn('gear load failed', n, e); } }));
