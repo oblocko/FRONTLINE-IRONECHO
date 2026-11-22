@@ -11,7 +11,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { pbr } from '../render/TextureFactory.js';
-import { cloneGun } from '../gear/GearLib.js';
+import { cloneGun, cloneRaw } from '../gear/GearLib.js';
 
 // ---------- materials ----------
 let M = null;
@@ -188,15 +188,35 @@ export function buildRifle() {
     for (const c of [...g.children]) if (!keep.has(c)) g.remove(c);
     magG.clear(); magG.add(real.mag); g.add(real.body);
     sightDrop = real.railTop - SY; sight.position.y = sightDrop;
+    const eo = eotech(real.railTop);
+    if (eo) { for (const c of [...sight.children]) if (c !== dot && c !== ring) sight.remove(c); sight.add(eo.group); sight.position.y = 0; dot.position.set(0, eo.cy, eo.cz); ring.position.set(0, eo.cy, eo.cz - 0.0001); sightDrop = eo.cy - dotY; eo.dotZ = eo.cz; }
     muzzle = real.muzzle;
     left.position.set(-0.03, -0.05, -0.34); lArm.position.z += 0.09; lArm.position.y += 0.006;
     right.position.add(new THREE.Vector3(0, -0.016, -0.05)); rArm.position.add(new THREE.Vector3(0, -0.016, -0.05));
   }
   g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; o.frustumCulled = false; } });
-  g.userData = { mag: magG, magBaseY: 0, muzzle, sightY: dotY + sightDrop, sightZ: -0.099, dot, ring, leftHand: left, leftHandBase: left.position.clone(), rightHand: right };
+  g.userData = { mag: magG, magBaseY: 0, muzzle, sightY: dotY + sightDrop, sightZ: dot.position.z, dot, ring, leftHand: left, leftHandBase: left.position.clone(), rightHand: right };
   return g;
 }
 
+// EOTech EXPS3 (Sketchfab, CC-BY) on the rail: base on the rail top, window centre returned for the reticle.
+// The model's own reticle plane is hidden; the game draws the 65 MOA ring + 1 MOA dot at the window centre.
+function eotech(railTop) {
+  const src = cloneRaw('eotech'); if (!src) return null;
+  const grp = new THREE.Group(); grp.name = 'eotech'; grp.add(src); src.updateMatrixWorld(true);
+  let glass = null; src.traverse((o) => { if (!o.isMesh) return; const n = o.material.name; if (n === 'Sight') o.visible = false; if (n === 'Holo') { glass = o; o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.18; o.material.depthWrite = false; } });
+  const b = new THREE.Box3().setFromObject(src), sz = b.getSize(new THREE.Vector3());
+  const s = 0.095 / sz.z; src.scale.setScalar(s);
+  // the clamp jaws hang down the rail sides; the flat base between them is what sits on the rail top
+  const cx = (b.min.x + b.max.x) / 2; let baseY = Infinity; const v = new THREE.Vector3();
+  src.traverse((o) => { if (!o.isMesh || !o.visible) return; const p = o.geometry.attributes.position; for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld); if (Math.abs(v.x - cx) < sz.x * 0.12) baseY = Math.min(baseY, v.y); } });
+  if (!isFinite(baseY)) baseY = b.min.y;
+  src.position.set(-cx * s, railTop - baseY * s, -0.085 - (b.min.z + b.max.z) / 2 * s);
+  grp.updateMatrixWorld(true);
+  const gb = glass ? new THREE.Box3().setFromObject(glass) : new THREE.Box3().setFromObject(src);
+  const c = gb.getCenter(new THREE.Vector3());
+  return { group: grp, cy: c.y, cz: gb.min.z - 0.002 };
+}
 // Real K2C1 (Sketchfab, CC-BY) in the viewmodel frame (muzzle −Z, grip centre ≈ (0,-0.1,0.055)).
 // The magazine triangles are split off into their own mesh so the reload animation can drop it.
 function realK2C1() {
@@ -220,7 +240,7 @@ function realK2C1() {
     if (magA.length) mag.add(new THREE.Mesh(pick(magA), mat));
   });
   const bb = new THREE.Box3().setFromObject(body);
-  return { body, mag, railTop: 0.037, muzzle: new THREE.Vector3(0, -0.005, -0.625), size: bb.getSize(new THREE.Vector3()) };
+  return { body, mag, railTop: 0.040, muzzle: new THREE.Vector3(0, -0.005, -0.625), size: bb.getSize(new THREE.Vector3()) };
 }
 
 // ======================================================================
@@ -298,7 +318,41 @@ export function buildPistol() {
   poseHand(left, { fingers: [1.25, 1.35, 1.4, 1.4], thumb: [0.9, 0.5] });
   const rArm = buildForearm(); g.add(rArm); rArm.position.set(0.035, -0.08, 0.06); rArm.rotation.set(0.85, 0.3, 0);
   const lArm = buildForearm(); g.add(lArm); lArm.position.set(-0.035, -0.085, 0.06); lArm.rotation.set(0.85, -0.3, 0);
+  let muzzleP = new THREE.Vector3(0, 0.039, -0.19), sightY = 0.062, sightZ = 0.02;
+  const real = realG17();
+  if (real) {
+    // swap the procedural pistol for the Glock 17 model (user-chosen, Sketchfab); keep the hands/sleeves
+    const keep = new Set([right, left, rArm, lArm]);
+    for (const c of [...g.children]) if (!keep.has(c)) g.remove(c);
+    slide.clear(); slide.add(real.slide); magG.clear(); magG.add(real.mag); g.add(real.frame, slide, magG);
+    muzzleP = real.muzzle; sightY = real.sightY; sightZ = real.sightZ;
+  }
   g.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; } });
-  g.userData = { mag: magG, magBaseY: 0, slide, slideAxis: 'z', slideBase: 0, muzzle: new THREE.Vector3(0, 0.039, -0.19), sightY: 0.062, sightZ: 0.02, leftHand: left, leftHandBase: left.position.clone(), rightHand: right };
+  g.userData = { mag: magG, magBaseY: 0, slide, slideAxis: 'z', slideBase: 0, muzzle: muzzleP, sightY, sightZ, leftHand: left, leftHandBase: left.position.clone(), rightHand: right };
   return g;
+}
+
+// Glock 17 in the viewmodel frame (muzzle −Z, grip at the origin like the procedural pistol): slide top at y .054,
+// slide rear at z .03; the magazine (modelled outside the gun) is seated in the grip.
+function realG17() {
+  const src = cloneRaw('g17'); if (!src) return null;
+  src.rotation.y = Math.PI; src.updateMatrixWorld(true);
+  const parts = {}; src.traverse((o) => { if (o.isMesh) parts[o.material.name] = o; });
+  const up = parts.Upper_Material, lo = parts.Lower_Material, mg = parts.Magazine_Material; if (!up || !lo) return null;
+  const bake = (o) => { const m = new THREE.Mesh(o.geometry.clone().applyMatrix4(o.matrixWorld), o.material); m.material.envMapIntensity = 0.6; return m; };
+  const slideM = bake(up), frameM = bake(lo), magM = mg ? bake(mg) : new THREE.Group();
+  const bs = new THREE.Box3().setFromObject(slideM), bf = new THREE.Box3().setFromObject(frameM);
+  const off = new THREE.Vector3(-(bs.min.x + bs.max.x) / 2, 0.054 - bs.max.y, 0.03 - bs.max.z);
+  for (const m of [slideM, frameM, magM]) m.geometry?.translate(off.x, off.y, off.z);
+  bs.translate(off); bf.translate(off);
+  if (mg) {   // seat the magazine: flush with the bottom of the grip, centred in the grip well
+    const bm = new THREE.Box3().setFromObject(magM);
+    const gp = frameM.geometry.attributes.position; let zs = 0, n = 0; for (let i = 0; i < gp.count; i++) { const y = gp.getY(i); if (y < bf.min.y + 0.03) { zs += gp.getZ(i); n++; } }
+    const gz = n ? zs / n : (bf.min.z + bf.max.z) / 2;
+    magM.geometry.translate(0, bf.min.y + 0.002 - bm.min.y, gz - (bm.min.z + bm.max.z) / 2 + (bm.max.z - bm.min.z) * 0.0);
+  }
+  // sights: rear notch at the back of the slide top, front post at the front
+  const sp = slideM.geometry.attributes.position; let rearTop = -1, frontTop = -1;
+  for (let i = 0; i < sp.count; i++) { const y = sp.getY(i), z = sp.getZ(i); if (z > bs.max.z - 0.03) rearTop = Math.max(rearTop, y); if (z < bs.min.z + 0.03) frontTop = Math.max(frontTop, y); }
+  return { slide: slideM, frame: frameM, mag: magM, muzzle: new THREE.Vector3(0, bs.max.y - 0.016, bs.min.z - 0.005), sightY: frontTop, sightZ: bs.max.z - 0.01, rearTop };
 }

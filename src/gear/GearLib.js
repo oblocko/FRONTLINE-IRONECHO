@@ -13,7 +13,7 @@ export const GUNS = {
 };
 const cache = {};
 export async function loadGear(names = Object.keys(GUNS)) {
-  await Promise.all([loadArmor(), ...names.map(async (n) => {
+  await Promise.all([loadArmor(), loadRawGear(), ...names.map(async (n) => {
     if (cache[n]) return;
     try { const g = await loadGLTF(GUNS[n].file); cache[n] = normaliseGun(g.scene, GUNS[n]); }
     catch (e) { console.warn('gear load failed', n, e); cache[n] = null; }
@@ -79,3 +79,11 @@ export async function loadArmor(names = Object.keys(ARMOR)) {
 }
 // geometry in model space centred at the origin (caller translates); material shared
 export function armorPart(n) { return armorCache[n] || null; }
+
+// ---- raw scenes for the first-person attachments / sidearm (fitted by the viewmodel builders) ----
+const RAW = { g17: 'gear/g17.glb', eotech: 'gear/eotech.glb' };
+const rawCache = {};
+export async function loadRawGear() {
+  await Promise.all(Object.entries(RAW).map(async ([n, f]) => { try { const g = await loadGLTF(f); g.scene.updateMatrixWorld(true); rawCache[n] = g.scene; } catch (e) { console.warn('gear load failed', n, e); } }));
+}
+export function cloneRaw(n) { const s = rawCache[n]; return s ? s.clone(true) : null; }

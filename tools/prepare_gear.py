@@ -21,6 +21,8 @@ ITEMS = {
   'carrier':   ('3b51e6329dbb4b0aa14e43f12eb6c42a', 1024, None),
   'vestpack':  ('7c41d35e505c4057abe60f89537408bd', 512, None),
   'helmet_hs': ('82adf376164f4d99a4e0b2949930e2ad', 1024, 0.5),
+  'g17':       ('e8e582e71ee946098c2a65fc60bf8d38', 1024, None, r'^Bullet'),   # Sketchfab Standard licence (user-chosen)
+  'eotech':    ('45e4fcdfb1b34756ab9e866564a12f66', 512, None),
 }
 def gt(*a): subprocess.run(GT + list(a), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 meta = json.load(open(os.path.join(SRC, 'meta.json'))); sources = {}
