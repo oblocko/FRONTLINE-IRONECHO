@@ -5,6 +5,7 @@
 // southern rally point. Terrain is a precomputed 0.5 m heightfield with
 // flattened compounds, road beds and carved trenches.
 import * as THREE from 'three';
+import { wreck } from '../../render/Destruction.js';
 import { pbr } from '../../render/TextureFactory.js';
 import { Sky } from '../../render/Sky.js';
 import { Weather } from '../../render/Effects.js';
@@ -414,6 +415,7 @@ export class GopSector {
     const landed = () => {
       const tip = base.clone().addScaledVector(away, 6.5);
       g.effects.explosion(V(tip.x, this.hf(tip.x, tip.z), tip.z), 0.9, { snow: true }); g.audio.explosion(tip, 0.8); g.player.addShake(0.3);
+      { const W = wreck(g); W.chunks(V(tip.x, this.hf(tip.x, tip.z) + 0.6, tip.z), { count: 18, size: 0.3, speed: 5, up: 5, mat: 'metal' }); W.dustPuff(V(tip.x, this.hf(tip.x, tip.z) + 0.3, tip.z), 2.5); W.char(t.grp, 0.5); }
       g.world.addBoxCentered(base.clone().addScaledVector(away, 4).setY(this.hf(base.x, base.z) + 0.8), V(2.6, 1.6, 2.6), { surface: 'metal', cover: true });
     };
     g.mission.every((dt) => {

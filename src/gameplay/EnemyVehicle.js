@@ -3,6 +3,7 @@
 // (a lot), and burns out when destroyed. Registered in director.vehicles so
 // Combat can hit it.
 import * as THREE from 'three';
+import { wreck } from '../render/Destruction.js';
 import { buildTruck } from '../world/Props.js';
 import { cloneRaw } from '../gear/GearLib.js';
 import { events } from '../core/Events.js';
@@ -59,7 +60,13 @@ export class EnemyVehicle {
     g.combat.explode(this.position.clone().add(new THREE.Vector3(0, 1, 0)), { radius: 7, damage: 150, owner: 'world', kind: 'vehicle', label: '차량 폭발', scale: 1.6, playerSafe: g.player.position.distanceTo(this.position) > 9 });
     this.fire = g.effects.fireEmitter(this.position.clone().add(new THREE.Vector3(0, 1.2, 0)), 1.3);
     if (this.smoke) g.effects.removeEmitter(this.smoke);
-    this.root.traverse((o) => { if (o.isMesh && o.material) { o.material = o.material.clone(); o.material.color?.multiplyScalar(0.18); o.material.map = null; } });
+    // torn-off parts (wheels, panels, the gun), a charred hull, ammunition cooking off
+    const W = wreck(g); const parts = [];
+    this.root.traverse((o) => { if (o.isMesh && o.geometry) { o.geometry.computeBoundingSphere?.(); if (o.geometry.boundingSphere && o.geometry.boundingSphere.radius * o.getWorldScale(new THREE.Vector3()).x < 1.3) parts.push(o); } });
+    for (const o of parts.sort(() => Math.random() - 0.5).slice(0, 4)) W.detach(o, { v: new THREE.Vector3((Math.random() - 0.5) * 10, 5 + Math.random() * 7, (Math.random() - 0.5) * 10), half: 0.3 });
+    if (this.gun?.parent) W.detach(this.gun, { v: new THREE.Vector3((Math.random() - 0.5) * 4, 8, (Math.random() - 0.5) * 4), half: 0.3 });
+    W.chunks(this.position.clone().add(new THREE.Vector3(0, 1.2, 0)), { count: 10, size: 0.25, speed: 7, up: 7, mat: 'metal' });
+    W.char(this.root, 0.2); W.cookOff(this.position.clone().add(new THREE.Vector3(0, 1.2, 0)), { n: 3, scale: 0.45, dur: 7 });
     this.root.rotation.z = 0.08;
     g.world.addBoxCentered(this.position.clone().add(new THREE.Vector3(0, 1.1, 0)), new THREE.Vector3(3, 2.2, 6), { surface: 'metal', cover: true });
     events.emit('vehicle:destroyed', { vehicle: this });

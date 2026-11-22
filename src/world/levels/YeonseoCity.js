@@ -3,6 +3,7 @@
 // end at barricades (x = ±56). Station exit 3 at the east sidewalk (z ≈ 22); the station
 // interior is a separate enclosed area at x 300..380 entered through a stair transition.
 import * as THREE from 'three';
+import { wreck } from '../../render/Destruction.js';
 import { pbr } from '../../render/TextureFactory.js';
 import { Sky } from '../../render/Sky.js';
 import { settings } from '../../core/Settings.js';
@@ -211,6 +212,7 @@ export class YeonseoCity {
       v += 15 * dt; mid.position.y = Math.max(0.9, mid.position.y - v * dt); rot = Math.min(0.22, rot + dt * 0.3); mid.rotation.z = rot;
       if (mid.position.y <= 0.9) {
         g.effects.explosion(V(0, 0.5, o.z), 1.6); g.audio.explosion(V(0, 1, o.z), 1.4); g.player.addShake(0.45);
+        { const W = wreck(g); for (const x of [-8, 0, 8]) W.chunks(V(x, 1.5, o.z), { count: 20, size: 0.55, speed: 7, up: 5, mat: 'concrete' }); W.dustPuff(V(0, 0.8, o.z), 4); for (const x of [-9.5, 9.5]) { W.rebar(V(x, 7, o.z), V(-Math.sign(x), 0, 0).applyAxisAngle(V(0, 1, 0), 0), { width: 10, n: 9, len: 1.2 }); W.dustFall(V(x, 6.6, o.z), { width: 10, dur: 10, side: V(0, 0, 1) }); } }
         g.world.addBoxCentered(V(0, 1.5, o.z), V(20, 3, 12), { surface: 'concrete', cover: true });
         return false;
       }
