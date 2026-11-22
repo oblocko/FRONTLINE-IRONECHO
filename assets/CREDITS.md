@@ -57,3 +57,5 @@ Downloaded with `tools/sketchfab_get.py`, converted by `tools/prepare_gear.py` (
 - **Ushanka - Trapper Hat** by PeteDeee — CC Attribution — https://sketchfab.com/3d-models/ushanka-trapper-hat-1046cd56a67d4b79902e47aa0daf3ccb → `assets/gear/ushanka.glb` (북한군 장교 털모자(색 보정))
 - **MAN SV Truck – British Army (WARNO mod)** by rran81 — Free Standard (Sketchfab Standard licence: use inside the game is allowed; no redistribution of the model on its own) — https://sketchfab.com/3d-models/man-sv-truck-british-army-warno-mod-dc7d9a2aecd84a1c97ae3534dbfc6354 → `assets/gear/mansv.glb` (국군 수송 트럭 (KMTV 대용, 사용자 선택))
 - **Kamaz 5330** by Brout — CC Attribution — https://sketchfab.com/3d-models/kamaz-5330-e86a62f4b8c84e03b2c6e32c51474bc7 → `assets/gear/kamaz.glb` (북한군 기관총 트럭)
+- **SPz Puma** by 42manako — CC Attribution — https://sketchfab.com/3d-models/spz-puma-8e7d946d4b3d4fdeaf458a3fc4226e1b → `assets/gear/puma.glb` (국군 장갑차 (K21 대용, 적용 예정))
+- **M997A2 HMMWV communications vehicle** by 42manako — CC Attribution — https://sketchfab.com/3d-models/m997a2-hmmwv-communications-vehicle-597e28fd34cb4177847058b06940243e → `assets/gear/m997.glb` (군 구급차 (적용 예정))

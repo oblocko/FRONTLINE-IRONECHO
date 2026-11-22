@@ -28,6 +28,8 @@ ITEMS = {
   'fast_blk':  ('c80875fc588344448e92eefed460540e', 512, None),     # FAST helmet, black (707)
   'ushanka':   ('1046cd56a67d4b79902e47aa0daf3ccb', 512, None),     # fur winter hat (KPA officers)
   'kamaz':     ('e86a62f4b8c84e03b2c6e32c51474bc7', 1024, None),    # KPA truck (Kamaz 5330 class)
+  'puma':      ('8e7d946d4b3d4fdeaf458a3fc4226e1b', 1024, None),    # ROK IFV stand-in for the K21 (SPz Puma)
+  'm997':      ('597e28fd34cb4177847058b06940243e', 1024, None),    # military ambulance (HMMWV M997A2 body)
   'mansv':     ('dc7d9a2aecd84a1c97ae3534dbfc6354', 1024, None),    # ROK truck stand-in for the KMTV (MAN SV; Sketchfab Standard licence, user-chosen)
 }
 def gt(*a): subprocess.run(GT + list(a), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
