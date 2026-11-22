@@ -17,7 +17,8 @@
     "test:m03": "vite build && node tests/mission03_playthrough.mjs",
     "test:m04": "vite build && node tests/mission04_playthrough.mjs",
     "test:sweep": "vite build && node tests/sweep.mjs",
-    "compose:menu": "python3 tools/compose_menu_theme.py menu_theme.wav && ffmpeg -y -i menu_theme.wav -codec:a libmp3lame -b:a 192k assets/audio/menu_theme.mp3"
+    "compose:menu": "python3 tools/compose_menu_theme.py menu_theme.wav && ffmpeg -y -i menu_theme.wav -codec:a libmp3lame -b:a 192k assets/audio/menu_theme.mp3",
+    "test:m05": "vite build && node tests/mission05_branches.mjs"
   },
   "dependencies": {
     "three": "0.187.0"
