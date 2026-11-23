@@ -184,7 +184,7 @@ export class GopSector {
       const nxv = -dz * r.w / 2, nzv = dx * r.w / 2;
       if (i > 0) dist += Math.hypot(x - pts[i - 1][0], z - pts[i - 1][1]);
       for (const s of [-1, 1]) { const vx = x + nxv * s, vz = z + nzv * s; pos.push(vx, hf(vx, vz) + 0.05, vz); uv.push((s + 1) / 2 * r.w / 4, dist / 4); }
-      if (i > 0) { const a = (i - 1) * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+      if (i > 0) { const a = (i - 1) * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
     }
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
     const mat = r.mat === 'asphalt' ? pbr('asphalt', { color: 0xc8c8c8 }) : pbr('dirt', { color: 0xd0c8c0 });

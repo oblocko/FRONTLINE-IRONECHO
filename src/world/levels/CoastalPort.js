@@ -104,11 +104,11 @@ export class CoastalPort {
   async terrain() {
     const g = this.game, B = PORT.bounds, scene = g.renderer.scene;
     const grass = pbr('grassdead', { repeat: [1, 1], color: 0x8a8a70, key: 'coastgrass' });
-    const pave = pbr('concrete', { repeat: [1, 1], color: 0x9a9890, key: 'portpave' });
+    const pave = portPavement();
     const build = (z0, z1, mat) => {
       const sx = B.maxX - B.minX + 60, sz = z1 - z0; const geo = new THREE.PlaneGeometry(sx, sz, Math.round(sx / 1.2), Math.round(sz / 1.2)); geo.rotateX(-Math.PI / 2);
       const p = geo.attributes.position, uv = geo.attributes.uv; const cx = (B.minX + B.maxX) / 2 + 20, cz = (z0 + z1) / 2;
-      for (let i = 0; i < p.count; i++) { const x = Math.max(PORT.coastX, p.getX(i) + cx), z = p.getZ(i) + cz; p.setXYZ(i, x, heightAt(x, z), z); uv.setXY(i, x / 6, z / 6); }
+      for (let i = 0; i < p.count; i++) { const x = Math.max(PORT.coastX, p.getX(i) + cx), z = p.getZ(i) + cz; p.setXYZ(i, x, heightAt(x, z), z); uv.setXY(i, x / (mat.userData.tile || 6), z / (mat.userData.tile || 6)); }
       geo.computeVertexNormals(); const m = new THREE.Mesh(geo, mat); m.receiveShadow = true; scene.add(m);
     };
     build(B.minZ - 40, -46, grass); await new Promise((r) => setTimeout(r, 0));
@@ -154,12 +154,16 @@ export class CoastalPort {
         let dx = qx - px, dz = qz - pz; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
         if (i > 0) dist += Math.hypot(x - P[i - 1][0], z - P[i - 1][1]);
         for (const s of [-1, 1]) { const vx = x - dz * w / 2 * s, vz = z + dx * w / 2 * s; pos.push(vx, hf(vx, vz) + 0.04, vz); uv.push((s + 1) / 2 * w / 4, dist / 4); }
-        if (i > 0) { const a = (i - 1) * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+        if (i > 0) { const a = (i - 1) * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
       }
       const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
       const m = new THREE.Mesh(geo, mat); m.material.polygonOffset = true; m.material.polygonOffsetFactor = -3; m.receiveShadow = true; scene.add(m);
+      if (mat.userData.marked) {   // painted lines: same strip, u 0..1 across, v every 6 m along
+        const g2 = geo.clone(); const u2 = g2.attributes.uv; for (let i = 0; i < u2.count; i++) u2.setXY(i, i % 2, uv[i * 2 + 1] * 4 / 6);
+        const mk = new THREE.Mesh(g2, roadLines()); mk.receiveShadow = true; mk.renderOrder = 1; scene.add(mk);
+      }
     };
-    const asphalt = pbr('asphalt', { color: 0x777777, key: 'portroad' });
+    const asphalt = pbr('asphalt', { color: 0x6a6a6a, key: 'portroad' }); asphalt.userData.marked = true;
     ribbon([[30, -160], [34, -130], [36, -112], [36, -80], [34, -48], [30, -20], [24, 20], [22, 60], [28, 96]], 8, asphalt);
     ribbon([[-50, -40], [-50, 130]], 9, asphalt);                // quay road under the crane
     ribbon([[-50, -40], [34, -42]], 7, asphalt);
@@ -394,4 +398,38 @@ export class CoastalPort {
     for (const h of this.helos) { h.userData.rotor.rotation.y += dt * 30; h.userData.tail.rotation.x += dt * 40; h.userData.beacon.visible = Math.sin(t * 8) > 0; }
     if (this.landingCraft) for (const [i, c] of this.craft.entries()) { if (c.position.x < -70) c.position.x += dt * (9 + i * 0.6); c.position.y = Math.sin(t * 1.5 + i) * 0.15; }
   }
+}
+
+// port pavement: 6 m concrete slabs with sealed joints, oil stains, tyre tracks and the odd patch (one
+// 24 m tile, so the repeat is not obvious at walking scale)
+let _pave = null;
+function portPavement() {
+  if (_pave) return _pave;
+  const N = 1024, c = document.createElement('canvas'); c.width = c.height = N; const x = c.getContext('2d');
+  const r = (() => { let s = 99; return () => ((s = (s * 16807) % 2147483647) / 2147483647); })();
+  x.fillStyle = '#7d7a73'; x.fillRect(0, 0, N, N);
+  const slab = N / 4;
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { const v = Math.floor((r() - 0.5) * 18); x.fillStyle = `rgb(${124 + v},${121 + v},${114 + v})`; x.fillRect(i * slab, j * slab, slab, slab); }
+  for (let k = 0; k < 14000; k++) { const a = r() * 0.08; x.fillStyle = r() < 0.5 ? `rgba(0,0,0,${a})` : `rgba(255,255,255,${a * 0.6})`; x.fillRect(r() * N, r() * N, 1 + r() * 2, 1 + r() * 2); }
+  for (let k = 0; k < 18; k++) { const cx = r() * N, cy = r() * N, rad = 10 + r() * 50; const g = x.createRadialGradient(cx, cy, 0, cx, cy, rad); g.addColorStop(0, `rgba(30,28,24,${0.15 + r() * 0.25})`); g.addColorStop(1, 'rgba(30,28,24,0)'); x.fillStyle = g; x.beginPath(); x.ellipse(cx, cy, rad, rad * (0.5 + r() * 0.5), r() * 3, 0, Math.PI * 2); x.fill(); }   // oil
+  x.strokeStyle = 'rgba(40,38,34,0.10)'; for (let k = 0; k < 6; k++) { const y0 = r() * N; x.lineWidth = 10 + r() * 8; x.beginPath(); x.moveTo(0, y0); x.bezierCurveTo(N * 0.3, y0 + (r() - 0.5) * 200, N * 0.7, y0 + (r() - 0.5) * 200, N, y0 + (r() - 0.5) * 80); x.stroke(); }   // tyre tracks
+  x.fillStyle = 'rgba(120,118,110,0.6)'; for (let k = 0; k < 3; k++) x.fillRect(r() * N, r() * N, 40 + r() * 80, 30 + r() * 60);   // patches
+  x.strokeStyle = '#3a3834'; x.lineWidth = 3; for (let i = 0; i <= 4; i++) { x.beginPath(); x.moveTo(i * slab, 0); x.lineTo(i * slab, N); x.stroke(); x.beginPath(); x.moveTo(0, i * slab); x.lineTo(N, i * slab); x.stroke(); }   // joints
+  x.strokeStyle = 'rgba(30,28,24,0.5)'; x.lineWidth = 1; for (let k = 0; k < 8; k++) { let px = r() * N, py = r() * N; x.beginPath(); x.moveTo(px, py); for (let s = 0; s < 8; s++) { px += (r() - 0.5) * 40; py += (r() - 0.5) * 40; x.lineTo(px, py); } x.stroke(); }   // cracks
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
+  _pave = new THREE.MeshStandardMaterial({ map: t, roughness: 0.9, metalness: 0 }); _pave.userData.tile = 24;
+  return _pave;
+}
+// road paint: white edge lines, yellow dashed centre line (transparent strip laid over the asphalt)
+let _lines = null;
+function roadLines() {
+  if (_lines) return _lines;
+  const c = document.createElement('canvas'); c.width = 128; c.height = 256; const x = c.getContext('2d');
+  x.clearRect(0, 0, 128, 256);
+  x.fillStyle = 'rgba(235,235,225,0.9)'; x.fillRect(4, 0, 4, 256); x.fillRect(120, 0, 4, 256);
+  x.fillStyle = 'rgba(230,180,40,0.9)'; x.fillRect(62, 0, 4, 150);
+  for (let k = 0; k < 400; k++) { x.clearRect(Math.random() * 128, Math.random() * 256, 1 + Math.random() * 2, 1 + Math.random() * 2); }   // worn paint
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
+  _lines = new THREE.MeshStandardMaterial({ map: t, transparent: true, depthWrite: false, roughness: 0.7, polygonOffset: true, polygonOffsetFactor: -6 });
+  return _lines;
 }

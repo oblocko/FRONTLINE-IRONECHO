@@ -150,7 +150,7 @@ export class HantanRiver {
         let dx = qx - px, dz = qz - pz; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
         if (i > 0) dist += Math.hypot(x - P[i - 1][0], z - P[i - 1][1]);
         for (const s of [-1, 1]) { const vx = x - dz * w / 2 * s, vz = z + dx * w / 2 * s; pos.push(vx, hf(vx, vz) + lift, vz); uv.push((s + 1) / 2 * w / 4, dist / 4); }
-        if (i > 0) { const a = (i - 1) * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+        if (i > 0) { const a = (i - 1) * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
       }
       const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
       const m = new THREE.Mesh(geo, mat); m.material.polygonOffset = true; m.material.polygonOffsetFactor = -3; m.receiveShadow = true; scene.add(m);
