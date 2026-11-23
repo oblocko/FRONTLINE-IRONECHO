@@ -14,10 +14,10 @@ export const DEFAULT_BINDINGS = {
 };
 
 export const QUALITY_PRESETS = {
-  low:    { shadows: 'off',    textures: 'low',    effects: 'low',    post: false, renderScale: 0.75 },
-  medium: { shadows: 'medium', textures: 'medium', effects: 'medium', post: true,  renderScale: 1.0 },
-  high:   { shadows: 'high',   textures: 'high',   effects: 'high',   post: true,  renderScale: 1.0 },
-  ultra:  { shadows: 'ultra',  textures: 'high',   effects: 'high',   post: true,  renderScale: 1.0 },
+  low:    { shadows: 'off',    textures: 'low',    effects: 'low',    post: false, renderScale: 0.75, aa: 0, ao: 'off' },
+  medium: { shadows: 'medium', textures: 'medium', effects: 'medium', post: true,  renderScale: 1.0,  aa: 2, ao: 'off' },
+  high:   { shadows: 'high',   textures: 'high',   effects: 'high',   post: true,  renderScale: 1.0,  aa: 4, ao: 'medium' },
+  ultra:  { shadows: 'ultra',  textures: 'high',   effects: 'high',   post: true,  renderScale: 1.0,  aa: 4, ao: 'high' },
 };
 
 export const DEFAULT_SETTINGS = {
@@ -29,6 +29,8 @@ export const DEFAULT_SETTINGS = {
     textures: 'high',         // low | medium | high (procedural texture resolution)
     effects: 'high',          // low | medium | high (particle budgets)
     post: true,               // bloom + film grain + vignette + color grading
+    aa: 4,                    // MSAA samples on the scene render target (0 | 2 | 4)
+    ao: 'medium',             // ambient occlusion (GTAO): off | medium (half resolution) | high (full)
     fov: 80,
     frameLimit: 0,            // 0 = unlimited (display refresh)
     vsync: true,              // browsers always present on vblank; see docs
@@ -56,7 +58,13 @@ class SettingsStore {
   load() {
     try {
       const raw = localStorage.getItem(KEY);
-      if (raw) return deepMerge(DEFAULT_SETTINGS, JSON.parse(raw));
+      if (raw) {
+        const saved = JSON.parse(raw); const out = deepMerge(DEFAULT_SETTINGS, saved);
+        // settings added later (antialiasing, ambient occlusion) follow the saved preset, not the defaults
+        const pr = QUALITY_PRESETS[out.graphics.preset];
+        if (pr) for (const k of ['aa', 'ao']) if (!(saved.graphics && k in saved.graphics)) out.graphics[k] = pr[k];
+        return out;
+      }
     } catch (e) { console.warn('settings load failed', e); }
     return structuredClone(DEFAULT_SETTINGS);
   }

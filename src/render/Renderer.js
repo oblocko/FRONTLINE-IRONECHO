@@ -1,11 +1,13 @@
 // Renderer: WebGL2 + PBR + shadows + post-processing chain
-// (RenderPass -> UnrealBloom -> cinematic grade [grain, vignette, damage, flash, letterbox] -> OutputPass)
+// (RenderPass into an MSAA half-float target -> GTAO ambient occlusion -> UnrealBloom ->
+//  cinematic grade [grain, vignette, damage, flash, letterbox] -> OutputPass)
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { settings } from '../core/Settings.js';
 import { events } from '../core/Events.js';
@@ -77,9 +79,27 @@ export class Renderer {
     this.envMap = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     this.vmScene.environment = this.envMap; this.vmScene.environmentIntensity = 0.55;
 
-    this.composer = new EffectComposer(this.renderer);
+    // the composer's own target would drop the canvas' antialiasing, so the scene renders into a
+    // multisampled one (samples follow graphics.aa)
+    this.sceneTarget = new THREE.WebGLRenderTarget(innerWidth, innerHeight, { type: THREE.HalfFloatType, samples: 4 });
+    this.composer = new EffectComposer(this.renderer, this.sceneTarget);
     this.renderPass = new RenderPass(this.scene, this.camera);
     this.composer.addPass(this.renderPass);
+    // ambient occlusion: darkens creases, corners, the ground under props and people (off on low/medium)
+    this.ao = new GTAOPass(this.scene, this.camera, innerWidth, innerHeight);
+    this.ao.output = GTAOPass.OUTPUT.Default; this.ao.blendIntensity = 0.85;
+    this.ao.updateGtaoMaterial({ radius: 0.6, distanceExponent: 1.4, thickness: 1.2, scale: 1.0, samples: 12, distanceFallOff: 1.0 });
+    this.ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 12 });
+    // smoke, fire, glass, water, decals and sprites must not occlude in the AO depth/normal pass
+    this.ao._overrideVisibility = function () {
+      const cache = this._visibilityCache;
+      this.scene.traverseVisible((o) => {
+        const m = o.material; const soft = m && (Array.isArray(m) ? m.some((x) => x.transparent || !x.depthWrite) : (m.transparent || !m.depthWrite));
+        if (o.isPoints || o.isLine || o.isLine2 || o.isSprite || (o.isMesh && soft)) cache.push(o);
+      });
+      for (const o of cache) o.visible = false;
+    };
+    this.composer.addPass(this.ao);
     this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.45, 0.6, 0.85);
     this.composer.addPass(this.bloom);
     this.grade = new ShaderPass(GradeShader);
@@ -100,6 +120,10 @@ export class Renderer {
     this.shadowSize = { off: 512, medium: 1024, high: 2048, ultra: 4096 }[g.shadows] || 2048;
     this.bloom.enabled = !!g.post;
     this.postEnabled = !!g.post;
+    const samples = g.aa ?? 4;
+    for (const rt of [this.composer.renderTarget1, this.composer.renderTarget2]) if (rt.samples !== samples) { rt.samples = samples; rt.dispose(); }
+    this.ao.enabled = (g.ao || 'off') !== 'off';
+    this.aoScale = g.ao === 'high' ? 1 : 0.5;
     this.resize();
     events.emit('render:quality', g);
   }
@@ -110,6 +134,7 @@ export class Renderer {
     this.renderer.setSize(innerWidth, innerHeight);
     this.composer.setPixelRatio(scale);
     this.composer.setSize(innerWidth, innerHeight);
+    if (this.ao) this.ao.setSize(Math.round(innerWidth * scale * (this.aoScale ?? 1)), Math.round(innerHeight * scale * (this.aoScale ?? 1)));
     this.camera.aspect = innerWidth / innerHeight; this.camera.updateProjectionMatrix();
     this.vmCamera.aspect = this.camera.aspect; this.vmCamera.updateProjectionMatrix();
   }

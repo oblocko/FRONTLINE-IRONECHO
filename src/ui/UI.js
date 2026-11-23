@@ -243,6 +243,8 @@ export class UI {
           seg('그림자 품질', 'graphics.shadows', [['off', 'OFF'], ['medium', 'MEDIUM'], ['high', 'HIGH'], ['ultra', 'ULTRA']]),
           seg('효과 품질', 'graphics.effects', [['low', 'LOW'], ['medium', 'MEDIUM'], ['high', 'HIGH']], '파티클 수 · 다음 레벨 로드 시 적용'),
           seg('후처리', 'graphics.post', [[true, 'ON'], [false, 'OFF']], '블룸 · 필름 그레인 · 비네트 · 색보정'),
+          seg('안티에일리어싱', 'graphics.aa', [[0, 'OFF'], [2, 'MSAA 2×'], [4, 'MSAA 4×']], '가장자리 계단 현상 제거'),
+          seg('주변광 차폐', 'graphics.ao', [['off', 'OFF'], ['medium', 'MEDIUM'], ['high', 'HIGH']], '구석 · 틈 · 물체 아래의 자연스러운 음영 (GTAO). GPU 부담이 큼'),
           slider('시야각 (FOV)', 'graphics.fov', 65, 105, 1, (v) => `${v}°`),
           seg('프레임 제한', 'graphics.frameLimit', [[0, 'OFF'], [30, '30'], [60, '60'], [120, '120'], [144, '144']]),
           seg('수직 동기화', 'graphics.vsync', [[true, 'ON'], [false, 'OFF']], '브라우저는 항상 디스플레이 주사율에 맞춰 화면을 출력합니다(OFF 시 티어링 해제 불가). OFF로 두면 프레임 제한만 적용됩니다.'),
