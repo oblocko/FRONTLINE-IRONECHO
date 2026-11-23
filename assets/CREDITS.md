@@ -65,4 +65,4 @@ Downloaded with `tools/sketchfab_get.py`, converted by `tools/prepare_gear.py` (
 
 ## 음성 (Voice)
 
-- **한민재 대사 (M01, 5줄)** — 프로젝트 소유자가 제작·제공한 녹음 → `assets/voice/m01/minjae_001–005.mp3`. 녹음 파일이 있는 대사는 이 음성으로 재생되고, 없는 대사는 설정에 따라 음성 합성(TTS) 또는 웅얼거림으로 대체됩니다.
+- **한민재 대사 (M01, 5줄)** — 프로젝트 소유자가 ElevenLabs 음성 합성으로 제작해 제공 (사용 조건은 제작자의 ElevenLabs 요금제 약관을 따름) → `assets/voice/m01/minjae_001–005.mp3`. 녹음 파일이 있는 대사는 이 음성으로 재생되고, 없는 대사는 설정에 따라 음성 합성(TTS) 또는 웅얼거림으로 대체됩니다.

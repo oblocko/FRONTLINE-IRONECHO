@@ -504,7 +504,7 @@ export class UI {
       for (const m of list) {
         const v = new THREE.Vector3(m.x, m.y + 1.2, m.z); const dist = Math.round(v.distanceTo(p.position));
         const proj = v.clone().project(cam);
-        if (proj.z < 1 && Math.abs(proj.x) < 1.1 && Math.abs(proj.y) < 1.1) {
+        if (!o.compassOnly && proj.z < 1 && Math.abs(proj.x) < 1.1 && Math.abs(proj.y) < 1.1) {   // compassOnly: navigation by bearing (no on-screen marker)
           const sx = (proj.x * 0.5 + 0.5) * W, sy = (-proj.y * 0.5 + 0.5) * H;
           html += `<div class="mk" style="left:${sx}px;top:${sy}px;opacity:${ads > 0.6 ? 0.35 : 1}">${dist}m</div>`;
         }

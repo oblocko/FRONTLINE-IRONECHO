@@ -171,6 +171,9 @@ export const LOOKS = {
   us: { cloth: 'camoUS', top: 0xffffff, pants: 0xffffff, boot: 0x8a7354, glove: 0x6e6248, rep: 4.5 },
   // private security contractors (Voss's former outfit): dark softshells, plain plate carriers, headsets
   pmc: { cloth: 'fabric', top: 0x2a2d31, pants: 0x3b3a36, boot: 0x2a2620, glove: 0x1a1a1a, rep: 10 },
+  // M06: Nadia Rahman (olive field jacket, dark trousers) and the harbour gang's hired guns (street clothes, light vests)
+  nadia: { cloth: 'fabric', top: 0x343a2a, pants: 0x1c1c1f, boot: 0x1d1a16, glove: 0x1c1c1c, rep: 10 },
+  merc: { cloth: 'fabric', top: 0x4a4d55, pants: 0x2a2e36, boot: 0x2a2620, glove: -1, rep: 10 },
   police: { cloth: 'fabric', top: 0x1f2a44, pants: 0x1c2232, boot: 0x141414, glove: -1, rep: 10 },
 };
 const CIV_TOPS = [0x3b4a6b, 0x6b3b3b, 0x5a5a5a, 0x2f4f3f, 0x7a6a4a, 0x2a2a35, 0x8a8478, 0x4a3a5a, 0xa05a2a, 0x2a5a6a, 0xc8c2b4];
@@ -443,7 +446,7 @@ export function gearFor(kind, key, hat, variant, sex = 'm') {
     P('spine_03', M.leather, T(roundedBox(0.03, 0.62, 0.012, 0.004), 0.02, chest.y - 0.02, cz + 0.13, 0, 0, -0.5));
     P('pelvis', M.leather, T(roundedBox(0.07, 0.15, 0.05, 0.015), pel.x - 0.17, pel.y + 0.0, pel.z + 0.06));
   } else if (soldier) {
-    const real = armorPart({ kpa: 'rig', us: 'heavy', pmc: 'heavy' }[key] || 'olive');
+    const real = armorPart({ kpa: 'rig', us: 'heavy', pmc: 'heavy', merc: 'rig', nadia: 'heavy' }[key] || 'olive');
     if (real) {
       const fit = ARMOR_FIT[key] || ARMOR_FIT.def;
       P('spine_03', real.material, real.geometry.clone().translate(0, chest.y + fit[0], cz + fit[1]));
@@ -539,7 +542,7 @@ function weaponParts(type) {
   return (WEAPONS[type] = { geos, mats: M, muzzle });
 }
 export function weaponTypeFor(look) {
-  return { rok: 'k2c1', rok_sf: 'k13', rok_707: 'k13', us: 'k13', pmc: 'k13', kpa: 'ak88', kpa_officer: 'ak88', kpa_sf: 'ak88s', kpa_sfb: 'aknew' }[look] || 'k2c1';
+  return { rok: 'k2c1', rok_sf: 'k13', rok_707: 'k13', us: 'k13', pmc: 'k13', nadia: 'k13', merc: 'ak88s', kpa: 'ak88', kpa_officer: 'ak88', kpa_sf: 'ak88s', kpa_sfb: 'aknew' }[look] || 'k2c1';
 }
 // real models (src/gear) per procedural type; the procedural rifle stays as the fallback
 const GEAR_FOR = { k2c1: 'k2c1', k13: 'm4a1', ak88: 'ak74', ak88s: 'ak74m', aknew: 'ak74m' };

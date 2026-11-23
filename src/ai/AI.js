@@ -26,7 +26,7 @@ export class AIAgent {
     this.team = opts.team; // 'friendly' | 'enemy'
     this.name = opts.name || (this.team === 'enemy' ? 'Hostile' : 'Soldier');
     this.callsign = opts.callsign || this.name;
-    this.actor = createActor(director.scene, { faction: opts.faction || (this.team === 'enemy' ? 'kpa' : 'rok'), name: this.name, variant: this.id, hat: opts.hat, weapon: opts.weapon !== false });
+    this.actor = createActor(director.scene, { faction: opts.faction || (this.team === 'enemy' ? 'kpa' : 'rok'), name: this.name, variant: this.id, hat: opts.hat, weapon: opts.weapon !== false, look: opts.look || null, sex: opts.sex || null });
     this.actor.root.position.copy(opts.pos);
     this.actor.root.position.y = director.world.groundHeight(opts.pos.x, opts.pos.z, Math.max(opts.pos.y, director.world.heightFn(opts.pos.x, opts.pos.z)) + 1.2);
     this.yaw = opts.yaw ?? 0; this.actor.root.rotation.y = this.yaw;

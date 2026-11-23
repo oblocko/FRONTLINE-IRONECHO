@@ -49,12 +49,12 @@ const ONESHOT = new Set(['Death01', 'Hit_Chest', 'Hit_Head', 'OverhandThrow']);
 const FINGERS = ['index', 'middle', 'ring', 'pinky'];
 
 export class ModelActor {
-  constructor(scene, { faction = 'rok', name = '', variant = 0, scale = 1, weapon = true, hat = 'helmet', look: lookOverride = null } = {}) {
+  constructor(scene, { faction = 'rok', name = '', variant = 0, scale = 1, weapon = true, hat = 'helmet', look: lookOverride = null, sex: sexOverride = null } = {}) {
     const lib = characterLib();
     this.faction = faction; this.name = name; this.variant = variant; this.isModel = true;
     const civ = faction === 'civ';
     const look = lookOverride || lookKey(faction, variant, weapon, hat); this.look = look;
-    const sex = lib.f && ((civ && variant % 3 === 1) || (look === 'us' && variant % 4 === 3)) ? 'f' : 'm'; this.sex = sex;
+    const sex = sexOverride && lib.f ? sexOverride : lib.f && ((civ && variant % 3 === 1) || (look === 'us' && variant % 4 === 3)) ? 'f' : 'm'; this.sex = sex;
     if (look === 'kpa_officer') hat = 'officer';
     this.root = new THREE.Group(); this.root.scale.setScalar(scale); this.root.userData.dynamic = true; scene.add(this.root);
     this.model = cloneBody(sex); this.root.add(this.model);
