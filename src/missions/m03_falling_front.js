@@ -293,7 +293,7 @@ export const SEGMENTS = [
     async run(game, m) {
       const lv = game.level, sq = game.squad;
       squadToLine(game);
-      game.objectives.add('mgpos', '교량 기관총 진지로 이동', { marker: lv.mg.seatWorld() });
+      game.objectives.add('mgpos', '교량 기관총 진지로 이동', { waypoint: true, marker: lv.mg.seatWorld() });
       await m.until(() => lv.mg.manned || game.player.position.distanceTo(lv.mg.seatWorld()) < 4, 60);
       game.objectives.complete('mgpos');
       lv.war = true; game.audio.setMusic('tension');
@@ -378,7 +378,7 @@ export const SEGMENTS = [
       game.objectives.complete('charges');
       await m.say('yoon', '설치 끝! 기폭 장치로 뛰어!', { priority: 3 });
       sq.yoon.moveTo(V(-3.5, 0, 25), { run: true, onArrive: (a) => a.hold(V(-3.5, 0, 25), V(0, 0, -30)) });
-      game.objectives.add('det', '기폭 장치로 복귀', { marker: R.detonator.clone().setY(lv.hf(R.detonator.x, R.detonator.z) + 0.8) });
+      game.objectives.add('det', '기폭 장치로 복귀', { waypoint: true, marker: R.detonator.clone().setY(lv.hf(R.detonator.x, R.detonator.z) + 0.8) });
       await m.reach(R.detonator, 3);
       game.objectives.complete('det');
     },

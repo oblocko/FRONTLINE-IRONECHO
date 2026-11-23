@@ -280,7 +280,7 @@ export const SEGMENTS = [
     async setup(game) { daniel(game); game.level.setUnderground(0); game.player.teleport(V(-77, 0, -26), 0); },
     async run(game, m) {
       const lv = game.level, p = game.player;
-      if (p.position.z < 4) { game.objectives.add('court', '보관소 안뜰로 이동', { marker: V(-76, 1.5, 12) }); await m.reach(V(-76, 0, 12), 6, { yTol: 4 }); game.objectives.complete('court'); }
+      if (p.position.z < 4) { game.objectives.add('court', '보관소 안뜰로 이동', { waypoint: true, marker: V(-76, 1.5, 12) }); await m.reach(V(-76, 0, 12), 6, { yTol: 4 }); game.objectives.complete('court'); }
       const route = flag('m05_route'), metro = flag('m05_metro'), tail = flag('m05_tail');
       await m.talk([
         ['maya', '저 강철문이야. "기록물 보관 — 출입 제한". 지하 채석장 터널을 개조한 창고고, 경비는 Halvard 계약 업체야. 너희 옛 사람들.', { radio: true, priority: 3 }],
@@ -417,13 +417,13 @@ export const SEGMENTS = [
       }
       // exfil: the ladder at the end of the east tunnel, then the courtyard and the van
       const guardE = spawnWave([[392, 133.2], [386, 134.8]]);
-      game.objectives.add('ladder', '동쪽 터널의 사다리로', { marker: A.ladder.clone().setY(1.5) });
+      game.objectives.add('ladder', '동쪽 터널의 사다리로', { waypoint: true, marker: A.ladder.clone().setY(1.5) });
       await interact(game, { pos: A.ladder.clone().setY(1.2), prompt: '사다리 오르기', radius: 2.0 });
       game.objectives.complete('ladder');
       await fade(game, m, async () => { lv.setUnderground(0); for (const e of game.director.enemies()) game.director.remove(e); p.teleport(V(-70, 0, 9), Math.PI); });
       const chasers = spawnWave([[-80, 30], [-84, 26], [-72, 32]]);
       const lane = spawnWave([[-74, -12], [-80, -18]]);
-      game.objectives.add('van', '골목의 마야 밴으로', { marker: P.van.clone().setY(2.4) });
+      game.objectives.add('van', '골목의 마야 밴으로', { waypoint: true, marker: P.van.clone().setY(2.4) });
       await m.say('maya', '안뜰 남쪽 골목! 밴 시동 걸어 뒀어!', { radio: true, priority: 3 });
       await interact(game, { pos: P.van.clone().add(V(1.3, 1.0, 0)), prompt: '밴에 타기', radius: 2.4 });
       game.objectives.complete('van');
@@ -447,7 +447,7 @@ export const SEGMENTS = [
 // ② metro route: crowd stealth on the platform, catch the train
 async function metroRoute(game, m) {
   const lv = game.level, p = game.player, M = P.m;
-  game.objectives.add('metro', '광장의 메트로 입구로', { marker: P.metroTop.clone().setY(2.4) });
+  game.objectives.add('metro', '광장의 메트로 입구로', { waypoint: true, marker: P.metroTop.clone().setY(2.4) });
   await interact(game, { pos: P.metroTop.clone().add(V(0, 0.6, 2.6)), prompt: '메트로로 내려가기', radius: 2.4 });
   game.objectives.complete('metro');
   const hot = flag('m05_tail_id') === 'wrong';
@@ -485,7 +485,7 @@ async function metroRoute(game, m) {
   const eng = game.audio.engineLoop('truck'); eng?.set(0.6, 0.3);
   let v = 16; await new Promise((res) => m.every((dt) => { const left = tr.position.x - 362; v = Math.max(0.6, Math.min(16, left * 0.45)); tr.position.x -= v * dt; eng?.setPos(tr.position); if (left < 0.1) { tr.position.x = 362; res(); return false; } }));
   eng?.set(0.25, 0.3); lv.setTrainDoors(1); game.audio.click(0.3, 1600, 0.2);
-  game.objectives.complete('blend'); game.objectives.add('board', '열차에 탑승', { markers: [V(371.5, 1.4, 1), V(390, 1.4, 1), V(408, 1.4, 1)] });
+  game.objectives.complete('blend'); game.objectives.add('board', '열차에 탑승', { waypoint: true, markers: [V(371.5, 1.4, 1), V(390, 1.4, 1), V(408, 1.4, 1)] });
   const doorPts = []; tr.updateMatrixWorld(true); for (const dd of lv.trainDoors) { const w = dd.l.parent.getWorldPosition(new THREE.Vector3()); doorPts.push(V(w.x, 0, 0.9)); }
   let boarded = false; const its = doorPts.map((pt) => p.addInteractable({ pos: pt.clone().setY(1.1), prompt: '열차 탑승', radius: 1.8, onUse: () => { boarded = true; } }));
   m.bind(() => its.forEach((it) => p.removeInteractable(it)));
@@ -509,7 +509,7 @@ async function alleyRoute(game, m) {
   game.objectives.complete('lure');
   lv.tailFree = true;
   const hide = V(-34.6, 0, 20.7);
-  game.objectives.add('hide', `쓰레기통 뒤에 숨기 — ${k(game, 'crouch')} 앉기`, { marker: hide.clone().setY(1) });
+  game.objectives.add('hide', `쓰레기통 뒤에 숨기`, { waypoint: true, marker: hide.clone().setY(1) }); game.ui.hint(`${k(game, 'crouch')} 앉기`, 3);
   await m.say('maya', hot ? '그 사람 총 꺼냈어. 조심해 — 그냥 들어오지 않을 거야.' : '따라 들어온다. 숨어.', { radio: true, priority: 3 });
   await m.until(() => p.position.distanceTo(V(hide.x, p.position.y, hide.z)) < 2 && p.crouching, 30);
   game.objectives.complete('hide');
@@ -560,7 +560,7 @@ async function alleyRoute(game, m) {
   for (const e of team) if (!e.dead) e.kill(p.position);
   game.objectives.complete('fight'); game.audio.setMusic('tension');
   await m.say('maya', '통로 끝이 안뜰이야. 보관소 문이 거기 있어.', { radio: true, priority: 3 });
-  game.objectives.add('court2', '통로를 지나 안뜰로', { marker: V(-70, 1.5, 19) });
+  game.objectives.add('court2', '통로를 지나 안뜰로', { waypoint: true, marker: V(-70, 1.5, 19) });
   await m.reach(V(-68, 0, 19), 4);
   game.objectives.complete('court2');
 }

@@ -92,7 +92,7 @@ async function stealthPatrol(game, m) {
   const wy = lv.hf(wallX, 34);
   game.props.box(V(0.45, 1.35, 9), V(wallX, wy + 0.67, 34), pbrBlk(), { surface: 'concrete' });
   ['yoon', 'jung', 'doyun'].forEach((key, i) => { const a = sq[key]; a.setPassive(true); a.moveTo(hide[i === 0 ? 0 : i === 1 ? 2 : 1].clone().add(V(-0.6, 0, i - 1)), { run: true, crouch: true, face: V(90, 0, 34) }); });
-  game.objectives.add('hide', `돌담 뒤에 숨기 — ${k('crouch')} 앉기`, { marker: hide[1] });
+  game.objectives.add('hide', `돌담 뒤에 숨기`, { waypoint: true, marker: hide[1] }); game.ui.hint(`${k('crouch')} 앉기`, 3);
   await m.say('yoon', '멈춰! 돌담 뒤로, 앉아. 정찰조다. 그냥 보내.', { priority: 3 });
   await m.until(() => (p.position.distanceTo(V(hide[1].x, p.position.y, hide[1].z)) < 3.5 && p.crouching), 12);
   game.objectives.complete('hide');
@@ -577,7 +577,7 @@ export const SEGMENTS = [
     async run(game, m) {
       const lv = game.level, sq = game.squad, scene = game.renderer.scene;
       m.every((dt) => { lv.dawn = Math.min(0.42, lv.dawn + dt * 0.0015); });
-      game.objectives.add('rally', '집결지 브라보로 이동', { marker: V(100, lv.hf(100, 113), 113) });
+      game.objectives.add('rally', '집결지 브라보로 이동', { waypoint: true, marker: V(100, lv.hf(100, 113), 113) });
       await m.reach(V(100, lv.hf(100, 113), 113), 8);
       game.objectives.complete('rally');
       sq.yoon.hold(V(96, 0, 110.5), V(90, 0, 80)); sq.jung.hold(V(105, 0, 110.5), V(95, 0, 80)); sq.doyun.pose('sit'); sq.doyun.actor.target.sit = 1;
@@ -630,7 +630,7 @@ export const SEGMENTS = [
       m.every((dt) => { rt = Math.min(1, rt + dt * 0.5); ramp.rotation.x = -rt * 1.35; if (rt >= 1) return false; });
       await m.say('apc', '램프 내린다. 빨리 타!', { radio: false, priority: 3 });
       const rampPos = apc.localToWorld(V(0, 1.0, -4.6));
-      game.objectives.add('board', '장갑차 탑승', { marker: rampPos });
+      game.objectives.add('board', '장갑차 탑승', { waypoint: true, marker: rampPos });
       sq.doyun.unpose(); sq.doyun.moveTo(apc.localToWorld(V(0, 0, -6)), { onArrive: (a) => a.pose('sit') });
       sq.yoon.moveTo(apc.localToWorld(V(-1.2, 0, -6.5))); sq.jung.moveTo(apc.localToWorld(V(1.2, 0, -6.5)));
       await new Promise((resolve) => { const it = game.player.addInteractable({ pos: rampPos, prompt: '장갑차 탑승', radius: 3, onUse: () => { it.enabled = false; resolve(); } }); });

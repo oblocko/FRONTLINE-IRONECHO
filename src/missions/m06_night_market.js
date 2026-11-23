@@ -234,7 +234,7 @@ export const SEGMENTS = [
       courier.moveTo(V(A.x + 12, 0, A.z - 8), { run: true });
       game.ui.hint('<b>가방 확보</b>', 3);
       // across town to the ghat's west end
-      game.objectives.add('west', '서쪽 빨래터 끝 창고로', { marker: M.godownDoor.clone().add(V(4, 1.6, 0)) });
+      game.objectives.add('west', '서쪽 빨래터 끝 창고로', { waypoint: true, marker: M.godownDoor.clone().add(V(4, 1.6, 0)) });
       await m.reach(M.godownDoor.clone().add(V(6, 0, 0)), 6);
       game.objectives.complete('west');
     },

@@ -195,7 +195,7 @@ export const SEGMENTS = [
     async run(game, m) {
       const lv = game.level;
       squadFollow(game, ['yoon', 'jung']);
-      game.objectives.add('station', '연서역 3번 출구로 이동', { marker: CITY.stationExit.clone().setY(1) });
+      game.objectives.add('station', '연서역 3번 출구로 이동', { waypoint: true, marker: CITY.stationExit.clone().setY(1) });
       // enemy mortar observer drone: while it sees the player, rounds start falling nearby
       const spotter = new Drone(game, { pos: V(30, 50, -60), mode: 'recon', orbit: V(0, 0, -45), speed: 9, hp: 40 });
       let warned = false;
@@ -356,7 +356,7 @@ export const SEGMENTS = [
       await m.until(() => arrive.done, 25);
       engIn?.stop?.(); esc.position.set(-6.5, 0, 56); esc.rotation.y = 0; esc.userData.sway = 0;
       mg.it && (mg.it.enabled = true);
-      game.objectives.add('mount', '호송 트럭 기관총에 탑승', { marker: mg.seatWorld() });
+      game.objectives.add('mount', '호송 트럭 기관총에 탑승', { waypoint: true, marker: mg.seatWorld() });
       await m.say('yoon', '민재, 트럭 기관총 잡아. 버스 뒤에 붙어서 간다!', { priority: 3 });
       await m.until(() => mg.manned, 120);
       if (!mg.manned) mg.mount();

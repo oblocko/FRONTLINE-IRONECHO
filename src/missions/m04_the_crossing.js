@@ -270,7 +270,7 @@ export const SEGMENTS = [
       const eng = game.audio.engineLoop('truck'); eng?.set(0.8, 0.35);
       const arrive = drive(game, m, apc, [[60, -150], [40, -132], [36, -116]], { speed: 6, onStep: () => eng?.setPos(apc.position) });
       await m.until(() => arrive.done, 40);
-      game.objectives.add('apc', '장갑차 포탑 탑승', { marker: apc.position.clone().add(V(0, 2.6, 0)) });
+      game.objectives.add('apc', '장갑차 포탑 탑승', { waypoint: true, marker: apc.position.clone().add(V(0, 2.6, 0)) });
       await interact(game, { pos: apc.position.clone().add(V(0, 1.5, 0)), prompt: '장갑차 포탑 탑승', radius: 4 });
       game.objectives.complete('apc');
       events.emit('ui:fade', { to: 1, dur: 0.4 }); await m.wait(0.45);
