@@ -8,6 +8,7 @@
 //   harbour yard     x 40..100, z -80..-26: containers, the auction warehouse (x 70..95, z -74..-52) open to the west
 //   laundry ghat     x -70..-20, z 24..84: grid of wash pens, lines of hanging cloth
 //   godown           x -88..-72, z 40..70 at the ghat's west end — the courier's handover
+import { ContainerYard, CONTAINER } from '../Containers.js';
 import * as THREE from 'three';
 import { pbr } from '../../render/TextureFactory.js';
 import { Sky } from '../../render/Sky.js';
@@ -253,9 +254,10 @@ export class MumbaiMarket {
   harbour() {
     const Y = MUMBAI.yard, Wh = MUMBAI.warehouse, M = this.M, scene = this.game.renderer.scene, props = this.game.props, w = this.game.world;
     // containers (stacks) around the yard
-    const cols = [0x8a3a2a, 0x2a4a7a, 0x3a6a3a, 0x9a7a2a, 0x5a5a5a, 0x2a6a6a];
-    const cont = (x, z, rotQ, lvl, c) => { const m = props.box(V(2.44, 2.6, 6.06), V(x, 1.3 + lvl * 2.6, z), pbr('corrugated', { color: cols[c % cols.length], key: 'mbc' + (c % cols.length) }), { surface: 'metal', rotY: rotQ * Math.PI / 2, walkable: true }); return m; };
+    const yard = new ContainerYard(this.game); const lines = ['garam', 'hanbada', 'mir', 'plain', 'solbit', 'taebaek'];
+    const cont = (x, z, rotQ, lvl, c) => yard.add({ x, y: lvl * CONTAINER.H, z, rotY: rotQ * Math.PI / 2, len: 20, line: lines[c % lines.length] });
     let c = 0; for (const [x, z, r, n] of [[46, -74, 0, 2], [49, -74, 0, 1], [46, -40, 0, 2], [52, -34, 1, 1], [60, -32, 1, 2], [66, -42, 0, 1], [56, -56, 0, 1], [62, -78, 1, 2], [97, -40, 0, 2], [97, -32, 0, 1]]) for (let l = 0; l < n; l++) cont(x, z, r, l, c++);
+    yard.build();
     // auction warehouse: walls on 3 sides + roof, the west side open (roll-up door raised)
     const H = 7.5, cx = (Wh.x0 + Wh.x1) / 2, cz = (Wh.z0 + Wh.z1) / 2, D = Wh.z1 - Wh.z0, W = Wh.x1 - Wh.x0;
     props.box(V(0.3, H, D), V(Wh.x1, H / 2, cz), M.corr, { surface: 'metal', walkable: false });

@@ -4,6 +4,7 @@
 // sits. A road ramps down the bluff into the port: container yard, a quay
 // gantry crane with its control room, warehouses, and the landing-zone plaza in
 // the south. When the fog lifts the allied fleet fills the horizon.
+import { ContainerYard, containerMesh, CONTAINER } from '../Containers.js';
 import * as THREE from 'three';
 import { pbr } from '../../render/TextureFactory.js';
 import { Sky } from '../../render/Sky.js';
@@ -205,15 +206,9 @@ export class CoastalPort {
 
   port() {
     const g = this.game, p = g.props, scene = g.renderer.scene, w = g.world, P = PORT;
-    // container yard: stacked 12 m boxes in rows, lanes between
-    const cols = [0x8a2a22, 0x2a4a7a, 0x3a6a4a, 0xa87a2a, 0x6a6a6a, 0x7a3a5a, 0x2a6a72, 0xb0a890];
-    const ribbed = (c) => pbr('corrugated', { color: c, key: `cont${c}`, repeat: [3, 1] });
-    const cont = (x, z, level = 0, c = 0, rotY = 0) => {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(2.44, 2.6, 12.2), ribbed(cols[c % cols.length])); m.position.set(x, P.quay + 1.3 + level * 2.6, z); m.rotation.y = rotY; m.castShadow = m.receiveShadow = true; scene.add(m);
-      const sx = rotY ? 12.2 : 2.44, sz = rotY ? 2.44 : 12.2;
-      w.addBoxCentered(m.position.clone(), V(sx, 2.6, sz), { surface: 'metal', cover: true });
-      return m;
-    };
+    // container yard: stacked 40 ft boxes in rows, lanes between (modelled, Korean lines — see world/Containers.js)
+    const yard = new ContainerYard(g); const lines = ['hanbada', 'garam', 'mir', 'solbit', 'taebaek', 'hanbada', 'plain', 'garam'];
+    const cont = (x, z, level = 0, c = 0, rotY = 0) => yard.add({ x, y: P.quay + level * CONTAINER.H, z, rotY, len: 40, line: lines[c % lines.length] });
     let k = 0;
     for (const row of [-34, -20, -6, 8]) for (const zc of [-18, 2, 22, 42, 62]) {
       if ((row === 8 && zc === 22) || (row === -20 && zc === 42)) continue;    // gaps for flanking lanes
@@ -222,6 +217,7 @@ export class CoastalPort {
     }
     // loose containers along the quay (cover for the crane fight)
     cont(-42, 70, 0, 2, Math.PI / 2); cont(-42, 88, 0, 5); cont(-38, -6, 0, 1, Math.PI / 2);
+    yard.build();
     // warehouses east
     const shed = pbr('corrugated', { color: 0x8a9298, key: 'warehouse', repeat: [6, 2] });
     for (const [x, z, d] of [[70, -20, 30], [70, 20, 30], [72, 70, 36]]) {
@@ -263,7 +259,7 @@ export class CoastalPort {
     const spreader = new THREE.Group(); spreader.position.y = -10; trolley.add(spreader);
     for (const s of [-1, 1]) add(new THREE.CylinderGeometry(0.03, 0.03, 10, 4), dark, s * 0.8, 5, 0, spreader);
     add(new THREE.BoxGeometry(2.6, 0.4, 12.4), dark, 0, 0, 0, spreader);
-    const box = new THREE.Mesh(new THREE.BoxGeometry(2.44, 2.6, 12.2), pbr('corrugated', { color: 0x1f5a8a, key: 'contCrane', repeat: [3, 1] })); box.position.y = -1.5; box.castShadow = true; spreader.add(box);
+    const box = containerMesh(g, 'hanbada', 40); box.position.y = -1.5; spreader.add(box);
     this.craneParts = { grp, trolley, spreader, box };
   }
 
