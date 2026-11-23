@@ -87,7 +87,7 @@ function plainTexture(L, rot = false) {
 // ---------- geometry ----------
 // corrugated panel in the XY plane facing +Z: length lx along X (u 0..1), height ly (v 0..1), trapezoid
 // waves of pitch p and depth d pushed toward +Z
-function corrugated(lx, ly, p, d, flipU = false) {
+export function corrugated(lx, ly, p, d, flipU = false) {
   const n = Math.max(1, Math.round(lx / p)), pitch = lx / n;
   // trapezoid: flat crest 40 %, slope 10 %, valley 40 %, slope 10 %
   const prof = [[0, 0], [0.4, 0], [0.5, 1], [0.9, 1], [1, 0]];

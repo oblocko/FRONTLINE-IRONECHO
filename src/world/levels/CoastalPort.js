@@ -4,6 +4,7 @@
 // sits. A road ramps down the bluff into the port: container yard, a quay
 // gantry crane with its control room, warehouses, and the landing-zone plaza in
 // the south. When the fog lifts the allied fleet fills the horizon.
+import { warehouse } from '../Industrial.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ContainerYard, containerMesh, CONTAINER } from '../Containers.js';
 import * as THREE from 'three';
@@ -220,10 +221,8 @@ export class CoastalPort {
     cont(-42, 70, 0, 2, Math.PI / 2); cont(-42, 88, 0, 5); cont(-38, -6, 0, 1, Math.PI / 2);
     yard.build();
     // warehouses east
-    const shed = pbr('corrugated', { color: 0x8a9298, key: 'warehouse', repeat: [6, 2] });
-    for (const [x, z, d] of [[70, -20, 30], [70, 20, 30], [72, 70, 36]]) {
-      const b = p.building({ x, z, w: 22, d, h: 8, wall: shed, roof: 'flat', doors: [{ side: 'w', at: -4, width: 4 }, { side: 'w', at: 6, width: 1.4 }], windows: [{ side: 'w', at: 0, width: 3, sill: 5, height: 1.2 }] });
-    }
+    [[70, -20, 30, '1'], [70, 20, 30, '2'], [72, 70, 36, '3']].forEach(([x, z, d, n], i) => warehouse(g, { x, z, y: w.heightFn(x, z), w: 22, d, h: 8, sign: n, owner: i === 2 ? '가람해운 물류센터' : '한바다해운 보세창고',
+      doors: [{ side: 'w', at: -6, width: 5, open: 0.55 }, { side: 'w', at: 5, width: 5, open: i === 1 ? 0.95 : 0.1 }, { side: 'w', at: 11.5, width: 1.1, kind: 'person' }, { side: 'e', at: 0, width: 5, open: 0 }] }));
     // crane control room
     const c = P.control;
     this.controlRoom = p.building({ x: c.x, z: c.z, w: 8, d: 6, h: 3, wall: pbr('plaster', { color: 0xd6d2c4, key: 'ctrl' }), roof: 'flat', light: { intensity: 3, color: 0xdde8ff }, lit: true,
