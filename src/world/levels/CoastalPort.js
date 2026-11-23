@@ -4,6 +4,7 @@
 // sits. A road ramps down the bluff into the port: container yard, a quay
 // gantry crane with its control room, warehouses, and the landing-zone plaza in
 // the south. When the fog lifts the allied fleet fills the horizon.
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ContainerYard, containerMesh, CONTAINER } from '../Containers.js';
 import * as THREE from 'three';
 import { pbr } from '../../render/TextureFactory.js';
@@ -241,26 +242,82 @@ export class CoastalPort {
     if (lib) { for (const [x, z] of [[-30, -26], [-28, -24], [15, 12], [16, 13.2]]) lib.place('barrel_02', x, z, { yawJitter: 2 }); lib.place('old_military_crate', -33, -24, { rotQ: 1 }); lib.place('ammo_box', 6, -38, { collide: false }); }
   }
 
+  // ship-to-shore container crane (modelled): portal legs on rail bogies with X-bracing and cross beams,
+  // box-girder boom out over the water and back-reach, A-frame with fore- and backstays, machinery house,
+  // stairs and walkways, floodlights; the trolley (with the operator cab) runs along the boom and carries
+  // the spreader and its container. Red / white, as many Korean terminals paint them.
   crane() {
     const g = this.game, scene = g.renderer.scene, P = PORT, C = P.crane;
-    const steel = pbr('paintedMetal', { color: 0xc8a030, key: 'craneSteel' }); const dark = new THREE.MeshStandardMaterial({ color: 0x2a2a28, metalness: 0.5, roughness: 0.5 });
+    const white = new THREE.MeshStandardMaterial({ color: 0xe6e4de, roughness: 0.55, metalness: 0.3 });
+    const red = new THREE.MeshStandardMaterial({ color: 0xb02a22, roughness: 0.5, metalness: 0.3 });
+    const dark = new THREE.MeshStandardMaterial({ color: 0x2a2a28, roughness: 0.5, metalness: 0.55 });
+    const steel = new THREE.MeshStandardMaterial({ color: 0x8a8c8e, roughness: 0.4, metalness: 0.8 });
+    const glass = new THREE.MeshStandardMaterial({ color: 0x1a2630, roughness: 0.1, metalness: 0.6, emissive: 0x334455, emissiveIntensity: 0.25 });
+    const stripeTex = (() => { const c = document.createElement('canvas'); c.width = 64; c.height = 64; const x = c.getContext('2d'); x.fillStyle = '#e8c020'; x.fillRect(0, 0, 64, 64); x.fillStyle = '#1a1a1a'; for (let i = -64; i < 128; i += 32) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i + 16, 0); x.lineTo(i + 80, 64); x.lineTo(i + 64, 64); x.fill(); } const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, 3); return t; })();
+    const stripes = new THREE.MeshStandardMaterial({ map: stripeTex, roughness: 0.6 });
     const grp = new THREE.Group(); grp.position.set(C.x, P.quay, C.z); grp.userData.dynamic = true; scene.add(grp);
-    const add = (geo, m, x, y, z, parent = grp) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; parent.add(o); return o; };
-    for (const lx of [-6, 6]) for (const lz of [-8, 8]) { add(new THREE.BoxGeometry(0.9, 30, 0.9), steel, lx, 15, lz); g.world.addBoxCentered(V(C.x + lx, P.quay + 15, C.z + lz), V(1, 30, 1), { surface: 'metal', walkable: false }); }
-    for (const lz of [-8, 8]) add(new THREE.BoxGeometry(13, 1.2, 1.2), steel, 0, 29.4, lz);
-    for (const lx of [-6, 6]) add(new THREE.BoxGeometry(1.2, 1.2, 17), steel, lx, 18, 0);
-    // boom out over the water (west) and back-reach (east)
-    add(new THREE.BoxGeometry(60, 1.6, 2.2), steel, -12, 30.6, 0);
-    add(new THREE.BoxGeometry(5, 4, 4), steel, 14, 27, 0);                          // machinery house / counterweight
-    const cab = add(new THREE.BoxGeometry(2.4, 2, 2.4), new THREE.MeshStandardMaterial({ color: 0xdedad0, roughness: 0.5 }), 0, 28.6, 2.2);
-    // trolley + spreader + hanging container (moves along the boom)
-    const trolley = new THREE.Group(); trolley.position.set(-24, 29.6, 0); grp.add(trolley);
-    add(new THREE.BoxGeometry(3, 1, 2.6), dark, 0, 0, 0, trolley);
+    // batch static parts per material
+    const parts = new Map(); const put = (geo, mat) => { if (!parts.has(mat)) parts.set(mat, []); parts.get(mat).push(geo.index ? geo.toNonIndexed() : geo); };
+    const box = (sx, sy, sz, x, y, z, mat) => put(new THREE.BoxGeometry(sx, sy, sz).translate(x, y, z), mat);
+    const beam = (a, b, t, mat) => { const d = b.clone().sub(a), L = d.length(); const geo = new THREE.BoxGeometry(t, L, t); const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); geo.applyQuaternion(q).translate((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2); put(geo, mat); };
+    const rope = (a, b, r, mat) => { const d = b.clone().sub(a), L = d.length(); const geo = new THREE.CylinderGeometry(r, r, L, 6); geo.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize())).translate((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2); put(geo, mat); };
+    const Vv = (x, y, z) => new THREE.Vector3(x, y, z);
+    const LX = 6, LZ = 8, PORTAL = 19, BOOM = 30.6;
+    // legs: tapered box sections, striped feet, bogies with wheels on the quay rails
+    for (const lx of [-LX, LX]) for (const lz of [-LZ, LZ]) {
+      box(1.3, PORTAL - 2.6, 1.3, lx, 2.6 + (PORTAL - 2.6) / 2, lz, red);
+      box(1.4, 1.6, 1.4, lx, 1.8, lz, stripes);
+      box(1.6, 0.8, 5.2, lx, 0.65, lz, dark);
+      for (const wz of [-1.8, -0.6, 0.6, 1.8]) put(new THREE.CylinderGeometry(0.32, 0.32, 0.3, 12).rotateZ(Math.PI / 2).translate(lx, 0.32, lz + wz), steel);
+      g.world.addBoxCentered(V(C.x + lx, P.quay + 15, C.z + lz), V(1.4, 30, 1.4), { surface: 'metal', walkable: false });
+    }
+    // quay rails the crane runs on
+    for (const lx of [-LX, LX]) box(0.16, 0.12, 120, lx, 0.06, 0, steel);
+    // portal: sill beams along z (between the legs of a side) and the portal beams across x at the top
+    for (const lx of [-LX, LX]) { box(1.0, 1.4, LZ * 2 + 1.3, lx, PORTAL - 0.7, 0, red); box(0.7, 0.8, LZ * 2, lx, 9, 0, red); }
+    for (const lz of [-LZ, LZ]) box(LX * 2 + 1.3, 1.6, 1.2, 0, PORTAL - 0.8, lz, red);
+    // X-bracing in the side frames (between the legs along z) below the portal
+    for (const lx of [-LX, LX]) for (const [y0, y1] of [[2.6, 9], [9, PORTAL - 1.4]]) { beam(Vv(lx, y0, -LZ), Vv(lx, y1, LZ), 0.35, red); beam(Vv(lx, y0, LZ), Vv(lx, y1, -LZ), 0.35, red); }
+    // upper frame from the portal up to the boom
+    for (const lz of [-LZ, LZ]) for (const lx of [-LX, LX]) box(0.9, BOOM - PORTAL - 1.1, 0.9, lx, PORTAL + (BOOM - PORTAL - 1.1) / 2, lz * 0.22, white);
+    for (const lz of [-1, 1]) box(LX * 2 + 0.9, 0.8, 0.8, 0, BOOM - 1.6, lz * LZ * 0.22, white);
+    // boom: two box girders (trolley runs between them), out over the water to x −42, back-reach to x 18
+    const B0 = -42, B1 = 18, bz = 1.7;
+    for (const s of [-1, 1]) { box(B1 - B0, 2.2, 0.9, (B0 + B1) / 2, BOOM, s * bz, white); box(B1 - B0, 0.14, 0.2, (B0 + B1) / 2, BOOM + 1.17, s * (bz - 0.3), steel); }
+    for (let x = B0 + 2; x < B1; x += 6) box(0.4, 0.4, bz * 2, x, BOOM + 1.0, 0, white);              // cross ties above the trolley
+    box(2.6, 2.6, bz * 2 + 1, B0 + 0.4, BOOM, 0, red);                                                // boom tip
+    // walkways with handrails along the outside of the girders
+    for (const s of [-1, 1]) { box(B1 - B0, 0.08, 0.9, (B0 + B1) / 2, BOOM - 0.95, s * (bz + 0.9), dark); for (let x = B0; x <= B1; x += 2) box(0.05, 1.0, 0.05, x, BOOM - 0.45, s * (bz + 1.32), steel); box(B1 - B0, 0.05, 0.05, (B0 + B1) / 2, BOOM + 0.05, s * (bz + 1.32), steel); }
+    // A-frame: two legs per side to the apex, fore- and backstays (ropes) down to the boom
+    const AP = Vv(1, 50, 0);
+    for (const s of [-1, 1]) { beam(Vv(-LX, BOOM + 1, s * bz), AP.clone().setZ(s * 1.1), 1.0, red); beam(Vv(LX + 2, BOOM + 1, s * bz), AP.clone().setZ(s * 1.1), 1.0, red); }
+    box(1.4, 1.4, 3.2, AP.x, AP.y, 0, red);
+    for (const s of [-1, 1]) { for (const tx of [-22, -40]) rope(Vv(AP.x - 0.4, AP.y - 0.3, s * 1.2), Vv(tx, BOOM + 1.1, s * bz), 0.09, dark); rope(Vv(AP.x + 0.4, AP.y - 0.3, s * 1.2), Vv(B1 - 1, BOOM + 1.1, s * bz), 0.11, dark); }
+    // machinery house on the back-reach, with louvres and a door; electrical room below
+    box(7, 4.2, 5.6, 13.5, BOOM + 3.2, 0, white);
+    for (let i = 0; i < 5; i++) box(0.05, 0.6, 1.4, 10 + i * 1.6 + 0.0, BOOM + 3.4, 2.82, dark);
+    box(0.06, 2.0, 0.9, 16.99, BOOM + 2.2, 1.2, dark);
+    box(5, 3, 4.6, 13, BOOM - 2.6, 0, red);
+    // stairs: zig-zag flights up one leg, landings
+    for (let f = 0; f < 6; f++) { const y0 = 1.2 + f * 3, dir = f % 2 ? -1 : 1; for (let k = 0; k < 14; k++) box(0.9, 0.06, 0.25, LX + 1.2, y0 + k * 0.215, -LZ + 1 + (dir > 0 ? k * 0.25 : 3.5 - k * 0.25), steel); box(1.0, 0.08, 1.2, LX + 1.2, y0 + 3, dir > 0 ? -LZ + 4.8 : -LZ + 0.5, dark); }
+    // floodlights under the boom and the portal
+    const lampMat = new THREE.MeshStandardMaterial({ color: 0xfff4d8, emissive: 0xfff0d0, emissiveIntensity: 2.2 });
+    for (const x of [-38, -26, -14, -2, 10]) for (const sgn of [-1, 1]) box(0.5, 0.25, 0.5, x, BOOM - 1.25, sgn * (bz + 0.2), lampMat);
+    for (const [mat, list] of parts) { const m = new THREE.Mesh(mergeGeometries(list), mat); m.castShadow = true; m.receiveShadow = true; grp.add(m); }
+    // trolley + operator cab + spreader + hanging container (moves along the boom)
+    const trolley = new THREE.Group(); trolley.position.set(-24, BOOM - 1.0, 0); grp.add(trolley);
+    const tb = new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.4, bz * 2 - 0.9), white); tb.castShadow = true; trolley.add(tb);
+    for (const sx of [-1.6, 1.6]) for (const sz of [-1, 1]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.25, 12), steel); w.rotation.x = Math.PI / 2; w.position.set(sx, 0.8, sz * (bz - 0.6)); trolley.add(w); }
+    const cab = new THREE.Group(); cab.position.set(-0.5, -2.2, bz + 0.2); trolley.add(cab);
+    const cb = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.3, 2.2), white); cb.castShadow = true; cab.add(cb);
+    const win = new THREE.Mesh(new THREE.BoxGeometry(2.3, 1.2, 2.25), glass); win.position.y = 0.1; cab.add(win);
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.05, 1.8), glass); floor.position.y = -1.16; cab.add(floor);   // glass floor: the operator looks down at the load
     const spreader = new THREE.Group(); spreader.position.y = -10; trolley.add(spreader);
-    for (const s of [-1, 1]) add(new THREE.CylinderGeometry(0.03, 0.03, 10, 4), dark, s * 0.8, 5, 0, spreader);
-    add(new THREE.BoxGeometry(2.6, 0.4, 12.4), dark, 0, 0, 0, spreader);
-    const box = containerMesh(g, 'hanbada', 40); box.position.y = -1.5; spreader.add(box);
-    this.craneParts = { grp, trolley, spreader, box };
+    for (const sx of [-1.2, 1.2]) for (const sz of [-0.7, 0.7]) { const r = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 10, 5), dark); r.position.set(sx, 5, sz); spreader.add(r); }
+    const sp = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.5, 12.3), new THREE.MeshStandardMaterial({ color: 0xd8b020, roughness: 0.5, metalness: 0.4 })); sp.castShadow = true; spreader.add(sp);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.8, 2.4), dark); head.position.y = 0.6; spreader.add(head);
+    const load = containerMesh(g, 'hanbada', 40); load.position.y = -1.55; spreader.add(load);
+    this.craneParts = { grp, trolley, spreader, box: load };
   }
 
   plaza() {
