@@ -14,6 +14,9 @@ export const CHARACTERS = {
   tail: { name: '미행자', en: 'Tail', rank: '', rankEn: '', unit: '추적팀', color: '#ff7a6a', pitch: 0.95, role: '', lang: 'en' },
   tracker: { name: '추적팀', en: 'Tracker team', rank: '', rankEn: '', unit: '', color: '#ff7a6a', pitch: 0.9, role: 'Radio', lang: 'en' },
   guard: { name: '경비', en: 'Guard', rank: '', rankEn: '', unit: '', color: '#ff7a6a', pitch: 1.0, role: '', lang: 'en' },
+  auctioneer: { name: '경매인', en: 'Auctioneer', rank: '', rankEn: '', unit: '', color: '#e0c890', pitch: 1.0, role: '', lang: 'en' },
+  courier: { name: '운반책', en: 'Courier', rank: '', rankEn: '', unit: '', color: '#ff9a7a', pitch: 1.05, role: '', lang: 'hi' },
+  thug: { name: '경비', en: 'Guard', rank: '', rankEn: '', unit: '', color: '#ff7a6a', pitch: 0.95, role: '', lang: 'hi' },
   tac: { name: '대대 지휘통제실', en: 'Battalion TOC', rank: '', rankEn: '', unit: '', color: '#ff9ec7', pitch: 1.1, role: 'Radio' },
   op: { name: 'OP 백두-3', en: 'OP Baekdu-3', rank: '', rankEn: '', unit: '', color: '#bbbbbb', pitch: 1.0, role: 'Radio' },
   driver: { name: '운전병', en: 'Driver', rank: '일병', rankEn: 'PFC', unit: '', color: '#cccccc', pitch: 1.0, role: '' },
@@ -33,7 +36,7 @@ export const CHARACTERS = {
 };
 
 // spoken language of a speaker (subtitles are always Korean; non-Korean speech is tagged)
-export const LANG_LABEL = { en: '영어', fr: '프랑스어' };
+export const LANG_LABEL = { en: '영어', fr: '프랑스어', hi: '힌디어' };
 export function speakerLabel(id) {
   const c = CHARACTERS[id]; if (!c) return id;
   return c.rank ? `${c.rank} ${c.name}` : c.name;

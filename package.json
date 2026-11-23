@@ -19,7 +19,8 @@
     "test:sweep": "vite build && node tests/sweep.mjs",
     "compose:menu": "python3 tools/compose_menu_theme.py menu_theme.wav && ffmpeg -y -i menu_theme.wav -codec:a libmp3lame -b:a 192k assets/audio/menu_theme.mp3",
     "test:m05": "vite build && node tests/mission05_branches.mjs",
-    "check:vendor": "node tools/check_vendor.mjs"
+    "check:vendor": "node tools/check_vendor.mjs",
+    "test:m06": "vite build && node tests/mission06_branches.mjs"
   },
   "dependencies": {
     "three": "0.187.0"
