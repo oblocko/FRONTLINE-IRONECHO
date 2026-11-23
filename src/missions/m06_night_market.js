@@ -7,7 +7,7 @@
 //                   m05_tail released → an anonymous warning about the rooftop lookout
 //                   m05_cole stall → Brennan's phone surfaced at Mumbai airport
 //   ① who won the lot (watched from the rooftop; no quiz)  m06_buyer   right / wrong / none
-//   ② how to follow the courier with the case              m06_route   crowd (on foot, stealth) / rail (over the viaduct, get ahead)
+//   (the case: Daniel raids the auction warehouse — guards and the courier's bodyguards — and takes it)
 //        crowd → tail through the bazaar and the laundry ghat; spotted → he runs and the godown is ready for you
 //        rail  → fight the lookouts on the viaduct, come down first and wait inside the godown
 //   ③ the standoff with Nadia                              m06_nadia   lower / aim / drive (only if the drive was carried) / maya (only if it was uploaded)
@@ -87,7 +87,7 @@ export const SEGMENTS = [
       ]);
       if (tail === 'tied') { await m.say('tracker', '(빼앗은 무전기) …창고 쪽 경비 넷, 시장 옥상 감시 하나. 교대는 한 시.', { radio: true, priority: 2 }); await m.say('daniel', '파리에서 빌린 무전기가 아직 일을 하는군.', {}); }
       if (tail === 'released') { game.ui.hint('<b>[문자 · 발신자 없음]</b> 부두 쪽 옥상에 감시 한 명. 계단은 남쪽. — E3', 6); await m.say('daniel', '…파리에서 풀어준 친구군. 빚은 갚는 타입이었어.', {}); }
-      game.objectives.add('roof', '부두가 보이는 건물 옥상으로 — 남쪽 바깥 계단', { marker: lv.roofStair.from.clone().setY(1.6) });
+      game.objectives.add('roof', '부두가 보이는 건물 옥상으로', { marker: lv.roofStair.from.clone().setY(1.6) });
       await m.reach(lv.roofStair.from, 3, { yTol: 6 });
       game.objectives.setMarker('roof', lv.roofStair.to.clone().setY(M.roof.y + 1.6));
       // a lookout on the roof
@@ -97,9 +97,16 @@ export const SEGMENTS = [
       takedowns(game, m, [look]);
       const st = suspicion(game, m, { watchers: () => [look], range: 18 });
       m.spawn(async () => { await m.until(() => st.spotted, 1e9); look.setPassive(false); look.visionRange = 40; attackOrder(game, [look], p); });
-      await m.until(() => p.position.y > M.roof.y - 1 && (look.dead || look.koed), 600);
-      st.stop?.();
+      // on the roof = objective done; the lookout is a step on the way (only his marker), not a gate
+      await m.until(() => p.position.y > M.roof.y - 1.5 && p.position.z < M.roof.z1 + 0.2, 600);
       game.objectives.complete('roof');
+      if (!look.dead && !look.koed) {
+        game.objectives.add('lookout', '감시원 제압', { waypoint: true, marker: look.position.clone().setY(M.roof.y + 2.2) });
+        m.every(() => { if (look.dead || look.koed) return false; game.objectives.setMarker('lookout', look.position.clone().setY(look.position.y + 2.2)); });
+        await m.until(() => look.dead || look.koed, 600);
+        game.objectives.complete('lookout');
+      }
+      st.stop?.();
       if (look.koed) await m.say('daniel', '(쓰러진 감시원을 눕히며) 잘 자. 교대는 한 시라던데.', {});
     },
   },
@@ -121,7 +128,7 @@ export const SEGMENTS = [
       const nadia = game.director.spawn({ team: 'civilian', faction: 'civ', look: 'nadia', sex: 'f', hat: 'none', weapon: true, passive: true, invulnerable: true, name: '나디아', pos: V(97, 5.2, -40) });
       nadia.hold(V(97, 0, -40)); nadia.lookAt(V(A.x, 1, A.z)); lv.nadia = nadia;
       const winner = bidders[Math.floor(Math.random() * 4)];   // differs every playthrough
-      lv.winner = winner; lv.courier = courier; lv.aucGuards = guards;
+      lv.winner = winner; lv.courier = courier; lv.aucGuards = guards; lv.bidders = bidders;
       game.objectives.add('watch', '경매를 지켜보며 "시연 기록"의 낙찰자를 확인', { marker: A.clone().setY(2) });
       await m.talk([
         ['maya', '창고 문이 열려 있어. 테이블 위 조명 아래가 경매대야.', { radio: true }],
@@ -166,62 +173,70 @@ export const SEGMENTS = [
       else if (verdict === 'wrong') await m.talk([['maya', '…그 사람은 마지막에 손을 안 들었어. 사진은 일단 보내 둘게.', { radio: true, priority: 3 }]]);
       else await m.talk([['maya', '못 봤어? 괜찮아. 가방이 더 중요해.', { radio: true, priority: 3 }]]);
       game.objectives.complete('watch');
-      // the courier leaves west with one guard
-      courier.moveTo(V(46, 0, 10));
-      await m.say('maya', '운반책이 나간다. 경비 하나 붙었어 — 서쪽 골목 쪽.', { radio: true, priority: 3 });
-      const route = await choose(game, m, { flag: 'm06_route', tag: '결정 // 가방을 따라간다', timeout: 25, fallback: 0,
-        options: [{ key: 'crowd', text: '내려가서 군중 속에서 따라간다', note: '조용히 — 들키면 운반책이 뛴다' },
-          { key: 'rail', text: '고가 철로로 앞질러 간다', note: '빠르다 — 철로 위 감시를 뚫어야 한다' }] });
-      lv.route = route;
+      await m.talk([
+        ['maya', '운반책이 가방을 들고 창고 안쪽으로 물러났어. 경호원 둘이 붙었고. 저 가방, 오늘 밤 부두를 떠나면 다시는 못 봐.', { radio: true, priority: 3 }],
+        ['daniel', '그럼 떠나기 전에 내가 가지.', {}],
+        ['maya', '…조용히 하라는 말은 안 할게. 어차피 안 들을 거니까.', { radio: true, priority: 3 }],
+      ]);
     },
   },
 
-  // ============ 2. FOLLOWING THE CASE ============
+  // ============ 2. THE RAID ON THE AUCTION WAREHOUSE ============
+  // (segment id kept as 'tail' so old checkpoints still load)
   {
     id: 'tail',
     async setup(game) {
-      daniel(game); const lv = game.level;
-      if (!lv.courier) { lv.courier = civ(game, 46, 10, { name: '운반책' }); lv.crowd = crowd(game, game.mission); }
-      game.player.teleport(V(M.roof.x0 + 1.4, 0, M.roof.z1 + 1.6), Math.PI);
+      daniel(game); const lv = game.level, A = M.auctionTable;
+      if (!lv.courier) lv.courier = civ(game, A.x - 0.8, A.z, { name: '운반책' });
+      if (!lv.aucGuards) { lv.aucGuards = [thug(game, A.x - 6, A.z - 4), thug(game, A.x - 6, A.z + 4), thug(game, A.x + 4, A.z - 5), thug(game, 58, -44)]; lv.aucGuards.forEach((g) => { g.setPassive(true); g.visionRange = 0.1; }); }
+      if (!lv.bidders) lv.bidders = [];
+      game.player.teleport(V(M.roof.x1 - 2.5, M.roof.y, M.roof.z0 + 6), -Math.PI / 2);
     },
     async run(game, m) {
-      const lv = game.level, p = game.player, courier = lv.courier; const route = flag('m06_route', 'crowd');
-      const escort = thug(game, courier.position.x + 1.5, courier.position.z, { visionRange: 0.1 }); escort.setPassive(true); lv.escort = escort;
-      const path = [V(30, 0, 10), V(0, 0, 10), V(-2, 0, 18), V(-1, 0, 22), V(-30, 0, 20), V(-50, 0, 40), V(-64, 0, 55), M.godownDoor.clone().add(V(2, 0, 0))];
-      let idx = 0, ran = false;
-      const walk = (fast = false) => m.spawn(async () => { for (; idx < path.length; idx++) { const pt = path[idx]; courier.moveTo(pt, { run: fast || ran }); escort.moveTo(pt.clone().add(V(1.2, 0, 1.2)), { run: fast || ran }); await m.until(() => courier.position.distanceTo(V(pt.x, courier.position.y, pt.z)) < 1.6, 120); if (!ran && route === 'crowd' && Math.random() < 0.5) { await m.wait(rand(1, 2.5)); escort.lookAt(p.position.clone()); } } lv.courierArrived = true; });
-      if (route === 'crowd') {
-        game.objectives.add('follow', '운반책을 놓치지 말고 따라가기 — 들키지 말 것', { marker: courier.position });
-        m.every(() => { game.objectives.setMarker('follow', courier.position.clone().setY(2.2)); if (lv.courierArrived) return false; });
-        walk();
-        // the escort keeps checking behind; close and in the open = suspicion, the crowd covers you
-        const st = suspicion(game, m, { watchers: () => [escort], range: 20, crowd: () => lv.crowd || [], label: '눈치챔' });
-        let lost = 0;
-        m.every((dt) => { if (lv.courierArrived || ran) return false; const d = p.position.distanceTo(courier.position); lost = d > 45 ? lost + dt : 0; if (lost > 12) { game.failMission('운반책을 놓쳤습니다', '운반책을 따라가기'); return false; } });
-        m.spawn(async () => { await m.until(() => st.spotted, 1e9); ran = true; saves.setFlag('m06_tail', 'spotted'); escort.setPassive(false); escort.visionRange = 40; attackOrder(game, [escort], p); await m.say('courier', '따라온다! 뛰어!', { priority: 3 }); walk(true); });
-        await m.until(() => lv.courierArrived || courier.dead, 900);
-        st.stop?.();
-        if (!flag('m06_tail')) saves.setFlag('m06_tail', 'clean');
-        game.objectives.complete('follow');
-        await m.say('maya', ran ? '안으로 뛰어 들어갔어. 이제 다 알고 있어.' : '서쪽 창고로 들어갔어. 아무도 너를 못 봤어.', { radio: true, priority: 3 });
-      } else {
-        // over the viaduct: the courier walks; Daniel runs the deck and comes down by the ghat first
-        walk();
-        game.objectives.add('rail', '동쪽 역 계단으로 철로 위에', { marker: V((M.stationE.x0 + M.stationE.x1) / 2, 1.5, M.stationE.z1) });
-        await m.reach(V((M.stationE.x0 + M.stationE.x1) / 2, 0, M.stationE.z1 - 1), 4, { yTol: 10 });
-        game.objectives.complete('rail');
-        const deck = [thug(game, 10, -20.5, { state: 'combat', accuracy: 0.6 }, M.rail.y), thug(game, -18, -19.5, { state: 'combat', accuracy: 0.6 }, M.rail.y), thug(game, -40, -21, { state: 'combat', accuracy: 0.6 }, M.rail.y)];
-        m.spawn(async () => { await m.until(() => p.position.y > M.rail.y - 0.5, 300); attackOrder(game, deck, p); await m.say('thug', '철로 위에 누가 있다!', { priority: 2 }); });
-        game.objectives.add('run', '철로를 따라 서쪽 역까지 — 운반책보다 먼저', { marker: V((M.stationW.x0 + M.stationW.x1) / 2, M.rail.y + 1.5, -18) });
-        await m.reach(V((M.stationW.x0 + M.stationW.x1) / 2, M.rail.y, -17), 4, { yTol: 3 });
-        game.objectives.complete('run');
-        game.objectives.add('down', '계단으로 내려가 창고에 먼저 들어가기', { marker: M.godownDoor.clone().setY(1.6) });
-        await m.reach(M.godownDoor.clone().add(V(-3, 0, 0)), 3.5);
-        const first = !lv.courierArrived; saves.setFlag('m06_tail', first ? 'ahead' : 'late');
-        game.objectives.complete('down');
-        await m.say('maya', first ? '네가 먼저야. 운반책은 아직 빨래터 근처야.' : '…늦었어. 벌써 안에 있어.', { radio: true, priority: 3 });
-        if (first) { await m.say('daniel', '(자루 더미 뒤로) 그럼 손님 맞을 준비를 하지.', {}); await m.until(() => lv.courierArrived, 300); }
-      }
+      const lv = game.level, p = game.player, A = M.auctionTable, courier = lv.courier;
+      // the courier backs into the warehouse with the case; two bodyguards close up on him
+      courier.hold(V(A.x + 8, 0, A.z - 4)); courier.lookAt(V(A.x - 10, 1.5, A.z));
+      const body = [thug(game, A.x + 6.5, A.z - 2.5, { name: '경호원' }), thug(game, A.x + 6.5, A.z - 5.5, { name: '경호원' })];
+      for (const b of body) { b.setPassive(true); b.visionRange = 0.1; b.lookAt(V(A.x - 10, 1.5, A.z)); }
+      const guards = (lv.aucGuards || []).filter((g) => !g.dead && !g.koed);
+      const all = [...guards, ...body]; lv.escort = body[0];
+      // down the stair and across the yard — just the marker
+      game.objectives.add('down', '경매장으로', { waypoint: true, marker: V(A.x - 12, 1.6, A.z) });
+      // the fight starts when Daniel is seen up close, or fires
+      let loud = false;
+      const goLoud = () => { if (loud) return; loud = true; for (const e of all) if (!e.dead && !e.koed) { e.setPassive(false); e.visionRange = 45; } attackOrder(game, all.filter((e) => !e.dead && !e.koed), p); game.audio.setMusic('combat');
+        for (const b of lv.bidders || []) if (!b.dead) b.moveTo(V(A.x + rand(10, 14), 0, A.z + rand(-8, 8)), { run: true });   // the bidders scatter to the back wall
+        m.spawn(() => m.say('thug', '총이다! 가방 지켜!', { priority: 3 })); };
+      trackShots(game, m, () => goLoud());
+      m.every(() => { if (loud) return false; if (all.some((e) => !e.dead && !e.koed && e.position.distanceTo(p.position) < 14)) goLoud(); });
+      takedowns(game, m, all);
+      await m.until(() => p.position.x > 40 || loud, 900);
+      game.objectives.complete('down');
+      game.objectives.add('raid', '경매장 경비와 운반책 경호원 제압', { count: all.length });
+      let done = 0;
+      m.every(() => { const live = all.filter((e) => !e.dead && !e.koed); const n = all.length - live.length; if (n > done) { game.objectives.progress('raid', n - done); done = n; } if (done >= all.length) return false; game.objectives.setMarkers('raid', live.map((e) => e.position.clone().setY(e.position.y + 2.1))); });
+      await m.until(() => all.every((e) => e.dead || e.koed), 900);
+      game.objectives.complete('raid'); game.audio.setMusic('tension');
+      saves.setFlag('m06_tail', 'assault');
+      // the courier: hands up, the case, and where it was going
+      game.objectives.add('courier', '운반책', { waypoint: true, marker: courier.position.clone().setY(2.2) });
+      courier.actor?.gesture?.('wave', 1.2);
+      await interact(game, { pos: courier.position.clone().setY(1), prompt: '운반책 붙잡기', radius: 2.4 });
+      game.objectives.complete('courier');
+      await m.talk([
+        ['courier', '쏘지 마! 난 들고 가기만 해! 열어 본 적도 없어!', { priority: 3 }],
+        ['daniel', '누구한테 들고 가지?', {}],
+        ['courier', '서쪽 빨래터 끝 창고. 한 시에 넘기기로 했어. 거기 사람들은 나보다 훨씬 덜 친절해.', { priority: 3 }],
+        ['daniel', '그건 걱정 마. 나도 별로 친절하지 않거든.', {}],
+        ['maya', '가방 무게 재 봐. …농담이야. 열지 말고 그대로 들고 와. 추적기가 있을 수도 있어.', { radio: true, priority: 3 }],
+      ]);
+      lv.caseTaken = true; lv.courier = null;
+      courier.moveTo(V(A.x + 12, 0, A.z - 8), { run: true });
+      game.ui.hint('<b>가방 확보</b>', 3);
+      // across town to the ghat's west end
+      game.objectives.add('west', '서쪽 빨래터 끝 창고로', { marker: M.godownDoor.clone().add(V(4, 1.6, 0)) });
+      await m.reach(M.godownDoor.clone().add(V(6, 0, 0)), 6);
+      game.objectives.complete('west');
     },
   },
 
@@ -231,19 +246,18 @@ export const SEGMENTS = [
     async setup(game) { daniel(game); game.player.teleport(M.godownDoor.clone().add(V(6, 0, 0)), -Math.PI / 2); },
     async run(game, m) {
       const lv = game.level, p = game.player, Gd = M.godown;
-      const tail = flag('m06_tail', 'clean');
+      const tail = flag('m06_tail', 'assault');
       // inside: the contact and his men; the courier hands over the case
       const contact = thug(game, -83, 55, { name: '접선자', visionRange: 0.1 }); contact.setPassive(true);
       const men = [thug(game, -86, 47), thug(game, -86, 63), thug(game, -77, 66), thug(game, -77, 44)];
-      if (tail === 'spotted' || tail === 'late') men.push(thug(game, -74, 52), thug(game, -74, 58));
-      const courier = lv.courier && !lv.courier.dead ? lv.courier : civ(game, -78, 55, { name: '운반책' });
-      courier.moveTo(V(-80, 0, 55));
+      if (tail === 'spotted' || tail === 'late' || tail === 'assault') men.push(thug(game, -74, 52), thug(game, -74, 58));   // they heard the shooting at the harbour
+      const courier = civ(game, -78, 55, { name: '중개인' }); courier.moveTo(V(-80, 0, 55));
       const all = [contact, ...men];
       if (flag('m05_tail') === 'tied') { game.objectives.add('intel', '빼앗은 무전기 — 창고 안 위치', { markers: all.map((e) => e.position.clone().setY(2)) }); m.every(() => { const live = all.filter((e) => !e.dead); if (!live.length) return false; game.objectives.setMarkers('intel', live.map((e) => e.position.clone().setY(2.1))); }); }
       const alerted = tail === 'spotted';
       if (alerted) { attackOrder(game, all, p); game.audio.setMusic('combat'); await m.say('thug', '문! 문 쪽이다!', { priority: 3 }); }
-      else { for (const e of all) { e.setPassive(true); e.visionRange = 0.1; } await m.talk([['courier', '물건이다. 돈은 약속대로.', { priority: 2 }], ['thug', '…열어 봐.', { priority: 2 }]]); }
-      game.objectives.add('case', '창고 안 — 가방을 확보', { marker: V(-81, 1.6, 55) });
+      else { for (const e of all) { e.setPassive(true); e.visionRange = 0.1; } await m.talk([['thug', '운반책이 늦어. 부두에서 총소리가 났다던데.', { priority: 2 }], ['thug', '…문 지켜.', { priority: 2 }]]); }
+      game.objectives.add('case', '서쪽 창고 — 접선 상대 제압', { marker: V(-81, 1.6, 55) });
       const goLoud = () => { for (const e of all) if (!e.dead) { e.setPassive(false); e.visionRange = 30; } attackOrder(game, all.filter((e) => !e.dead), p); game.audio.setMusic('combat'); };
       if (!alerted) { trackShots(game, m, (s) => { if (!s.suppressed || all.some((e) => !e.dead && e.position.distanceTo(p.position) < 9)) goLoud(); }); m.spawn(async () => { await m.until(() => p.position.x < -72.5, 600); await m.wait(2.5); goLoud(); }); }
       // midway through the fight the lights die — someone else is in here

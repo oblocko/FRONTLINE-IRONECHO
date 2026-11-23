@@ -5,8 +5,9 @@ import { events } from '../core/Events.js';
 
 export class Objectives {
   constructor() { this.list = []; this.markers = []; }
-  add(id, text, { sub = null, count = 0, marker = null, markers = null, optional = false, compassOnly = false } = {}) {
-    const o = { id, text, sub, count, progress: 0, done: false, failed: false, optional, compassOnly, marker: marker ? marker.clone?.() ?? marker : null };
+  // waypoint: a minor step (hide here, go there) — only the green diamond marker, no banner, not in the list
+  add(id, text, { sub = null, count = 0, marker = null, markers = null, optional = false, compassOnly = false, waypoint = false } = {}) {
+    const o = { id, text, sub, count, progress: 0, done: false, failed: false, optional, compassOnly, waypoint, marker: marker ? marker.clone?.() ?? marker : null };
     if (markers) o.markers = markers.map((m) => m.clone());
     this.list.push(o); events.emit('objective:new', o); this.changed(); return o;
   }

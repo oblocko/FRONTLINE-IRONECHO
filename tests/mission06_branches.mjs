@@ -3,7 +3,7 @@
 // player to the current objective / interaction, performs takedowns from behind, and (outside the
 // stealth branch) clears hostiles so the run stays fast. Checks: every branch reaches the debrief,
 // the expected story flags are stored, the debrief lists the choices, no page errors.
-//   BRANCH=A|B|C (default all)   OUTDIR=<frozen build dir>
+//   BRANCH=A|B|C (default all)   OUTDIR=<frozen build dir>   START=<checkpoint> (default market)
 import { spawn, execSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { mkdirSync } from 'node:fs';
@@ -12,9 +12,9 @@ let pw; try { pw = require('playwright'); } catch { pw = require(execSync('npm r
 const OUT = new URL('./output/', import.meta.url).pathname; mkdirSync(OUT, { recursive: true });
 const PORT = 4196;
 const BRANCHES = {
-  A: { seed: { m05_drive: 'upload', m05_tail: 'tied' }, m06_buyer: 'right', m06_route: 'crowd', m06_nadia: 'maya', expect: { m06_buyer: 'right', m06_route: 'crowd', m06_nadia: 'maya' } },
-  B: { seed: { m05_drive: 'carry', m05_tail: 'released', m05_cole: 'stall' }, m06_buyer: 'wrong', m06_route: 'rail', m06_nadia: 'drive', expect: { m06_buyer: 'wrong', m06_route: 'rail', m06_nadia: 'drive' } },
-  C: { seed: {}, m06_buyer: 'none', m06_route: 'crowd', m06_nadia: 'aim', expect: { m06_route: 'crowd', m06_nadia: 'aim' } },
+  A: { seed: { m05_drive: 'upload', m05_tail: 'tied' }, m06_buyer: 'right', m06_nadia: 'maya', expect: { m06_buyer: 'right', m06_tail: 'assault', m06_nadia: 'maya' } },
+  B: { seed: { m05_drive: 'carry', m05_tail: 'released', m05_cole: 'stall' }, m06_buyer: 'wrong', m06_nadia: 'drive', expect: { m06_buyer: 'wrong', m06_tail: 'assault', m06_nadia: 'drive' } },
+  C: { seed: {}, m06_buyer: 'none', m06_nadia: 'aim', expect: { m06_tail: 'assault', m06_nadia: 'aim' } },
 };
 const pick = (process.env.BRANCH || 'A,B,C').split(',');
 const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort', '--outDir', process.env.OUTDIR || 'dist'], { stdio: 'pipe', cwd: new URL('..', import.meta.url).pathname });
@@ -27,9 +27,9 @@ for (const name of pick) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   page.on('pageerror', (e) => errors.push('pageerror: ' + e.message + '\n' + (e.stack || '').split('\n').slice(0, 3).join('\n')));
   page.on('console', (m) => { if (m.type() === 'error' && !/favicon|404/.test(m.text())) errors.push('console: ' + m.text()); });
-  await page.addInitScript((seed) => { if (sessionStorage.getItem('init')) return; sessionStorage.setItem('init', 1); localStorage.clear();
+  await page.addInitScript(([seed, start]) => { if (sessionStorage.getItem('init')) return; sessionStorage.setItem('init', 1); localStorage.clear();
     localStorage.setItem('fie.settings.v1', JSON.stringify({ graphics: { preset: 'low', shadows: 'off', textures: 'low', effects: 'low', post: false, renderScale: 0.5 } }));
-    localStorage.setItem('fie.save.v1', JSON.stringify({ version: 1, unlocked: ['m01', 'm02', 'm03', 'm04', 'm05', 'm06'], completed: {}, checkpoint: { missionId: 'm06', checkpointId: 'market', savedAt: Date.now() }, lastMission: 'm06', storyFlags: seed })); }, B.seed);
+    localStorage.setItem('fie.save.v1', JSON.stringify({ version: 1, unlocked: ['m01', 'm02', 'm03', 'm04', 'm05', 'm06'], completed: {}, checkpoint: { missionId: 'm06', checkpointId: start, savedAt: Date.now() }, lastMission: 'm06', storyFlags: seed })); }, [B.seed, process.env.START || 'market']);
   const ev = (fn, arg) => page.evaluate(fn, arg);
   try {
     await page.goto(`http://localhost:${PORT}/?nolock&autostart`); await page.waitForSelector('#menu', { timeout: 120000 });
