@@ -197,8 +197,14 @@ export function buildRifle(gun = 'k2c1') {
     for (const c of [...g.children]) if (!keep.has(c)) g.remove(c);
     magG.clear(); magG.add(real.mag); g.add(real.body);
     sightDrop = real.railTop - SY; sight.position.y = sightDrop;
-    const eo = eotech(real.railTop);
-    if (eo) { for (const c of [...sight.children]) if (c !== dot && c !== ring) sight.remove(c); sight.add(eo.group); sight.position.y = 0; dot.position.set(0, eo.cy, eo.cz); ring.position.set(0, eo.cy, eo.cz - 0.0001); sightDrop = eo.cy - dotY; eo.dotZ = eo.cz; }
+    // the M4A1 model carries its own EOTech: aim through that one (window centre measured from a rear
+    // render of the model: x +1.4 mm, y 0.0622, front glass z −0.062); the K2C1 gets the separate EXPS3
+    const eo = gun === 'k2c1' ? eotech(real.railTop) : null;
+    if (gun === 'm4a1') {
+      for (const c of [...sight.children]) if (c !== dot && c !== ring) sight.remove(c);
+      sight.position.y = 0; for (const grp of [real.body, real.mag]) grp.position.x = -0.0014;   // optic on the centre line (bore 1.4 mm aside)
+      dot.position.set(0, 0.0622, -0.063); ring.position.set(0, 0.0622, -0.0631); sightDrop = 0.0622 - dotY;
+    } else if (eo) { for (const c of [...sight.children]) if (c !== dot && c !== ring) sight.remove(c); sight.add(eo.group); sight.position.y = 0; dot.position.set(0, eo.cy, eo.cz); ring.position.set(0, eo.cy, eo.cz - 0.0001); sightDrop = eo.cy - dotY; eo.dotZ = eo.cz; }
     muzzle = real.muzzle;
     left.position.set(-0.03, -0.05, -0.34); lArm.position.z += 0.09; lArm.position.y += 0.006;
     right.position.add(new THREE.Vector3(0, -0.016, -0.05)); rArm.position.add(new THREE.Vector3(0, -0.016, -0.05));
