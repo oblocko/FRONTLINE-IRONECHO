@@ -150,13 +150,12 @@ export class WeaponSystem {
     this.reloading = true; this.reloadEmpty = empty; this.reloadCommitted = false; this.reloadDur = empty ? d.reloadEmpty : d.reload; this.reloadT = 0;
     this.reloadPlan = reloadPlan(d.id, empty);
     const T = this.reloadDur, P = this.reloadPlan, a = this.audio;
-    a.click(0.22, 1700, 0.03, P.release * T);                         // mag release
-    a.click(0.12, 800, 0.07, P.out * T);                              // mag sliding out
+    const kind = d.id === 'pistol' ? 'pistol' : 'rifle';
+    a.reloadPart('magout', kind, P.release * T);                       // mag release + pull
     if (empty) a.click(0.18, 500, 0.05, (P.out + 0.08) * T);          // empty mag hits the ground
     a.click(0.1, 600, 0.1, P.pouch * T);                              // pouch
-    a.click(0.38, 2300, 0.03, P.seat * T); a.click(0.2, 1100, 0.04, (P.seat + 0.02) * T);   // seat + slap
-    if (empty && d.id !== 'pistol') { a.click(0.3, 2800, 0.02, P.chargeBack * T); a.click(0.34, 1900, 0.03, P.chargeFwd * T); }
-    if (empty && d.id === 'pistol') a.click(0.36, 2600, 0.025, P.chargeFwd * T);
+    a.reloadPart('magin', kind, (P.seat - 0.03) * T);                  // fresh mag seated
+    if (empty) a.reloadPart('charge', kind, (kind === 'pistol' ? P.chargeFwd - 0.02 : P.chargeBack - 0.02) * T);   // charging handle / slide release
     events.emit('player:reload', {});
   }
   throwGrenade() {

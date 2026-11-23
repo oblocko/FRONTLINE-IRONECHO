@@ -1,6 +1,8 @@
-// Procedural audio engine (Web Audio API). Every sound is synthesised at
-// runtime: weapons, explosions, footsteps, vehicles, rotors, radio, ambience
-// and an adaptive score. Features:
+// Audio engine (Web Audio API). Gunshots, explosions, reload foley and footsteps play recorded samples
+// (assets/sfx, cut by tools/build_sfx.py; sources in assets/CREDITS.md) through the same distance /
+// HRTF / reverb chain, layered with a synthesised low end; anything without samples (vehicles, rotors,
+// radio, ambience, the adaptive score, and every sound until the samples have decoded) is synthesised
+// at runtime. Features:
 //  - Buses: music / sfx / ambience / dialogue -> master -> limiter
 //  - Priority + ducking: dialogue ducks music & sfx; voice-limited sfx pool
 //  - HRTF 3D panning for positional sources, distance attenuation
@@ -44,6 +46,7 @@ export class AudioEngine {
     this.applyVolumes();
     events.on('settings:changed', () => this.applyVolumes());
     this.ready = true;
+    this.loadSamples();
     this.startMusicEngine();
   }
   applyVolumes() {
@@ -116,9 +119,58 @@ export class AudioEngine {
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(end, t + a + d);
   }
 
+  // ---------- recorded samples ----------
+  async loadSamples() {
+    this.sfx = {}; this.lastPick = {};
+    try {
+      const base = new URL('assets/sfx/', document.baseURI);
+      const man = await (await fetch(new URL('manifest.json', base))).json();
+      await Promise.all(Object.entries(man).map(async ([bank, n]) => {
+        const bufs = await Promise.all(Array.from({ length: n }, async (_, i) => {
+          try { const r = await fetch(new URL(`${bank}_${i}.mp3`, base)); return r.ok ? await this.ctx.decodeAudioData(await r.arrayBuffer()) : null; } catch { return null; }
+        }));
+        const ok = bufs.filter(Boolean); if (ok.length) this.sfx[bank] = ok;
+      }));
+    } catch { /* no samples: everything stays synthesised */ }
+  }
+  has(bank) { return !!this.sfx?.[bank]; }
+  // one random variant of a bank (never the same one twice in a row), with optional pitch spread,
+  // low-pass (distance / muffling), delay (speed of sound) and the usual spatial routing
+  sample(bank, { pos = null, gain = 1, rate = 1, spread = 0.04, lp = 0, delay = 0, ref = 4, rolloff = 1.2, wet = true, echo = true, busName } = {}) {
+    const list = this.sfx?.[bank]; if (!list) return null;
+    const c = this.ctx, t = c.currentTime + delay;
+    let i = Math.floor(Math.random() * list.length); if (list.length > 1 && i === this.lastPick[bank]) i = (i + 1) % list.length; this.lastPick[bank] = i;
+    const src = c.createBufferSource(); src.buffer = list[i]; src.playbackRate.value = rate * (1 + (Math.random() * 2 - 1) * spread);
+    const g = c.createGain(); g.gain.value = gain; let node = src;
+    if (lp > 0 && lp < 18000) { const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lp; f.Q.value = 0.5; node.connect(f); node = f; }
+    node.connect(g); this.route(g, pos, { ref, rolloff, wet, echo, bus: busName });
+    src.start(t); this.track(src, list[i].duration / src.playbackRate.value + delay);
+    return src;
+  }
+
   // ---------- weapons ----------
+  // kind: rifle | pistol | mg (mounted machine gun) | heavy (autocannon)
   shot(pos, { kind = 'rifle', enemy = false, suppressed = false } = {}) {
     if (!this.canPlay(enemy ? 1 : 2)) return;
+    const bank = suppressed ? null : kind === 'pistol' ? 'pistol' : kind === 'mg' || kind === 'heavy' ? 'heavy' : 'rifle';
+    if (!bank || !this.has(bank)) return this.synthShot(pos, { kind, enemy, suppressed });
+    const c = this.ctx, t = c.currentTime;
+    const dist = pos && this.listenerPos ? this.listenerPos.distanceTo(pos) : 0;
+    const far = Math.min(1, dist / 160);
+    // the crack loses its top end with distance and arrives late; the player's own gun is closest and loudest
+    const lp = pos ? 16000 * Math.pow(1 - far, 2) + 900 : 0;
+    const delay = dist > 30 ? Math.min(0.6, (dist - 30) / 343) : 0;
+    const rate = kind === 'heavy' ? 0.78 : kind === 'mg' ? 0.92 : enemy ? 0.95 : 1.0;
+    this.sample(bank, { pos, gain: (pos ? (enemy ? 1.1 : 0.95) : 0.62) * (kind === 'pistol' ? 0.6 : 1), rate, lp, delay, ref: 7, rolloff: 0.85 });
+    // synthesised low-end thump under the recording (the body of the shot that small speakers lose)
+    if (!pos || dist < 40) {
+      const o = c.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(kind === 'pistol' ? 130 : 95, t + delay); o.frequency.exponentialRampToValueAtTime(38, t + delay + 0.14);
+      const og = c.createGain(); this.env(og, t + delay, 0.002, (pos ? 0.35 : 0.5) * (1 - dist / 40), 0.13); o.connect(og); this.route(og, pos, { ref: 6, rolloff: 0.9, wet: false });
+      o.start(t + delay); o.stop(t + delay + 0.22);
+    }
+    if (!pos) this.click(0.06, 2200, 0.02);   // action cycling, close to the ear
+  }
+  synthShot(pos, { kind = 'rifle', enemy = false, suppressed = false } = {}) {
     const c = this.ctx, t = c.currentTime;
     const dist = pos && this.listenerPos ? this.listenerPos.distanceTo(pos) : 0;
     const far = Math.min(1, dist / 120);
@@ -144,11 +196,21 @@ export class AudioEngine {
     n.start(t, Math.random()); n.stop(t + dur + 0.05);
   }
   reload(kind = 'rifle', dur = 2.2) {
-    // magazine out, pouch, mag in, charging handle
+    // magazine out, mag in, charging handle (used by ammo crates and NPCs; the player's reload times
+    // each part to its animation in Weapons.reload)
     const k = dur / 2.2;
-    this.click(0.25, 1800, 0.03, 0.25 * k); this.click(0.12, 900, 0.06, 0.4 * k);
-    this.click(0.15, 700, 0.08, 0.9 * k); this.click(0.35, 2400, 0.03, 1.35 * k); this.click(0.2, 1200, 0.04, 1.4 * k);
-    if (kind === 'rifle') { this.click(0.3, 3000, 0.02, 1.8 * k); this.click(0.3, 2000, 0.03, 1.9 * k); }
+    this.reloadPart('magout', kind, 0.25 * k); this.reloadPart('magin', kind, 1.3 * k);
+    if (kind === 'rifle') this.reloadPart('charge', kind, 1.75 * k);
+  }
+  // one part of the reload (magout | magin | charge) for 'rifle' or 'pistol', `when` seconds from now;
+  // falls back to synthesised clicks until the samples are in
+  reloadPart(part, kind = 'rifle', when = 0) {
+    if (!this.ready) return;
+    const bank = kind === 'pistol' ? { magout: 'pistol_magout', magin: 'pistol_magin', charge: 'pistol_slide' }[part] : `rifle_${part}`;
+    if (this.has(bank)) { this.sample(bank, { gain: part === 'magout' ? 0.55 : 0.7, delay: when, spread: 0.03, wet: true, echo: false }); return; }
+    if (part === 'magout') { this.click(0.22, 1700, 0.03, when); this.click(0.12, 800, 0.07, when + 0.1); }
+    else if (part === 'magin') { this.click(0.38, 2300, 0.03, when); this.click(0.2, 1100, 0.04, when + 0.04); }
+    else { this.click(0.3, 2800, 0.02, when); this.click(0.34, 1900, 0.03, when + 0.12); }
   }
   dryFire() { this.click(0.25, 3500, 0.01); }
   switchWeapon() { this.click(0.15, 1000, 0.05); this.click(0.2, 2500, 0.02, 0.18); }
@@ -188,6 +250,10 @@ export class AudioEngine {
     const o = c.createOscillator(); o.frequency.setValueAtTime(60, t0); o.frequency.exponentialRampToValueAtTime(25, t0 + 1.2);
     const og = c.createGain(); this.env(og, t0, 0.01, 1.4 * scale, 1.4); o.connect(og);
     const mix = c.createGain(); g.connect(mix); cg.connect(mix); og.connect(mix);
+    if (this.has('explosion')) {   // the recorded blast carries the crack and debris; the synth keeps the sub and the long rumble
+      cg.disconnect(); mix.gain.value = 0.7;
+      this.sample('explosion', { pos, gain: 1.25 * Math.min(1.4, scale), rate: scale > 1.2 ? 0.85 : scale < 0.5 ? 1.15 : 1, spread: 0.06, lp: 14000 / (1 + dist / 60) + 400, delay, ref: 15, rolloff: 0.6 });
+    }
     this.route(mix, pos, { ref: 15, rolloff: 0.6 });
     n.start(t0, Math.random()); n.stop(t0 + 3.5); crack.start(t0, Math.random()); crack.stop(t0 + 0.4); o.start(t0); o.stop(t0 + 1.6);
     this.track(n, 3.5 + delay);
@@ -209,7 +275,13 @@ export class AudioEngine {
     n.start(t, Math.random()); n.stop(t + 5);
   }
   footstep(surface = 'dirt', loud = 1, pos = null) {
-    if (!this.canPlay(pos ? 0 : 1)) return; const c = this.ctx, t = c.currentTime;
+    if (!this.canPlay(pos ? 0 : 1)) return;
+    const bank = 'step_' + ({ snow: 'snow', concrete: 'concrete', metal: 'metal', wood: 'wood', gravel: 'gravel', dirt: 'dirt', grass: 'dirt', mud: 'dirt', tile: 'tile', water: 'water' }[surface] || 'dirt');
+    if (this.has(bank)) { this.sample(bank, { pos, gain: 0.2 * loud, spread: 0.07, lp: loud < 0.5 ? 2500 : 0, ref: 2, rolloff: 2, echo: false }); return; }
+    this.synthFootstep(surface, loud, pos);
+  }
+  synthFootstep(surface, loud, pos) {
+    const c = this.ctx, t = c.currentTime;
     const n = this.noiseSrc(); const f = c.createBiquadFilter();
     const cfg = { dirt: [700, 1.2, 0.09], snow: [1800, 0.7, 0.14], concrete: [1800, 2, 0.05], metal: [2600, 6, 0.08], wood: [900, 3, 0.07], gravel: [2500, 0.8, 0.1] }[surface] || [900, 1, 0.08];
     f.type = 'bandpass'; f.frequency.value = cfg[0] * (0.85 + Math.random() * 0.3); f.Q.value = cfg[1];
@@ -274,9 +346,9 @@ export class AudioEngine {
   // recorded dialogue (assets/voice/<id>.mp3): decoded once, played on the dialogue bus (radio lines
   // band-limited). Returns the clip length in seconds, or 0 if the file is missing.
   async loadVoice(id) {
-    this.voices ||= new Map(); if (this.voices.has(id)) return this.voices.get(id);
+    this.voiceCache ||= new Map(); if (this.voiceCache.has(id)) return this.voiceCache.get(id);
     const pr = (async () => { try { const r = await fetch(new URL(`assets/voice/${id}.mp3`, document.baseURI)); if (!r.ok) return null; const buf = await r.arrayBuffer(); return await this.ctx.decodeAudioData(buf); } catch { return null; } })();
-    this.voices.set(id, pr); return pr;
+    this.voiceCache.set(id, pr); return pr;
   }
   async playVoice(id, radio = false) {
     if (!this.ready) return 0; const buf = await this.loadVoice(id); if (!buf) return 0;

@@ -1,0 +1,20 @@
+{
+ "rifle": 7,
+ "heavy": 4,
+ "pistol": 4,
+ "explosion": 3,
+ "rifle_magout": 2,
+ "rifle_magin": 2,
+ "rifle_charge": 2,
+ "pistol_magout": 2,
+ "pistol_magin": 2,
+ "pistol_slide": 2,
+ "step_concrete": 9,
+ "step_gravel": 10,
+ "step_dirt": 9,
+ "step_wood": 9,
+ "step_tile": 9,
+ "step_water": 5,
+ "step_metal": 12,
+ "step_snow": 12
+}

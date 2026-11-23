@@ -3,7 +3,7 @@
 1인칭 싱글플레이 현대전 FPS 캠페인. 2029년 한반도 전쟁과 해외 비밀 작전이 교차하는 16개 미션의 이야기 (현재 **Mission 01–05 플레이 가능** — ACT 1 전체 + ACT 2 첫 미션, 미션 완료 후 다음 미션으로 자동 연결, M05부터 분기 선택).
 
 - 엔진: three.js r187 (WebGL 2) + Vite — 엔진 선택 사유는 [docs/ENGINE_DECISION.md](docs/ENGINE_DECISION.md)
-- 에셋: 사람 캐릭터는 Quaternius CC0 인체·애니메이션에 코드로 군복·장구류를 입힘. 총기·조준기·방탄모·방탄복·트럭·헬기·함정은 Sketchfab 라이선스 모델, 텍스처·소품 일부는 Poly Haven CC0(출처: `assets/CREDITS.md`). 건물·지형·K21 장갑차·효과음·음악은 코드로 만든 원본
+- 에셋: 사람 캐릭터는 Quaternius CC0 인체·애니메이션에 코드로 군복·장구류를 입힘. 총기·조준기·방탄모·방탄복·트럭·헬기·함정은 Sketchfab 라이선스 모델, 텍스처·소품 일부는 Poly Haven CC0(출처: `assets/CREDITS.md`). 총성·폭발·재장전·발소리는 OpenGameArt CC0/CC-BY 녹음을 `tools/build_sfx.py`로 잘라 쓴 것. 건물·지형·K21 장갑차·나머지 효과음·음악은 코드로 만든 원본
 - 진행 상황: [PROJECT_STATUS.md](PROJECT_STATUS.md)
 - **바로 플레이**: https://oblocko.github.io/FRONTLINE-IRONECHO/ (JavaScript와 WebGL 2가 켜진 데스크톱 브라우저). 텍스트만 읽는 도구로 열면 게임 대신 소개 페이지가 보입니다.
 

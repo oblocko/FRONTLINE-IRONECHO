@@ -66,3 +66,19 @@ Downloaded with `tools/sketchfab_get.py`, converted by `tools/prepare_gear.py` (
 ## 음성 (Voice)
 
 - **한민재 대사 (M01, 5줄)** — 프로젝트 소유자가 ElevenLabs 음성 합성으로 제작해 제공 (사용 조건은 제작자의 ElevenLabs 요금제 약관을 따름) → `assets/voice/m01/minjae_001–005.mp3`. 녹음 파일이 있는 대사는 이 음성으로 재생되고, 없는 대사는 설정에 따라 음성 합성(TTS) 또는 웅얼거림으로 대체됩니다.
+
+## Sound effects (OpenGameArt)
+
+Gunshots, explosions, reload foley and footsteps are recorded samples from OpenGameArt. They were cut into one-shot clips, loudness-matched and re-encoded as mono MP3 by `tools/build_sfx.py`; the output is in `assets/sfx/`. The audio engine plays them through its own distance filtering, speed-of-sound delay, HRTF panning and reverb, and layers a synthesised low end under shots and explosions. Every other sound (vehicles, rotors, radio, ambience, music) is still synthesised at runtime.
+
+| Files | Pack | Author | Licence | Source |
+|---|---|---|---|---|
+| `sfx/rifle_*`, `heavy_*`, `pistol_*` (SKS, Mosin-Nagant, CZ field recordings) | Gunshot sounds | Tabasco | CC0 1.0 | https://opengameart.org/content/gunshot-sounds |
+| `sfx/explosion_0`, `explosion_1` | 2 High Quality Explosions | qubodup | CC-BY 3.0 | https://opengameart.org/content/2-high-quality-explosions |
+| `sfx/explosion_2` | Big Explosion | Lamoot | CC-BY 3.0 | https://opengameart.org/content/big-explosion |
+| `sfx/rifle_magout_*`, `rifle_magin_0`, `rifle_charge_*` | Gun Reload Sounds | SpringySpringo | CC0 1.0 | https://opengameart.org/content/gun-reload-sounds |
+| `sfx/pistol_magout_0`, `pistol_magin_0`, `pistol_slide_0` | Handgun Reload Sound Effect | zer0_sol | CC0 1.0 | https://opengameart.org/content/handgun-reload-sound-effect |
+| `sfx/rifle_magin_1`, `pistol_*_1` | 2 Gun Reloads | StarNinjas | CC0 1.0 | https://opengameart.org/content/2-gun-reloads |
+| `sfx/step_concrete_*`, `step_gravel_*`, `step_dirt_*`, `step_wood_*`, `step_tile_*`, `step_water_*` | Footsteps on different surfaces | congusbongus | CC-BY 3.0 | https://opengameart.org/content/footsteps-on-different-surfaces |
+| `sfx/step_metal_*` | Metal footsteps on concrete | Thimras | CC0 1.0 | https://opengameart.org/content/metal-footsteps-on-concrete |
+| `sfx/step_snow_*` | 42 snow and gravel footsteps (recorded by Corsica_S, extracted by qubodup) | Corsica_S, qubodup | CC0 1.0 | https://opengameart.org/content/42-snow-and-gravel-footsteps |
