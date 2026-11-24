@@ -15,7 +15,7 @@ import { modernTower, landmarkTower, shell, cap, outline, outlineColliders, outl
 import { channelSign } from '../korea/Signs.js';
 import { furnishSidewalk, placeCar, parkAlong, CURB } from './Streets.js';
 import { carType } from '../korea/Cars.js';
-import { buildCentralStation, footbridge } from './Station.js';
+import { buildCentralStation, footbridge, stationQuarter } from './Station.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 export const ND = {
@@ -92,7 +92,13 @@ export function buildNewDistrict(ctx) {
   const stBlock = new Rect(216 + 4, -224 + 4, bx0 - L.walk, -104 - L.sw);
   const station = buildCentralStation(ctx, { block: stBlock, rail: R });
   footbridge(ctx, { x0: stBlock.x1 - 30, z0: -116, x1: bx1 + L.walk + 10, z1: -84 + L.sw + 8 });   // lands on the landmark forecourt
-  plan.walk(new Rect(bx1 + L.walk, -224 + 4, 520, -104 - L.sw), 'plaza');   // the landing on the east side
+  // the east side: mixed-use development across the boulevard (department store podium + hotel tower), its forecourt
+  // where the footbridge lands
+  plan.walk(new Rect(bx1 + L.walk, -166, bx1 + L.walk + 14, -104 - L.sw), 'plaza');
+  plan.walk(new Rect(bx1 + L.walk, -112.5, 612 - 2, -104 - L.sw), 'plaza');   // the department store / hotel forecourt on 올림픽로
+  modernTower(ctx, { x: 492, z: -137, y0: CURB, podium: { kind: 'round', w: 82, d: 50, h: 26, r: 10 }, sections: [{ kind: 'round', w: 34, d: 26, r: 8, h: 118, floorH: 4, rims: 2 }],
+    crown: 'fin', zone: 'business', use: 'shops', front: [0, 1], palette: { glass: 0x5a7486, spandrel: 0xc8ccd0, mullion: 0xe0e4e6, key: 'hotel' } });
+  stationQuarter(ctx, { st: station, block: stBlock, rail: R, east: [new Rect(bx1 + L.walk + 2, -206, 612 - L.sw - 2, -166), new Rect(624 + L.sw + 2, -206, L.x1 - 2, -166)] });
   // ---------------------------------------------------------------- the landmark + podium mall (east of the boulevard, facing the lakes)
   const T = L.tower; landmarkTower(ctx, { x: T.x, z: T.z, y0: CURB, H: 520, base: 58, name: '연서 하늘타워' });
   // podium mall north / east of the tower: a long retail block and a rounded "dome" department store

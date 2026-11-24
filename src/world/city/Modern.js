@@ -149,7 +149,8 @@ export function modernTower(ctx, { x, z, y0, sections, podium = null, crown = 'p
   const slab = slabMat(palette.slab ?? 0xe4e2dc), roofM = flatMat(0x8a8c88, { roughness: 0.9, key: 'mroof' });
   if (podium) {
     const pts = outline(podium.kind ?? 'rect', podium.w, podium.d, podium); foot = pts;
-    const shop = curtainMat({ glass: 0x3e4c54, spandrel: 0x2e3236, mullion: 0x8a9094, floorH: podium.h, spandrelH: Math.min(3, podium.h * 0.3), bays: 3, key: 'retail' }); B.add(shell([{ y, pts }, { y: y + podium.h, pts }], { cx: x, cz: z, uM: 6, vM: podium.h }), shop);
+    const pfh = podium.h > 12 ? 5.2 : podium.h;   // tall podiums (department stores) read as floors, low ones as one shop storey
+    const shop = curtainMat({ glass: 0x3e4c54, spandrel: podium.h > 12 ? 0xc8ccd0 : 0x2e3236, mullion: 0x8a9094, floorH: pfh, spandrelH: Math.min(3, pfh * 0.3), bays: 3, key: 'retail' + pfh }); B.add(shell([{ y, pts }, { y: y + podium.h, pts }], { cx: x, cz: z, uM: 6, vM: pfh }), shop);
     B.add(rim(pts, y + podium.h - 0.6, 0.6, 0.25, { cx: x, cz: z }), slab);
     B.add(cap(pts, y + podium.h, { cx: x, cz: z }), roofM);
     colliders.push(...outlineColliders(world, pts, x, z, y, podium.h));

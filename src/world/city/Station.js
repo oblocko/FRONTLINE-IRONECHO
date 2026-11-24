@@ -177,3 +177,59 @@ export function footbridge(ctx, { x0, z0, x1, z1 }) {
   for (const [px, pz] of [[x0 + 20, z0], [(x0 + x1) / 2, z0], [x1, (z0 + z1) / 2]]) { batch.box(m, 1.2, y - CURB, 1.2, px, (y + CURB) / 2, pz); }
   plan.add({ kind: 'structure', id: 'footbridge', rect: new Rect(x0, z0 - w / 2, x1 + w / 2, z1), y0: y - 0.4, h: 2, tags: ['elevated', 'onRoad'] });
 }
+
+// ---------------------------------------------------------------- the station quarter (역세권) around the building:
+// plaza furniture, a north entrance with a drop-off lane, shop arcades under the viaduct, and the mixed-use
+// development across the boulevard (department store podium + hotel tower) that the footbridge lands on
+export function stationQuarter(ctx, { st, block, rail, east, streetsZ }) {
+  const { plan, batch, scene, world } = ctx, R = rail, { conc, front } = st;
+  const steel = flatMat(0xd6dade, { roughness: 0.35, metalness: 0.75, key: 'stnsteel' }), dark = flatMat(0x2a2e32, { roughness: 0.5, metalness: 0.5, key: 'stndark' });
+  const wood = flatMat(0x8a6a48, { roughness: 0.8, key: 'bench' }), planter = wallMat('stone', 0xb8b4ac);
+  const prop = (id, rect, h, add) => { if (!plan.free(rect, { roads: true })) return null; add(); return plan.add({ kind: 'prop', id, rect, y0: CURB, h, colliders: [world.addBox(V(rect.x0, CURB, rect.z0), V(rect.x1, CURB + h, rect.z1), { surface: 'concrete', walkable: false, cover: h > 1 })] }); };
+  const plaza = st.plaza;
+
+  // --- plaza furniture: a sculpture on the axis, planters with trees + benches, kiosks, a media pylon, bollards
+  const ax = conc.x0 + (conc.x1 - conc.x0) / 2;
+  prop('sculpture', Rect.c(ax, plaza.z1 - 12, 3, 3), 9, () => { batch.box(planter, 4, 0.6, 4, ax, CURB + 0.3, plaza.z1 - 12); const g = new THREE.TorusKnotGeometry(1.6, 0.35, 64, 8); g.scale(1, 1.6, 1); g.translate(ax, CURB + 4.6, plaza.z1 - 12); batch.add(g, steel); });
+  for (const s of [-1, 1]) for (let k = 0; k < 3; k++) {
+    const x = ax + s * (24 + k * 14), z = plaza.z1 - 14;
+    prop(`planter${s}${k}`, Rect.c(x, z, 5, 3), 0.6, () => { batch.box(planter, 5, 0.6, 3, x, CURB + 0.3, z); batch.box(groundMat('lawn'), 4.6, 0.02, 2.6, x, CURB + 0.61, z, 0, { cast: false }); });
+    ctx.treeBatch.add(x, z, { kind: k === 1 ? 'pine' : 'leaf' });
+    prop(`bench${s}${k}`, Rect.c(x, z + 2.4, 3, 0.6), 0.5, () => { batch.box(wood, 3, 0.08, 0.55, x, CURB + 0.45, z + 2.4); batch.box(dark, 0.08, 0.45, 0.5, x - 1.3, CURB + 0.22, z + 2.4); batch.box(dark, 0.08, 0.45, 0.5, x + 1.3, CURB + 0.22, z + 2.4); });
+  }
+  const kioskCols = [0xc8402a, 0x2a6ab0, 0x3a8a4a, 0xd8a020];
+  for (let k = 0; k < 4; k++) { const x = ax + (k < 2 ? -1 : 1) * (12 + (k % 2) * 7), z = front + 30;
+    prop(`kiosk${k}`, Rect.c(x, z, 3, 2.4), 2.6, () => { batch.box(flatMat(0xe8e6e0, { key: 'kiosk' }), 3, 2.3, 2.4, x, CURB + 1.15, z); batch.box(flatMat(kioskCols[k], { key: 'kioskroof' + k }), 3.6, 0.2, 3.0, x, CURB + 2.5, z); batch.box(dark, 2.2, 0.9, 0.05, x, CURB + 1.4, z + 1.22); }); }
+  { const x = conc.x1 + 10, z = front + 26; prop('media-pylon', Rect.c(x, z, 2, 1), 12, () => { batch.box(dark, 1.4, 12, 0.8, x, CURB + 6, z);
+      const scr = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 7.6), new THREE.MeshBasicMaterial({ map: (() => { const c = document.createElement('canvas'); c.width = 256; c.height = 440; const g = c.getContext('2d'); const gr = g.createLinearGradient(0, 0, 0, 440); gr.addColorStop(0, '#1d3f8a'); gr.addColorStop(1, '#0a1a3a'); g.fillStyle = gr; g.fillRect(0, 0, 256, 440); g.fillStyle = '#fff'; g.font = 'bold 34px "WenQuanYi Zen Hei", sans-serif'; g.textAlign = 'center'; g.fillText('연서중앙역', 128, 120); g.font = '22px sans-serif'; g.fillText('YEONSEO CENTRAL', 128, 160); g.fillStyle = '#ffcc33'; g.font = 'bold 26px "WenQuanYi Zen Hei", sans-serif'; g.fillText('KTX · ITX · 지하철 3·7호선', 128, 260); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })(), toneMapped: false }));
+      scr.position.set(x, CURB + 7.6, z + 0.42); scene.add(scr); }); }
+  for (let x = plaza.x0 + 4; x < plaza.x1 - 4; x += 2.4) if (Math.abs(x - ax) > 20) batch.box(steel, 0.25, 0.9, 0.25, x, CURB + 0.45, plaza.z1 - 1.2);   // bollards on the curb
+
+  // --- north entrance: canopy, glass doors, a drop-off lane along the north street, bike racks
+  const nz = conc.z0, nw = 40;
+  batch.add(new THREE.BoxGeometry(nw, 0.6, 10).translate(ax, CURB + 7, nz - 5), steel);
+  for (const s of [-1, 1]) batch.box(steel, 0.6, 7, 0.6, ax + s * (nw / 2 - 1), CURB + 3.5, nz - 9.5);
+  batch.box(flatMat(0x7e98a8, { roughness: 0.06, metalness: 0.4, key: 'ndoor' }), nw - 8, 5.5, 0.2, ax, CURB + 2.75, nz - 0.1);
+  const nn = channelSign('연서중앙역 북측 출입구', '#1d3f8a', 1.1, { raceway: null }); nn.position.set(ax, CURB + 6, nz - 0.25); nn.rotation.y = Math.PI; scene.add(nn);
+  plan.walk(new Rect(block.x0, block.z0, block.x1, nz), 'plaza');
+  batch.add(cap(outline('rect', block.x1 - block.x0, nz - block.z0), CURB + 0.015, { cx: (block.x0 + block.x1) / 2, cz: (block.z0 + nz) / 2 }), groundMat('plaza', { color: 0xc8c4bc }), { cast: false });
+  { const lane = new Rect(ax - 40, block.z0 + 0.5, ax + 40, block.z0 + 6); plan.park(lane); batch.add(cap(outline('rect', lane.w, lane.d), CURB + 0.02, { cx: lane.cx, cz: lane.cz }), groundMat('asphalt'), { cast: false });
+    for (let i = 0; i < 4; i++) placeCar(ctx, i % 2 ? 'taxi' : 'sedan', lane.x0 + 8 + i * 14, lane.cz, -Math.PI / 2, { state: 'clean' }); }
+  for (let i = 0; i < 10; i++) batch.box(dark, 0.06, 0.8, 1.6, ax + 24 + i * 1.2, CURB + 0.4, nz - 12);
+
+  // --- shop arcades under the viaduct (deck underside y ~7.4): rows of small units with glass fronts, both sides
+  const arcade = curtainMat({ glass: 0x3e4c54, spandrel: 0x2e3236, mullion: 0x8a9094, floorH: 5, spandrelH: 1.2, bays: 3, key: 'arcade' });
+  for (const [x0, x1] of [[block.x0, conc.x0 - 40], [conc.x1 + 40, block.x1], ...east.map((r) => [r.x0, r.x1])]) {
+    if (x1 - x0 < 14) continue;
+    const pc = (R.z0 + R.z1) / 2;   // the viaduct piers stand on the centre line: one arcade strip either side of them
+    for (const r of [new Rect(x0 + 2, R.z0 + 4, x1 - 2, pc - 4), new Rect(x0 + 2, pc + 4, x1 - 2, R.z1 - 4)]) {
+    if (plan.items.some((o) => (o.kind === 'building' || o.kind === 'structure' || o.kind === 'car') && !o.tags.includes('elevated') && o.rect?.hits(r))) continue;   // under the deck is fine
+    batch.add(shell([{ y: CURB, pts: outline('rect', r.w, r.d) }, { y: CURB + 5, pts: outline('rect', r.w, r.d) }], { cx: r.cx, cz: r.cz, uM: 6, vM: 5 }), arcade);
+    batch.add(cap(outline('rect', r.w, r.d), CURB + 5, { cx: r.cx, cz: r.cz }), flatMat(0x6e7270, { key: 'arcroof' }));
+    for (let x = r.x0 + 6; x < r.x1 - 4; x += 9) for (const zz of [r.z0, r.z1]) { const s2 = boxSignFor(x, zz, zz === r.z1 ? 0 : Math.PI); scene.add(s2); }
+    plan.add({ kind: 'building', id: `arcade${x0 | 0}${r.z0 | 0}`, use: 'shops', zone: 'commercial', rect: r, y0: CURB, h: 5, tags: ['support'], colliders: [world.addBox(V(r.x0, CURB, r.z0), V(r.x1, CURB + 5, r.z1), { surface: 'concrete', cover: true, walkable: false })], entrances: [] });
+    }
+  }
+  function boxSignFor(x, z, rot) { const names = [['김밥나라', '#ffffff', '#d8261c'], ['역전우동', '#1d3f8a', '#ffffff'], ['편의점', '#1f6e4c', '#ffffff'], ['커피', '#2b2420', '#e8d7b8'], ['약국', '#1f8a4c', '#ffffff'], ['휴대폰', '#e2231a', '#ffffff']];
+    const [n, bg, fg] = names[Math.abs(Math.floor(x * 7 + z)) % names.length]; const s2 = boxSign(n, '', [bg, fg, fg], 6, 0.8); s2.position.set(x, CURB + 4.3, z); s2.rotation.y = rot; return s2; }
+}
