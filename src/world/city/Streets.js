@@ -22,7 +22,14 @@ export function buildGround(ctx) {
   for (const r of plan.roads) if (r.kind !== 'drive') batch.box(asph, r.rect.w, 0.02, r.rect.d, r.rect.cx, -0.01, r.rect.cz, 0, { cast: false });
   // raised land: every block is a slab from -0.3 to CURB, its top = lot concrete; sidewalks get pavers on top
   const lot = groundMat('plaza', { color: 0x9a9890 }), curb = wallMat('stone', 0xb0aca4), pav = groundMat('pavers');
-  for (const b of plan.blocks) batch.box(lot, b.rect.w, CURB + 0.3, b.rect.d, b.rect.cx, (CURB - 0.3) / 2, b.rect.cz, 0, { cast: false });
+  for (const b of plan.blocks) {
+    if (!b.holes?.length) { batch.box(lot, b.rect.w, CURB + 0.3, b.rect.d, b.rect.cx, (CURB - 0.3) / 2, b.rect.cz, 0, { cast: false }); continue; }
+    // land with holes (lakes): extruded outline from -0.3 up to the curb
+    const sh = new THREE.Shape([[b.rect.x0, -b.rect.z0], [b.rect.x1, -b.rect.z0], [b.rect.x1, -b.rect.z1], [b.rect.x0, -b.rect.z1]].map(([x, y]) => new THREE.Vector2(x, y)));
+    for (const h of b.holes) sh.holes.push(new THREE.Path(h.map(([x, z]) => new THREE.Vector2(x, -z))));
+    const g = new THREE.ExtrudeGeometry(sh, { depth: CURB + 0.3, bevelEnabled: false, curveSegments: 1 }); g.rotateX(-Math.PI / 2); g.translate(0, -0.3, 0);
+    batch.add(g, b.lawn ? groundMat('lawn') : lot, { cast: false });
+  }
   for (const w of plan.walks) if (w.kind === 'sidewalk') {
     batch.box(pav, w.rect.w, 0.01, w.rect.d, w.rect.cx, CURB + 0.005, w.rect.cz, 0, { cast: false });
     // granite curb along the edge that meets a road
@@ -112,10 +119,11 @@ export class TreeBatch {
     const geos = { leaf: leafTreeGeo(), pine: pineGeo() };
     for (const [k, pts] of Object.entries(this.list)) {
       if (!pts.length) continue;
-      for (const [part, mat] of geos[k]) {
-        const im = new THREE.InstancedMesh(part, mat, pts.length);
-        pts.forEach((p, i) => { d.position.set(p.x, p.y, p.z); d.rotation.set(0, p.r, 0); d.scale.setScalar(p.s); d.updateMatrix(); im.setMatrixAt(i, d.matrix); });
-        im.castShadow = true; im.receiveShadow = true; im.computeBoundingSphere(); scene.add(im);
+      const cells = new Map(); for (const p of pts) { const key = `${Math.floor(p.x / 60)},${Math.floor(p.z / 60)}`; if (!cells.has(key)) cells.set(key, []); cells.get(key).push(p); }
+      for (const [key, list] of cells) for (const [part, mat] of geos[k]) {
+        const im = new THREE.InstancedMesh(part, mat, list.length);
+        list.forEach((p, i) => { d.position.set(p.x, p.y, p.z); d.rotation.set(0, p.r, 0); d.scale.setScalar(p.s); d.updateMatrix(); im.setMatrixAt(i, d.matrix); });
+        im.castShadow = true; im.receiveShadow = true; im.computeBoundingSphere(); im.userData.cell = key; im.userData.lodMid = true; scene.add(im);
       }
     }
   }

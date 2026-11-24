@@ -175,8 +175,8 @@ export class Facades {
       if (!all.length) continue;
       // split into 60 m cells so off-screen streets are culled
       const cells = new Map(); for (const e of all) { p.setFromMatrixPosition(e.m); const key = `${Math.floor(p.x / 60)},${Math.floor(p.z / 60)}`; if (!cells.has(key)) cells.set(key, []); cells.get(key).push(e); }
-      for (const list of cells.values()) {
-        const d = defs[k], mesh = new THREE.InstancedMesh(d.geo, mats[d.mat], list.length);
+      for (const [cell, list] of cells) {
+        const d = defs[k], mesh = new THREE.InstancedMesh(d.geo, mats[d.mat], list.length); mesh.userData.cell = cell;
         list.forEach((e, i) => { mesh.setMatrixAt(i, e.m); mesh.setColorAt(i, e.c || white); });
         mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
         mesh.computeBoundingSphere();

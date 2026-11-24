@@ -175,10 +175,14 @@ export class CarBatch {
     for (const { k, geo, mat } of carParts(type, opts)) { const key = geo.uuid + mat.uuid; if (!this.groups.has(key)) this.groups.set(key, { geo, mat, k, list: [] }); this.groups.get(key).list.push({ mtx, owner }); }
   }
   build(removed = new Set()) {
+    const p = new THREE.Vector3();
     for (const { geo, mat, k, list } of this.groups.values()) {
-      const l = list.filter((e) => !removed.has(e.owner)); if (!l.length) continue;
-      const im = new THREE.InstancedMesh(geo, mat, l.length); l.forEach((e, i) => im.setMatrixAt(i, e.mtx));
-      im.castShadow = k === 'paint' || k === 'glass' || k === 'bed'; im.receiveShadow = true; im.computeBoundingSphere(); this.scene.add(im);
+      const cells = new Map();
+      for (const e of list) { if (removed.has(e.owner)) continue; p.setFromMatrixPosition(e.mtx); const key = `${Math.floor(p.x / 60)},${Math.floor(p.z / 60)}`; if (!cells.has(key)) cells.set(key, []); cells.get(key).push(e); }
+      for (const [key, l] of cells) {
+        const im = new THREE.InstancedMesh(geo, mat, l.length); l.forEach((e, i) => im.setMatrixAt(i, e.mtx));
+        im.castShadow = k === 'paint' || k === 'glass' || k === 'bed'; im.receiveShadow = true; im.computeBoundingSphere(); im.userData.cell = key; im.userData.lodMid = true; this.scene.add(im);
+      }
     }
   }
 }

@@ -155,6 +155,8 @@ export class Game {
     this.stats = stats || { time: 0, deaths: 0, kills: 0, headshots: 0, shotsFired: 0, shotsHit: 0 };
     this.killOff = events.on('player:kill', (e) => { this.stats.kills++; if (e.head) this.stats.headshots++; });
     // build level
+    this.renderer.setDistanceBlur(null);   // a level turns it on if it wants it
+    this.renderer.camera.far = 1500; this.renderer.camera.updateProjectionMatrix();
     await p.mod.build(this);
     this.batchStats = batchStatic(this.renderer.scene);   // merge non-moving level geometry
     this.director.buildCovers();

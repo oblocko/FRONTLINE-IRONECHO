@@ -179,21 +179,21 @@ export class Batch {
   build(removed = new Set()) {
     const out = [];
     for (const [mat, b] of this.buckets) {
-      const geos = b.geos.filter((g) => !removed.has(g.userData.owner)).map((g) => { const n = g.index ? g.toNonIndexed() : g; for (const a of Object.keys(n.attributes)) if (!['position', 'normal', 'uv'].includes(a)) n.deleteAttribute(a); if (!n.attributes.uv) n.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(n.attributes.position.count * 2), 2)); return n; });
+      const geos = b.geos.filter((g) => !removed.has(g.userData.owner)).map((g) => { const n = g.index ? g.toNonIndexed() : g; n.userData.keepUV = g.userData.keepUV; for (const a of Object.keys(n.attributes)) if (!['position', 'normal', 'uv'].includes(a)) n.deleteAttribute(a); if (!n.attributes.uv) n.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(n.attributes.position.count * 2), 2)); return n; });
       // world-planar UVs
       for (const g of geos) {
         if (g.userData.keepUV) continue;
-        const p = g.attributes.position, nrm = g.attributes.normal, uv = g.attributes.uv, k = 1 / b.texMeters;
+        const p = g.attributes.position, nrm = g.attributes.normal, uv = g.attributes.uv, k = 1 / (mat.userData.uM ?? b.texMeters), kv = 1 / (mat.userData.vM ?? b.texMeters);
         for (let i = 0; i < p.count; i++) {
           const ax = Math.abs(nrm.getX(i)), ay = Math.abs(nrm.getY(i));
-          if (ay > 0.6) uv.setXY(i, p.getX(i) * k, p.getZ(i) * k); else if (ax > 0.6) uv.setXY(i, p.getZ(i) * k, p.getY(i) * k); else uv.setXY(i, p.getX(i) * k, p.getY(i) * k);
+          if (ay > 0.6) uv.setXY(i, p.getX(i) * k, p.getZ(i) * k); else if (ax > 0.6) uv.setXY(i, p.getZ(i) * k, p.getY(i) * kv); else uv.setXY(i, p.getX(i) * k, p.getY(i) * kv);
         }
       }
       // split into chunks so frustum culling still works on a big city
       const chunks = new Map();
       for (const g of geos) { g.computeBoundingBox(); const c = g.boundingBox.getCenter(new THREE.Vector3()); const key = `${Math.floor(c.x / 60)},${Math.floor(c.z / 60)}`; if (!chunks.has(key)) chunks.set(key, []); chunks.get(key).push(g); }
-      for (const list of chunks.values()) {
-        const merged = mergeAll(list); const m = new THREE.Mesh(merged, mat); m.castShadow = b.cast; m.receiveShadow = true; this.scene.add(m); out.push(m);
+      for (const [key, list] of chunks) {
+        const merged = mergeAll(list); const m = new THREE.Mesh(merged, mat); m.castShadow = b.cast; m.receiveShadow = true; m.userData.cell = key; if (this.lodAlways || !b.cast) m.userData.lodAlways = true;   // ground / road surfaces always draw this.scene.add(m); out.push(m);
       }
     }
     this.buckets.clear(); return out;

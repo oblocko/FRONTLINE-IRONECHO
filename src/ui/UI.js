@@ -145,7 +145,7 @@ export class UI {
     const m = missionById(id);
     const el = this.mount('briefing', h(`<div class="scanlines">
       <div class="bl">
-        <div class="num">MISSION ${m.num} // ${ACTS[m.act - 1].title}</div>
+        <div class="num">MISSION ${m.num} // ${ACTS[m.act - 1]?.title ?? "DEV"}</div>
         <h1>${m.title}</h1><div class="ko">${m.ko}</div>
         <div class="meta">
           <div class="k">AREA</div><div>${esc(m.location)}</div>

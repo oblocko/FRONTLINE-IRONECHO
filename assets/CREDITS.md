@@ -4,6 +4,7 @@ All assets below are CC0 1.0 (public domain) from Poly Haven. Attribution is not
 
 | Type | ID | Name | Author(s) | Licence | Source |
 |---|---|---|---|---|---|
+| sky | `yeonseo_day` | Kloofendal 48d Partly Cloudy (Pure Sky), tonemapped, horizon haze below | Greg Zaal, Jarod Guest | CC0 1.0 | https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky |
 | texture | `snow_02` | Snow 02 | Rob Tuytel | CC0 1.0 | https://polyhaven.com/a/snow_02 |
 | texture | `asphalt_snow` | Asphalt Snow | eye-candy.xyz | CC0 1.0 | https://polyhaven.com/a/asphalt_snow |
 | texture | `stony_dirt_path` | Stony Dirt Path | eye-candy.xyz | CC0 1.0 | https://polyhaven.com/a/stony_dirt_path |

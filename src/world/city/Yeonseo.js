@@ -20,6 +20,9 @@ import * as B from './Buildings.js';
 import { buildGround, markings, median, furnishSidewalk, TreeBatch, placeCar, parkAlong, lamp, signal, CURB, CarBatch, bakeStatic } from './Streets.js';
 import { CityKit } from '../CityProps.js';
 import { groundMat } from './CityMaterials.js';
+import { buildNewDistrict, inLake } from './NewDistrict.js';
+import { CityLod } from './CityLod.js';
+import { Region } from './Region.js';
 import { carType } from '../korea/Cars.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -30,7 +33,7 @@ export const LAYOUT = {
   corridors: [{ rect: new Rect(-4.7, -230, -0.3, -117), why: 'convoy route' }, { rect: new Rect(-9.2, 0, -2.3, 203), why: 'escort / bus route' }, { rect: new Rect(8, 114.5, 62, 125.5), why: 'technical route' }],
 };
 
-export function buildYeonseo(game, { station = null, early = null, corridors = [], jam = false } = {}) {
+export function buildYeonseo(game, { station = null, early = null, corridors = [], jam = false, district = true, region: regionOn = true } = {}) {
   const scene = game.renderer.scene, world = game.world, L = LAYOUT;
   let seed = 20260320; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   const plan = new CityPlan({});
@@ -38,14 +41,16 @@ export function buildYeonseo(game, { station = null, early = null, corridors = [
   const S = station;
   const heightFn = (x, z) => {
     if (S && x > 290) return x > S.pit[0] && x < S.pit[1] && z > S.z0 && z < S.z1 ? -1.3 : 0;
+    if (x > 216 && inLake(x, z)) return -0.9;
     for (const r of plan.carriageways) if (r.rect.has(x, z)) return 0;
     return CURB;
   };
   plan.heightFn = heightFn;
   world.setTerrain(heightFn, () => 'concrete');
   const batch = new Batch(scene); plan.batch = batch;
+  const landmarkBatch = new Batch(scene); landmarkBatch.lodAlways = true;
   const fac = new FacadeSet(game, {});
-  const ctx = { game, scene, world, plan, batch, fac, rnd, ground: heightFn, cur: null };
+  const ctx = { game, scene, world, plan, batch, landmarkBatch, fac, rnd, ground: heightFn, cur: null };
   ctx.ownBegin = (it) => { ctx.cur = it; batch.owner = it; fac.owner = it; };
   ctx.ownEnd = () => { ctx.cur = null; batch.owner = null; fac.owner = null; };
   ctx.own = (o) => { if (ctx.cur) (ctx.cur.objs ||= []).push(o); };
@@ -152,11 +157,13 @@ export function buildYeonseo(game, { station = null, early = null, corridors = [
   for (const [x0, x1] of [[F, bs0], [bs1, 61.6], [-bs0, -F], [-92, -bs1]]) build.push(() => B.parkingLot(ctx, parcel(x0, L.overpass[0], x1, L.overpass[1], x0 > 0 ? 'residential' : 'public', [x0 > 0 ? -1 : 1, 0]), { fill: 0.35 }));
 
   // station exit 3 on the plaza (registered first so nothing is built over its approach)
-  const kit = new CityKit(game);
+  const kit = new CityKit(game); ctx.kit = kit;
   const ex = L.stationExit; const exit = kit.subwayEntrance(ex.x, ex.z, 0, '연서역 3번 출구'); exit.position.y = CURB;
   plan.add({ kind: 'structure', id: 'subway-exit-3', use: 'plaza', zone: 'commercial', rect: Rect.c(ex.x, ex.z, 3.5, 6.2), y0: CURB, h: 3.1, obj: exit, entrances: [{ x: ex.x, z: ex.z + 3.1, nx: 0, nz: 1 }] });
   early?.(ctx);
   for (const f of build) f();
+  // the new district east of the old centre (its own roads, blocks, landmark, central station)
+  if (district) buildNewDistrict(ctx);
 
   // ---------------------------------------------------------------- 5. streetscape
   const junctions = zc.map((z) => ({ z0: z - ch, z1: z + ch }));
@@ -220,5 +227,12 @@ export function buildYeonseo(game, { station = null, early = null, corridors = [
   ctx.carBatch.build(plan.removedSet);
   batch.build(plan.removedSet);
   fac.build(plan.removedSet);
-  return { plan, report, kit, ctx };
+  landmarkBatch.build();
+  // LOD: building volumes per 60 m cell (HLOD proxies + occluders), then sort the city meshes into near / mid / full
+  const lod = new CityLod(game);
+  const tint = { apartment: 0xe4e0d6, villa: 0x9a6a54, office: 0x6a8090, officeTall: 0x5a7486, shops: 0xd0c8b8, shopsTall: 0xa8b0b8, bank: 0xbab4a6, school: 0x9a5a44, hospital: 0xe6e4de, mixedShops: 0xc8a890, apartmentShops: 0xd8d2c4, warehouse: 0xa9b0b4, logistics: 0xa9b0b4, factory: 0xa9b0b4, gas: 0xe8e6e0, house: 0xd8ccb8, civic: 0x8a9ca8 };
+  for (const it of plan.items) if (it.kind === 'building' && it.id !== 'landmark' && it.rect) lod.box(it.rect, it.y0, it.h, tint[it.use] ?? 0xc8c4bc);
+  const region = regionOn && !(typeof location !== 'undefined' && /[?&]noregion\b/.test(location.search)) ? new Region(ctx, lod) : null;   // ?noregion: dev switch
+  lod.collect(scene);
+  return { plan, report, kit, ctx, lod, region };
 }

@@ -8,6 +8,21 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
+
+const DistanceBlurShader = {
+  uniforms: { tDiffuse: { value: null }, tDepth: { value: null }, cameraNear: { value: 0.05 }, cameraFar: { value: 1500 }, start: { value: 150 }, end: { value: 600 }, radius: { value: 2.5 }, resolution: { value: new THREE.Vector2(1, 1) } },
+  vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: `uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform float cameraNear, cameraFar, start, end, radius; uniform vec2 resolution; varying vec2 vUv;
+    float lin(float d) { float z = d * 2.0 - 1.0; return 2.0 * cameraNear * cameraFar / (cameraFar + cameraNear - z * (cameraFar - cameraNear)); }
+    void main() {
+      vec4 c = texture2D(tDiffuse, vUv); float k = smoothstep(start, end, lin(texture2D(tDepth, vUv).x));
+      if (k < 0.01) { gl_FragColor = c; return; }
+      vec2 px = radius * k / resolution; vec4 s = c * 2.0; float w = 2.0;
+      for (int i = 0; i < 8; i++) { float a = float(i) * 0.785398; vec2 o = vec2(cos(a), sin(a)) * px;
+        float kk = smoothstep(start, end, lin(texture2D(tDepth, vUv + o).x)); s += texture2D(tDiffuse, vUv + o) * kk; w += kk; }
+      gl_FragColor = s / w;
+    }`,
+};
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { settings } from '../core/Settings.js';
 import { events } from '../core/Events.js';
@@ -82,6 +97,7 @@ export class Renderer {
     // the composer's own target would drop the canvas' antialiasing, so the scene renders into a
     // multisampled one (samples follow graphics.aa)
     this.sceneTarget = new THREE.WebGLRenderTarget(innerWidth, innerHeight, { type: THREE.HalfFloatType, samples: 4 });
+    this.sceneTarget.depthTexture = new THREE.DepthTexture(innerWidth, innerHeight);   // read by the distance blur
     this.composer = new EffectComposer(this.renderer, this.sceneTarget);
     this.renderPass = new RenderPass(this.scene, this.camera);
     this.composer.addPass(this.renderPass);
@@ -100,6 +116,11 @@ export class Renderer {
       for (const o of cache) o.visible = false;
     };
     this.composer.addPass(this.ao);
+    // distance blur: far pixels (by scene depth) are softened, near ones untouched. Off unless a level turns it
+    // on (setDistanceBlur); levels pair it with distance culling of small detail, which the blur hides
+    this.dblur = new ShaderPass(DistanceBlurShader); this.dblur.enabled = false; this.composer.addPass(this.dblur);
+    { const rp = this.renderPass, orig = rp.render.bind(rp), self = this; rp.render = function (r, w, rb, ...a) { self._depthRT = rb; return orig(r, w, rb, ...a); };
+      const db = this.dblur, dorig = db.render.bind(db); db.render = function (r, w, rb, ...a) { const u = db.uniforms; u.tDepth.value = self._depthRT?.depthTexture ?? null; u.cameraNear.value = self.camera.near; u.cameraFar.value = self.camera.far; u.resolution.value.set(rb.width, rb.height); return dorig(r, w, rb, ...a); }; }
     this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.45, 0.6, 0.85);
     this.composer.addPass(this.bloom);
     this.grade = new ShaderPass(GradeShader);
@@ -113,6 +134,11 @@ export class Renderer {
     this.info = this.renderer.info; this.renderer.info.autoReset = false;   // counted over the whole frame (scene + post passes + viewmodel), reset in render()
   }
 
+  // opts: { start, end (metres), radius (px) } or null to switch it off
+  setDistanceBlur(opts) {
+    this.dblur.enabled = !!opts; if (!opts) return;
+    const u = this.dblur.uniforms; u.start.value = opts.start ?? 150; u.end.value = opts.end ?? 600; u.radius.value = opts.radius ?? 2.5;
+  }
   applySettings() {
     const g = settings.data.graphics;
     this.camera.fov = g.fov; this.camera.updateProjectionMatrix();

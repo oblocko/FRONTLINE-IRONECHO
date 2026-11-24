@@ -22,17 +22,26 @@ export class YeonseoMetro {
     this.atmosphere();
     const city = buildYeonseo(g, { corridors: this.opts.corridors || [], jam: !!this.opts.jam, early: (ctx) => this.buildOverpass(165, ctx) });
     this.city = city; this.plan = city.plan; this.report = city.report; this.kit = city.kit; this.hf = w.heightFn;
+    this.lod = city.lod; this.region = city.region;
+    g.renderer.camera.far = 6000; g.renderer.camera.updateProjectionMatrix();   // the region + mountains reach ~4 km
+    g.renderer.setDistanceBlur({ start: 220, end: 1400, radius: 2.2 });
+    this.lod.update(0, true);
   }
   atmosphere() {
     const g = this.game, scene = g.renderer.scene;
-    scene.fog = new THREE.FogExp2(0x8c8a84, 0.0105);
+    scene.fog = new THREE.FogExp2(0xb4c2d0, 0.00035);   // a light haze only: ~15% at 1 km, ~40% at 2 km   // only a light haze (the distance blur does the rest): the landmark reads from across the city
     scene.environment = g.renderer.envMap; scene.environmentIntensity = 0.45;
-    this.sky = new Sky(scene, { zenith: 0x6d747c, horizon: 0xa9a49a, stars: 0, sunDir: [-0.3, 0.45, 0.6], sunColor: 0xd8d0c0, sunSize: 0.9996 });
+    // photographed sky (Poly Haven, CC0): clear blue with scattered low cumulus; the sun light comes from where the
+    // sun is in the image, and the image also lights reflections
+    this.sky = null;
+    new THREE.TextureLoader().load('assets/sky/yeonseo_day.jpg', (t) => { t.mapping = THREE.EquirectangularReflectionMapping; t.colorSpace = THREE.SRGBColorSpace; scene.background = t;
+      const pm = new THREE.PMREMGenerator(g.renderer.renderer); scene.environment = pm.fromEquirectangular(t).texture; pm.dispose(); });
+    scene.background = new THREE.Color(0x9fb8d4);
     this.hemi = new THREE.HemisphereLight(0xb4b8bc, 0x5a554c, 1.25); scene.add(this.hemi);
     const sun = new THREE.DirectionalLight(0xe8dcc8, 1.6); const sh = settings.data.graphics.shadows;
     sun.castShadow = sh !== 'off'; const size = { medium: 1024, high: 2048, ultra: 4096 }[sh] || 1024;
     sun.shadow.mapSize.set(size, size); Object.assign(sun.shadow.camera, { left: -55, right: 55, top: 55, bottom: -55, near: 1, far: 260 }); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
-    scene.add(sun); scene.add(sun.target); g.sun = sun; g.sunOffset = V(-45, 80, 60); this.sunLight = sun;
+    scene.add(sun); scene.add(sun.target); g.sun = sun; g.sunOffset = V(53, 75, 39); this.sunLight = sun;
     g.renderer.renderer.toneMappingExposure = 1.0;
     g.effects.setSmokeLight(0.85);
   }
@@ -55,5 +64,5 @@ export class YeonseoMetro {
       plan.add({ kind: 'structure', id: `pier${x}`, rect, y0, h: 6.05 - y0, obj: p, colliders: [p.userData.collider] });
     }
   }
-  update(dt) { this.sky.update(dt, this.game.renderer.camera); }
+  update(dt) { this.sky?.update(dt, this.game.renderer.camera); this.lod.update(dt); this.region?.update(dt); }
 }
