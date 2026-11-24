@@ -8,6 +8,7 @@ import { pbr } from '../../render/TextureFactory.js';
 import { Sky } from '../../render/Sky.js';
 import { settings } from '../../core/Settings.js';
 import { CityKit } from '../CityProps.js';
+import { Facades } from '../Facade.js';
 import { buildTruck } from '../Props.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -74,25 +75,37 @@ export class YeonseoCity {
 
   buildings() {
     const C = CITY, k = this.kit; let seed = 3;
+    k.facades = new Facades(this.game, 'korea');
     const spans = [[-218, -127], [-113, -47], [-33, 33], [47, 113], [127, 215]];
     for (const [z0, z1] of spans) for (const side of [-1, 1]) {
-      let z = z0;
+      let z = z0; const row = [];
       while (z < z1 - 8) {
         const len = Math.min(z1 - z, 18 + ((seed * 7) % 14)); const depth = 22 + (seed % 3) * 6;
         const x = side * (C.avenueHalf + C.walk + depth / 2);
         const tall = (seed % 4 === 0) ? 48 + (seed % 5) * 6 : 14 + (seed % 4) * 5;
         // leave a gap for the station exit plaza on the east side
-        if (!(side > 0 && z0 === -33 && z < 30 && z + len > 12)) k.building({ x, z: z + len / 2, w: depth, d: len - 1.2, h: tall, kind: seed % 5, seed, shopSide: [-side, 0] });
+        if (!(side > 0 && z0 === -33 && z < 30 && z + len > 12)) row.push({ x, z: z + len / 2, w: depth, d: len - 1.2, h: tall, kind: seed % 5, seed, shopSide: [-side, 0] });
         z += len; seed++;
       }
+      // 3D windows: the avenue face (above the shop band); end walls on the cross streets / the plaza gap;
+      // side walls of a block that rises above its neighbour, from the neighbour's roof up
+      row.forEach((b, i) => {
+        const faces = [{ n: [-side, 0], startFloor: 2 }];
+        for (const [dz, j] of [[-1, i - 1], [1, i + 1]]) {
+          const nb = row[j]; const gap = !nb || Math.abs(nb.z - b.z) > (nb.d + b.d) / 2 + 2;
+          if (gap) faces.push({ n: [0, dz], startFloor: 1 }); else if (nb.h < b.h - 3) faces.push({ n: [0, dz], minY: nb.h + 1.5 });
+        }
+        k.building({ ...b, faces });
+      });
     }
     // cross-street backdrops & barricade walls closing the side streets
     for (const zc of C.cross) for (const side of [-1, 1]) {
-      k.building({ x: side * 72, z: zc, w: 20, d: 40, h: 30 + (seed++ % 3) * 12, kind: seed % 5, seed });
+      k.building({ x: side * 72, z: zc, w: 20, d: 40, h: 30 + (seed++ % 3) * 12, kind: seed % 5, seed, faces: [{ n: [-side, 0], startFloor: 1 }] });
     }
     // station plaza building (east) behind the exit, with a set-back
-    k.building({ x: 44, z: 0, w: 26, d: 26, h: 36, kind: 1, seed: 77, shopSide: [-1, 0] });
-    k.building({ x: 44, z: 26, w: 26, d: 14, h: 18, kind: 2, seed: 78 });
+    k.building({ x: 44, z: 0, w: 26, d: 26, h: 36, kind: 1, seed: 77, shopSide: [-1, 0], faces: [{ n: [-1, 0], startFloor: 2 }, { n: [0, 1], minY: 19.5 }, { n: [0, -1], startFloor: 1 }] });
+    k.building({ x: 44, z: 26, w: 26, d: 14, h: 18, kind: 2, seed: 78, faces: [{ n: [-1, 0], startFloor: 1 }, { n: [0, 1], startFloor: 1 }] });
+    k.facades.build();
   }
 
   streetFurniture() {

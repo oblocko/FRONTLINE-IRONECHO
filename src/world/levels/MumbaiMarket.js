@@ -14,6 +14,7 @@ import { pbr } from '../../render/TextureFactory.js';
 import { Sky } from '../../render/Sky.js';
 import { settings } from '../../core/Settings.js';
 import { signTexture } from '../CityProps.js';
+import { Facades } from '../Facade.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 let seedN = 11; const rnd = () => ((seedN = (seedN * 16807) % 2147483647) / 2147483647);
@@ -64,6 +65,16 @@ function facadeTex(k) {
   });
   return { map, emissive };
 }
+// the same plaster without windows, for the street faces that carry 3D windows (Facade.js)
+const MPAL = ['#c9a77c', '#b9c2b0', '#d6c39a', '#a9b8c4', '#c79e8e', '#d8d2c2'];
+const plainTex = (k) => canvasTex(`mfacp${k % 6}`, 512, 512, (g, W, H) => {
+  g.fillStyle = MPAL[k % 6]; g.fillRect(0, 0, W, H);
+  for (let i = 0; i < 30; i++) { const r = 30 + Math.random() * 90, x = Math.random() * W, y = Math.random() * H, gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, `rgba(70,60,40,${0.05 + Math.random() * 0.08})`); gr.addColorStop(1, 'rgba(70,60,40,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); }
+  for (let i = 0; i < 220; i++) { g.fillStyle = `rgba(40,30,20,${Math.random() * 0.1})`; g.fillRect(Math.random() * W, Math.random() * H, 2 + Math.random() * 9, 30 + Math.random() * 200); }   // monsoon stains
+  for (let i = 0; i < 14; i++) { g.fillStyle = `rgba(250,245,230,${0.05 + Math.random() * 0.08})`; g.fillRect(Math.random() * W, Math.random() * H, 20 + Math.random() * 60, 14 + Math.random() * 40); }   // patched render
+  speckle(g, W, H, 5000, 0.16);
+  g.fillStyle = 'rgba(30,24,18,0.35)'; for (let f = 1; f < 4; f++) g.fillRect(0, f * H / 4 - 3, W, 4);
+});
 const tarpTex = (col) => canvasTex(`tarp${col}`, 128, 128, (g, W, H) => { g.fillStyle = col; g.fillRect(0, 0, W, H); for (let i = 0; i < 400; i++) { g.fillStyle = `rgba(0,0,0,${Math.random() * 0.12})`; g.fillRect(Math.random() * W, Math.random() * H, 3, 3); } for (let x = 0; x < W; x += 32) { g.fillStyle = 'rgba(255,255,255,0.07)'; g.fillRect(x, 0, 2, H); } });
 const goodsTex = () => canvasTex('goods', 256, 128, (g, W, H) => { g.fillStyle = '#2a2420'; g.fillRect(0, 0, W, H);
   // stacked wares: cloth bolts, sacks, tins and boxes in market colours, muted by dust and lamplight
@@ -85,6 +96,7 @@ export class MumbaiMarket {
     this.mats();
     this.atmosphere();
     this.ground();
+    this.fac = new Facades(g, 'mumbai', { night: true });
     this.bazaar();
     this.cross();
     this.railway();
@@ -93,6 +105,7 @@ export class MumbaiMarket {
     this.ghat();
     this.godown();
     this.blockers();
+    this.fac.build();
     this.lightsInit();
     w.ladders = [];
   }
@@ -147,8 +160,12 @@ export class MumbaiMarket {
     const scene = this.game.renderer.scene, w = this.game.world, M = this.M;
     const W = x1 - x0, D = z1 - z0, H = floors * 3.1, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
     const tex = facadeTex(k);
-    const fm = (len) => { const m = new THREE.MeshStandardMaterial({ map: tex.map.clone(), emissiveMap: tex.emissive.clone(), emissive: 0xffffff, emissiveIntensity: 0.9, roughness: 0.9 }); m.map.repeat.set(len / 12, floors / 4); m.emissiveMap.repeat.set(len / 12, floors / 4); m.map.needsUpdate = m.emissiveMap.needsUpdate = true; return m; };
-    const b = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), [fm(D), fm(D), M.concDark, M.concDark, fm(W), fm(W)]); b.position.set(cx, H / 2, cz); b.castShadow = true; b.receiveShadow = true; scene.add(b);
+    const fm = (len) => { const m = new THREE.MeshStandardMaterial({ map: tex.map.clone(), emissiveMap: tex.emissive.clone(), emissive: 0xffffff, emissiveIntensity: 0.45, roughness: 0.9 }); m.map.repeat.set(len / 12, floors / 4); m.emissiveMap.repeat.set(len / 12, floors / 4); m.map.needsUpdate = m.emissiveMap.needsUpdate = true; return m; };
+    const pm = (len) => { const m = new THREE.MeshStandardMaterial({ map: plainTex(k).clone(), roughness: 0.92 }); m.map.repeat.set(len / 12, floors / 4); m.map.needsUpdate = true; return m; };
+    const isF = (nx, nz) => face && face[0] === nx && face[1] === nz;
+    const b = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), [(isF(1, 0) ? pm : fm)(D), (isF(-1, 0) ? pm : fm)(D), M.concDark, M.concDark, (isF(0, 1) ? pm : fm)(W), (isF(0, -1) ? pm : fm)(W)]);
+    if (face) this.fac.face({ cx: cx + face[0] * W / 2, cz: cz + face[1] * D / 2, nx: face[0], nz: face[1], len: face[0] ? D : W, floors, startFloor: 1,
+      wall: new THREE.Color(MPAL[k % 6]).getHex(), frame: [0x2a5a5a, 0x6a3a22, 0x3a4a6a, 0x5a5a4a, 0x2a4a2a][k % 5], lit: 0.38, ac: 0.22 }); b.position.set(cx, H / 2, cz); b.castShadow = true; b.receiveShadow = true; scene.add(b);
     w.addBoxCentered(V(cx, H / 2, cz), V(W, H, D), { surface: 'concrete', cover: true, walkable: roof });
     // parapet + water tank + dish on the roof
     const par = new THREE.Mesh(new THREE.BoxGeometry(W, 0.9, D), M.conc); par.scale.set(1, 1, 1); par.position.set(cx, H + 0.45, cz);

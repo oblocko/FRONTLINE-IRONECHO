@@ -8,15 +8,27 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const facadeCache = new Map();
 
 // Facade texture: 4 x 4 bays (each bay = one 3 m floor x 3 m window module)
-export function facadeTexture(kind = 0, seed = 1) {
-  const key = `${kind}:${seed}`; if (facadeCache.has(key)) return facadeCache.get(key);
+export const FACADE_WALLS = [['#c9c4b8', '#8d887c'], ['#9aa1a6', '#6d7378'], ['#d8d2c4', '#a39b88'], ['#7d7468', '#5a5249'], ['#b8b9b4', '#83847f']];
+// plain = true: the wall only (render, panel joints, grime) for faces that carry 3D windows (Facade.js)
+export function facadeTexture(kind = 0, seed = 1, plain = false) {
+  const key = `${kind}:${seed}:${plain}`; if (facadeCache.has(key)) return facadeCache.get(key);
   const S = 512, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d');
   let r = seed * 9301 + 49297; const rnd = () => ((r = (r * 9301 + 49297) % 233280) / 233280);
-  const walls = [['#c9c4b8', '#8d887c'], ['#9aa1a6', '#6d7378'], ['#d8d2c4', '#a39b88'], ['#7d7468', '#5a5249'], ['#b8b9b4', '#83847f']];
-  const [wc, wd] = walls[kind % walls.length];
+  const [wc, wd] = FACADE_WALLS[kind % FACADE_WALLS.length];
   g.fillStyle = wc; g.fillRect(0, 0, S, S);
   // grime streaks
   for (let i = 0; i < 60; i++) { g.fillStyle = `rgba(40,36,30,${rnd() * 0.08})`; g.fillRect(rnd() * S, rnd() * S, 2 + rnd() * 6, 30 + rnd() * 120); }
+  if (plain) {
+    // painted render over concrete: faint panel joints, blotches, speckle, streaks from the floor bands
+    for (let i = 0; i < 2500; i++) { g.fillStyle = `rgba(${rnd() < 0.5 ? '30,28,24' : '255,252,240'},${rnd() * 0.07})`; g.fillRect(rnd() * S, rnd() * S, 1 + rnd() * 3, 1 + rnd() * 3); }
+    for (let i = 0; i < 18; i++) { const r2 = 20 + rnd() * 60, x = rnd() * S, y = rnd() * S, gr = g.createRadialGradient(x, y, 0, x, y, r2); gr.addColorStop(0, `rgba(60,55,45,${0.03 + rnd() * 0.05})`); gr.addColorStop(1, 'rgba(60,55,45,0)'); g.fillStyle = gr; g.fillRect(x - r2, y - r2, r2 * 2, r2 * 2); }
+    g.strokeStyle = 'rgba(40,38,34,0.16)'; g.lineWidth = 1.5;
+    for (let x = 0; x <= S; x += S / 4) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, S); g.stroke(); }
+    for (let y = S / 8; y < S; y += S / 4) { g.beginPath(); g.moveTo(0, y); g.lineTo(S, y); g.stroke(); }
+    for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(35,32,26,${0.03 + rnd() * 0.06})`; g.fillRect(rnd() * S, ((rnd() * 4) | 0) * S / 4, 3 + rnd() * 8, 20 + rnd() * 70); }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
+    facadeCache.set(key, t); return t;
+  }
   const bay = S / 4;
   for (let fy = 0; fy < 4; fy++) for (let fx = 0; fx < 4; fx++) {
     const x0 = fx * bay, y0 = fy * bay;
@@ -24,7 +36,7 @@ export function facadeTexture(kind = 0, seed = 1) {
     const wx = x0 + bay * 0.14, wy = y0 + bay * 0.18, ww = bay * 0.72, wh = bay * 0.58;
     const state = rnd();
     const grd = g.createLinearGradient(wx, wy, wx + ww, wy + wh);
-    if (state < 0.08) { grd.addColorStop(0, '#d8b070'); grd.addColorStop(1, '#a87830'); }        // lit (generator)
+    if (state < 0.08) { grd.addColorStop(0, '#8e8676'); grd.addColorStop(1, '#6a6458'); }        // drawn blinds
     else if (state < 0.16) { grd.addColorStop(0, '#0b0b0c'); grd.addColorStop(1, '#151515'); }   // broken/black
     else { grd.addColorStop(0, '#5d7486'); grd.addColorStop(0.5, '#2c3a46'); grd.addColorStop(1, '#4a5d6c'); }
     g.fillStyle = grd; g.fillRect(wx, wy, ww, wh);
@@ -54,11 +66,21 @@ export class CityKit {
   constructor(game) { this.game = game; this.scene = game.renderer.scene; this.world = game.world; this.shopIdx = 0; }
 
   // Solid city building (exterior only) with facade, storefront band and roof clutter.
-  building({ x, z, w, d, h, kind = 0, shopSide = null, seed = 1 }) {
-    const tex = facadeTexture(kind, seed);
-    const mk = (rx, ry) => { const m = new THREE.MeshStandardMaterial({ map: tex.clone(), roughness: 0.85, metalness: 0.05 }); m.map.repeat.set(rx, ry); m.map.needsUpdate = true; return m; };
+  // faces: [{ n: [nx, nz], minY, startFloor }] get 3D windows from this.facades (Facade.js) on a plain wall
+  building({ x, z, w, d, h, kind = 0, shopSide = null, seed = 1, faces = [] }) {
+    const tex = facadeTexture(kind, seed), plain = facadeTexture(kind, seed, true);
+    const mk = (rx, ry, t = tex) => { const m = new THREE.MeshStandardMaterial({ map: t.clone(), roughness: 0.85, metalness: 0.05 }); m.map.repeat.set(rx, ry); m.map.needsUpdate = true; return m; };
     const roof = pbr('concrete', { color: 0x8a8a86, key: 'cityroof' });
-    const mats = [mk(d / 12, h / 12), mk(d / 12, h / 12), roof, roof, mk(w / 12, h / 12), mk(w / 12, h / 12)];
+    const F = this.facades ? faces : [];
+    const has = (nx, nz) => F.find((f) => f.n[0] === nx && f.n[1] === nz);
+    const mats = [mk(d / 12, h / 12, has(1, 0) ? plain : tex), mk(d / 12, h / 12, has(-1, 0) ? plain : tex), roof, roof, mk(w / 12, h / 12, has(0, 1) ? plain : tex), mk(w / 12, h / 12, has(0, -1) ? plain : tex)];
+    const floors = Math.floor(h / 3);
+    for (const f of F) {
+      const [nx, nz] = f.n, len = nx ? d : w;
+      this.facades.face({ cx: x + nx * w / 2, cz: z + nz * d / 2, nx, nz, len, floors, startFloor: f.startFloor ?? 0, minY: f.minY ?? -1,
+        wall: new THREE.Color(FACADE_WALLS[kind % FACADE_WALLS.length][0]).getHex(), frame: [0x8e9498, 0x3a3e42, 0xc8c8c0, 0x6a5a48][(seed + kind) % 4],
+        lit: 0.03, guard: kind % 2 === 0 ? 0.55 : 0.08, ac: 0.14 });
+    }
     const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mats); b.position.set(x, h / 2, z); b.castShadow = true; b.receiveShadow = true; this.scene.add(b);
     this.world.addBoxCentered(V(x, h / 2, z), V(w, h, d), { surface: 'concrete', cover: true, walkable: false });
     // parapet + rooftop units
@@ -66,14 +88,38 @@ export class CityKit {
     for (const [px, pz, sx, sz] of [[0, d / 2, w, 0.3], [0, -d / 2, w, 0.3], [w / 2, 0, 0.3, d], [-w / 2, 0, 0.3, d]]) { const p = new THREE.Mesh(new THREE.BoxGeometry(sx, 1.1, sz), par); p.position.set(x + px, h + 0.55, z + pz); this.scene.add(p); }
     const unit = pbr('metal', { color: 0x9aa0a0, key: 'ac' });
     for (let i = 0; i < 3; i++) { const u = new THREE.Mesh(new THREE.BoxGeometry(2 + (seed + i) % 3, 1.5, 2), unit); u.position.set(x + ((seed * 7 + i * 13) % 10 - 5) * w / 14, h + 0.75, z + ((seed * 3 + i * 11) % 10 - 5) * d / 14); u.castShadow = true; this.scene.add(u); }
+    // stair / lift head with a door, a water tank on legs on the taller blocks, an antenna mast
+    const head = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 3.4), par); const hx = x - w / 4 + (seed % 3) * w / 8, hz = z - d / 4 + (seed % 2) * d / 3;
+    head.position.set(hx, h + 1.5, hz); head.castShadow = true; this.scene.add(head);
+    const hcap = new THREE.Mesh(new THREE.BoxGeometry(4.3, 0.18, 3.7), roof); hcap.position.set(hx, h + 3.09, hz); this.scene.add(hcap);
+    const hdoor = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 2.05), pbr('metal', { color: 0x5a6266, key: 'roofdoor' })); hdoor.position.set(hx, h + 1.03, hz + 1.71); this.scene.add(hdoor);
+    if (h > 25) {
+      const tank = new THREE.Group(); tank.position.set(x + w / 4 - (seed % 2) * w / 8, h, z + d / 4 - (seed % 3) * d / 8);
+      const tm = pbr('paintedMetal', { color: 0x8aa0a8, key: 'roofTank' });
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 2.2, 16), tm); body.position.y = 2.3; body.castShadow = true; tank.add(body);
+      for (const [lx, lz] of [[-0.8, -0.8], [0.8, -0.8], [0.8, 0.8], [-0.8, 0.8]]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.2, 0.12), unit); leg.position.set(lx, 0.6, lz); tank.add(leg); }
+      this.scene.add(tank);
+    }
+    if (seed % 3 === 0) { const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 6, 6), unit); mast.position.set(hx + 1.2, h + 6, hz - 0.9); this.scene.add(mast); }
     // storefront band facing the avenue
     if (shopSide) {
       const [nx, nz] = shopSide; const len = nx ? d : w; const n = Math.max(1, Math.floor(len / 9));
       for (let i = 0; i < n; i++) {
         const off = -len / 2 + (i + 0.5) * len / n; const [name, sub, col] = SHOPS[this.shopIdx++ % SHOPS.length];
         const cx = x + nx * (w / 2 + 0.02) + (nx ? 0 : off), cz = z + nz * (d / 2 + 0.02) + (nz ? 0 : off);
-        const glass = new THREE.Mesh(new THREE.PlaneGeometry(len / n - 1.2, 3.0), new THREE.MeshStandardMaterial({ color: 0x1c2328, metalness: 0.6, roughness: 0.1, emissive: 0x0a0a08 }));
-        glass.position.set(cx, 1.8, cz); glass.rotation.y = Math.atan2(nx, nz); this.scene.add(glass);
+        if (this.facades) {
+          // shop window with the shop behind it, in an aluminium frame on a low stall riser
+          this.facades.shop(cx, 1.8, cz, Math.atan2(nx, nz), len / n - 1.2, 3.0, { lit: 0.3 });
+          const fr = pbr('metal', { color: 0x6a7074, key: 'shopframe' }), along = nx ? 0 : 1, sw = len / n - 1.2;
+          for (const [ox, oy, sx, sy] of [[0, 0.27, sw + 0.16, 0.14], [0, 3.33, sw + 0.16, 0.14], [-sw / 2, 1.8, 0.1, 3.2], [sw / 2, 1.8, 0.1, 3.2], [sw / 6, 1.8, 0.06, 3.0]]) {
+            const m = new THREE.Mesh(new THREE.BoxGeometry(along ? sx : 0.1, sy, along ? 0.1 : sx), fr);
+            m.position.set(cx + (along ? ox : nx * 0.04), oy, cz + (along ? nz * 0.04 : -ox * nx)); this.scene.add(m);
+          }
+          const riser = new THREE.Mesh(new THREE.BoxGeometry(along ? sw : 0.14, 0.3, along ? 0.14 : sw), pbr('concrete', { color: 0x5a5a58, key: 'riser' })); riser.position.set(cx, 0.15, cz); this.scene.add(riser);
+        } else {
+          const glass = new THREE.Mesh(new THREE.PlaneGeometry(len / n - 1.2, 3.0), new THREE.MeshStandardMaterial({ color: 0x1c2328, metalness: 0.6, roughness: 0.1, emissive: 0x0a0a08 }));
+          glass.position.set(cx, 1.8, cz); glass.rotation.y = Math.atan2(nx, nz); this.scene.add(glass);
+        }
         const sign = new THREE.Mesh(new THREE.BoxGeometry(len / n - 1, 1.1, 0.25), [pbr('metal'), pbr('metal'), pbr('metal'), pbr('metal'), new THREE.MeshStandardMaterial({ map: signTexture(name, sub, col), roughness: 0.6 }), pbr('metal')]);
         sign.position.set(cx + nx * 0.15, 3.9, cz + nz * 0.15); sign.rotation.y = Math.atan2(nx, nz); sign.castShadow = true; this.scene.add(sign);
       }
