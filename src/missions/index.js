@@ -65,5 +65,10 @@ export const MISSIONS = [
     objectives: ['터미널 돌파', '화물선 진입', '송신 차단'], cast: ['minjae', 'daniel', 'yoon', 'maya', 'nadia', 'seoyeon', 'morrow'], status: 'planned' },
 ];
 
-export const missionById = (id) => MISSIONS.find((m) => m.id === id);
+// dev-only levels (not listed in the campaign / menu)
+export const DEV_MISSIONS = [
+  { id: 'dev_city', act: 0, num: '--', title: 'YEONSEO CITY (DEV)', ko: '연서시 중심가 (개발용)', pov: 'minjae', location: '연서시 중심가', locEn: 'Yeonseo City center', date: '2029-03-27', time: '06:10 KST', weather: '맑음', unit: '—',
+    summary: '나중 미션(M10 · M15)용 대도시 레이아웃 확인용 자유 이동.', objectives: [], cast: [], status: 'playable', load: () => import('./dev_city.js') },
+];
+export const missionById = (id) => MISSIONS.find((m) => m.id === id) || DEV_MISSIONS.find((m) => m.id === id);
 export const nextMission = (id) => { const i = MISSIONS.findIndex((m) => m.id === id); return MISSIONS[i + 1] || null; };

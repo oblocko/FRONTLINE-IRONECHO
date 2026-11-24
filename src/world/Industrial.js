@@ -124,6 +124,6 @@ export function warehouse(game, spec) {
   }
   // collider: the whole shed (not entered)
   const sw = rotQ % 2 ? d : w, sdp = rotQ % 2 ? w : d;
-  game.world.addBoxCentered(new THREE.Vector3(x, y0 + h / 2, z), new THREE.Vector3(sw, h, sdp), { surface: 'metal', cover: true, walkable: false });
+  grp.userData.collider = game.world.addBoxCentered(new THREE.Vector3(x, y0 + h / 2, z), new THREE.Vector3(sw, h, sdp), { surface: 'metal', cover: true, walkable: false });
   return grp;
 }

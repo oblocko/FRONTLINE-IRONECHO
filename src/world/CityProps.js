@@ -62,6 +62,9 @@ export function signTexture(text, sub = '', bg = '#1d4f8a', fg = '#ffffff') {
 const SHOPS = [['편의점', '24H', '#1f6f4a'], ['약국', 'PHARMACY', '#2a8a4a'], ['연서치킨', '배달 가능', '#c23a2a'], ['카페 바다', 'COFFEE', '#5a3a2a'], ['연서은행', 'BANK', '#1d3f7a'],
   ['안경원', '', '#2a4a7a'], ['분식', '김밥 · 떡볶이', '#d07a1a'], ['부동산', '', '#4a4a4a'], ['휴대폰', '5G', '#7a2a7a'], ['병원', '내과 · 소아과', '#2a6a8a'], ['세탁소', '', '#3a5a6a'], ['노래방', '', '#8a1a5a']];
 
+// interior behind each shop's glass matches its sign (InteriorGlass types: 0 store, 1 cafe, 2 restaurant, 3 pharmacy/clinic, 4 office, 5 phone/optician, 6 salon)
+const SHOP_INTERIOR = { 편의점: 0, 약국: 3, 연서치킨: 2, '카페 바다': 1, 연서은행: 4, 안경원: 5, 분식: 2, 부동산: 4, 휴대폰: 5, 병원: 3, 세탁소: 0, 노래방: 6 };
+
 export class CityKit {
   constructor(game) { this.game = game; this.scene = game.renderer.scene; this.world = game.world; this.shopIdx = 0; }
 
@@ -109,7 +112,7 @@ export class CityKit {
         const cx = x + nx * (w / 2 + 0.02) + (nx ? 0 : off), cz = z + nz * (d / 2 + 0.02) + (nz ? 0 : off);
         if (this.facades) {
           // shop window with the shop behind it, in an aluminium frame on a low stall riser
-          this.facades.shop(cx, 1.8, cz, Math.atan2(nx, nz), len / n - 1.2, 3.0, { lit: 0.3 });
+          this.facades.shop(cx, 1.8, cz, Math.atan2(nx, nz), len / n - 1.2, 3.0, { lit: 0.3, type: SHOP_INTERIOR[name] ?? 0 });
           const fr = pbr('metal', { color: 0x6a7074, key: 'shopframe' }), along = nx ? 0 : 1, sw = len / n - 1.2;
           for (const [ox, oy, sx, sy] of [[0, 0.27, sw + 0.16, 0.14], [0, 3.33, sw + 0.16, 0.14], [-sw / 2, 1.8, 0.1, 3.2], [sw / 2, 1.8, 0.1, 3.2], [sw / 6, 1.8, 0.06, 3.0]]) {
             const m = new THREE.Mesh(new THREE.BoxGeometry(along ? sx : 0.1, sy, along ? 0.1 : sx), fr);
