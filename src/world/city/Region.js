@@ -95,8 +95,8 @@ export class Region {
     for (const h of holes) sh.holes.push(new THREE.Path([[h[0], -h[1]], [h[0], -h[3]], [h[2], -h[3]], [h[2], -h[1]]].map(([a, b]) => new THREE.Vector2(a, b))));
     const g = new THREE.ExtrudeGeometry(sh, { depth: 0.3, bevelEnabled: false }); g.rotateX(-Math.PI / 2); g.translate(0, CURB - 0.31, 0); return g; };
   const gm = groundMat('plaza', { color: 0x8a8882 });
-  if (!DBG.includes('noground')) B.add(slab(EXT.x0 - 2600, RIVER.z1, EXT.x1 + 2600, EXT.z1 + 2600, [[-200, -270, 200, 270], [200, -300, 720, 300]]), gm, { cast: false });
-  if (!DBG.includes('noground')) B.add(slab(EXT.x0 - 2600, EXT.z0 - 2600, EXT.x1 + 2600, RIVER.z0, []), gm, { cast: false });
+  if (!DBG.includes('noground')) B.add(slab(EXT.x0 - 160, RIVER.z1, EXT.x1 + 160, EXT.z1 + 160, [[-200, -270, 200, 270], [200, -300, 720, 300]]), gm, { cast: false });
+  if (!DBG.includes('noground')) B.add(slab(EXT.x0 - 160, EXT.z0 - 160, EXT.x1 + 160, RIVER.z0, []), gm, { cast: false });
   const water = new THREE.Mesh(new THREE.PlaneGeometry(9000, RIVER.z1 - RIVER.z0), new THREE.MeshStandardMaterial({ color: 0x4a6468, roughness: 0.08, metalness: 0.35, envMapIntensity: 1.1 }));
   water.rotation.x = -Math.PI / 2; water.position.set(200, -2.0, (RIVER.z0 + RIVER.z1) / 2); if (!DBG.includes('nowater')) scene.add(water);
   for (const z of [RIVER.z0, RIVER.z1]) { B.add(boxGeo(9000, 0.1, 60, 200, CURB, z + (z === RIVER.z1 ? 30 : -30)), groundMat('lawn'), { cast: false }); }   // riverside parks
@@ -147,13 +147,9 @@ export class Region {
   }
   // trees stream with their chunk (merged low-poly crowns)
   for (const [x, z] of treeSpots) { if (inCore(x - 10, z - 10, x + 10, z + 10) || inRiver(z, z)) continue; const s2 = 0.8 + rnd() * 0.5; spec(x, z, { geo: () => treeGeo(x, z, s2), mat: () => treeMat(), box: [x - 1, z - 1, x + 1, z + 1, 6 * s2], color: 0x4a6a3a, tree: true }); }
-  // mountains around the horizon
-  const hill = new THREE.MeshStandardMaterial({ color: 0x4a5a48, roughness: 1 });
-  for (let i = 0; i < (DBG.includes('nohills') ? 0 : 46); i++) {
-    const a = (i / 46) * Math.PI * 2 + rnd() * 0.08, r = 3300 + rnd() * 1200, h = 260 + rnd() * 380;
-    const g = new THREE.SphereGeometry(1, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2); const p = g.attributes.position; const ph = rnd() * 6; for (let k = 0; k < p.count; k++) { const x = p.getX(k), y = p.getY(k), z = p.getZ(k); const n = 1 + 0.12 * Math.sin(x * 5 + ph) * Math.cos(z * 4 - ph) + 0.06 * Math.sin(x * 13 + z * 11); p.setXYZ(k, x * n, y * (0.75 + 0.35 * n), z * n); } g.computeVertexNormals();
-    const m = new THREE.Mesh(g, hill); m.scale.set(500 + rnd() * 500, h, 500 + rnd() * 400); m.position.set(200 + Math.cos(a) * r, -10, Math.sin(a) * r); m.userData.lodAlways = true; scene.add(m);
-  }
+  // terrain beyond the city: foothills rising into mountain ranges, the river valley carried on through them
+  if (!DBG.includes('nohills')) scene.add(terrain(rnd));
+
   this.specCount = NSPEC;
   if (DBG.includes('nobatch')) B.buckets.clear();
   const out = B.build(); for (const m of out) { m.userData.region = true; m.userData.lodAlways = true; m.castShadow = false; }
@@ -186,6 +182,36 @@ function proxyMesh(specs, mat, scene) {
     for (let i = 0; i < p.count; i++) { pos.push(p.getX(i), p.getY(i), p.getZ(i)); nor.push(n.getX(i), n.getY(i), n.getZ(i)); const ay = Math.abs(n.getY(i)) > 0.5, ax = Math.abs(n.getX(i)) > 0.5; uv.push(ay ? 0 : (ax ? p.getZ(i) : p.getX(i)) / 8, ay ? 0 : p.getY(i) / 8); const k = ay ? 0.7 : 1; col.push(c.r * k, c.g * k, c.b * k); } }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.computeBoundingSphere();
   const m = new THREE.Mesh(g, mat); m.userData.lodAlways = true; scene.add(m); return m;
+}
+
+// ------------------------------------------------------------------ terrain
+// A disc of terrain (radius ~9 km round the city) on a polar grid, dense near the city and coarse far out.
+// Height is 0 (under the city ground) inside the city rectangle and rises with distance from it into
+// fractal ridges; the river valley is cut through east and west. Vertex colours: meadow → forest → rock.
+function noise2(x, z) { const xi = Math.floor(x), zi = Math.floor(z), xf = x - xi, zf = z - zi;
+  const h = (a, b) => { const n = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return n - Math.floor(n); };
+  const u = xf * xf * (3 - 2 * xf), v = zf * zf * (3 - 2 * zf);
+  return (h(xi, zi) * (1 - u) + h(xi + 1, zi) * u) * (1 - v) + (h(xi, zi + 1) * (1 - u) + h(xi + 1, zi + 1) * u) * v; }
+function fbm(x, z) { let a = 0, f = 1, w = 0.5; for (let i = 0; i < 6; i++) { a += w * noise2(x * f, z * f); f *= 2.03; w *= 0.5; } return a; }
+export function terrainHeight(x, z) {
+  const dx = Math.max(EXT.x0 - 140 - x, 0, x - EXT.x1 - 140), dz = Math.max(EXT.z0 - 140 - z, 0, z - EXT.z1 - 140), d = Math.hypot(dx, dz);
+  if (d <= 0) return CURB - 0.6;
+  const rise = Math.min(1, d / 1400), ridge = 1 - Math.abs(fbm(x / 1700, z / 1700) * 2 - 1);   // sharp ridges
+  let h = rise * rise * (60 + 520 * Math.pow(ridge, 1.6) + 160 * fbm(x / 500 + 7, z / 500 - 3)) + Math.min(d, 300) * 0.05;
+  const rc = (RIVER.z0 + RIVER.z1) / 2, rw = (RIVER.z1 - RIVER.z0) / 2 + 40 + Math.max(0, Math.abs(x - 200) - 2000) * 0.05;   // the valley widens away from the city
+  const valley = Math.exp(-Math.pow(Math.max(0, Math.abs(z - rc) - rw) / 260, 2)); h = h * (1 - valley) + (Math.abs(z - rc) < rw ? -6 : h * 0.15) * valley;
+  return h + CURB - 0.6;
+}
+function terrain(rnd) {
+  const cx = 200, cz = 0, NA = 256, NR = 90, rMax = 9500, pos = [], col = [], idx = [];
+  const c = new THREE.Color(), meadow = new THREE.Color(0x7a8a5a), forest = new THREE.Color(0x3e5236), rock = new THREE.Color(0x7a766c), snow = new THREE.Color(0xc8c8c0);
+  for (let j = 0; j <= NR; j++) { const r = rMax * Math.pow(j / NR, 1.8);
+    for (let i = 0; i < NA; i++) { const a = (i / NA) * Math.PI * 2, x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r, y = terrainHeight(x, z); pos.push(x, y, z);
+      const t = Math.min(1, Math.max(0, (y - 20) / 420)); c.copy(meadow).lerp(forest, Math.min(1, t * 2.5)); if (t > 0.55) c.lerp(rock, (t - 0.55) / 0.45); if (t > 0.92) c.lerp(snow, (t - 0.92) / 0.08 * 0.5);
+      const k = 0.85 + noise2(x / 60, z / 60) * 0.3; col.push(c.r * k, c.g * k, c.b * k); } }
+  for (let j = 0; j < NR; j++) for (let i = 0; i < NA; i++) { const a = j * NA + i, b = j * NA + (i + 1) % NA, c2 = (j + 1) * NA + i, d = (j + 1) * NA + (i + 1) % NA; idx.push(a, b, c2, b, d, c2); }   // wound so the normals face up
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals();
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 })); m.receiveShadow = false; m.userData.lodAlways = true; m.userData.region = true; return m;
 }
 
 // ------------------------------------------------------------------ districts

@@ -29,7 +29,7 @@ export class YeonseoMetro {
   }
   atmosphere() {
     const g = this.game, scene = g.renderer.scene;
-    scene.fog = new THREE.FogExp2(0xb4c2d0, 0.00035);   // a light haze only: ~15% at 1 km, ~40% at 2 km   // only a light haze (the distance blur does the rest): the landmark reads from across the city
+    scene.fog = new THREE.FogExp2(0xb4c2d0, 0.00024);   // a light haze only: ~6% at 1 km, ~45% at 3 km, mountains at 5 km still read   // only a light haze (the distance blur does the rest): the landmark reads from across the city
     scene.environment = g.renderer.envMap; scene.environmentIntensity = 0.45;
     // photographed sky (Poly Haven, CC0): clear blue with scattered low cumulus; the sun light comes from where the
     // sun is in the image, and the image also lights reflections
