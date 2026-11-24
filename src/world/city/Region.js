@@ -282,9 +282,9 @@ function fillBlock(spec, r, D, T, { edge, hotter, rnd, pick, occl }) {
         const pts = outline(kind, w, d, { r: 6, c: 5, n: 24 }), podH = 8 + Math.floor(rnd() * 3) * 4;
         put(cx, cz, Math.min(gw - 4, w + 12), Math.min(gd - 4, d + 12), podH, () => comMat(pick([0x9aa0a4, 0xb8b4aa, 0x7e8488]), 0x3e4a52), 0x9aa0a4);
         const tiers = H > 120 ? 3 : H > 70 ? 2 : 1; let y = CURB + podH, k = 1;
-        for (let t = 0; t < tiers; t++) { const hh = (H - podH) / tiers, sc = k, p2 = pts.map(([px, pz]) => [px * sc, pz * sc]);
-          flat(() => shell([{ y, pts: p2 }, { y: y + hh, pts: p2 }], { cx, cz, uM, vM }), mm, cx, cz, [cx - w * sc / 2, cz - d * sc / 2, cx + w * sc / 2, cz + d * sc / 2, y - CURB + hh], tint);
-          flat(() => cap(p2, y + hh, { cx, cz }), roofM, cx, cz, [cx - 1, cz - 1, cx + 1, cz + 1, 0.1], 0x6e7270); y += hh; k *= 0.82; }
+        for (let t = 0; t < tiers; t++) { const hh = (H - podH) / tiers, sc = k, p2 = pts.map(([px, pz]) => [px * sc, pz * sc]), yb = y;   // yb: this tier's base, fixed now (the geometry is built later)
+          flat(() => shell([{ y: yb, pts: p2 }, { y: yb + hh, pts: p2 }], { cx, cz, uM, vM }), mm, cx, cz, [cx - w * sc / 2, cz - d * sc / 2, cx + w * sc / 2, cz + d * sc / 2, yb - CURB + hh], tint);
+          flat(() => cap(p2, yb + hh, { cx, cz }), roofM, cx, cz, [cx - 1, cz - 1, cx + 1, cz + 1, 0.1], 0x6e7270); y += hh; k *= 0.82; }
         occl(cx - w / 2, cz - d / 2, cx + w / 2, cz + d / 2, H);
       }
       return;

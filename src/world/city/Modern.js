@@ -180,46 +180,58 @@ export function modernTower(ctx, { x, z, y0, sections, podium = null, crown = 'p
   ctx.ownEnd(); return it;
 }
 
-// ------------------------------------------------------------------ the landmark (fictional name, same silhouette type
-// as the tapering supertall: rounded square plan, slightly convex taper, four vertical seams, split open crown)
-export function landmarkTower(ctx, { x, z, y0, H = 470, base = 62, name = '연서 하늘타워' }) {
-  const B = ctx.landmarkBatch || ctx.batch, rings = [], N = 64;   // its own batch: always drawn, never swapped for a proxy
-  const finTex = tex('lwt-fins', 512, 512, (g, W, Hh, rnd) => {
-    g.fillStyle = '#8fa2ae'; g.fillRect(0, 0, W, Hh);
-    const gr = g.createLinearGradient(0, 0, W, 0); gr.addColorStop(0, 'rgba(255,255,255,0.10)'); gr.addColorStop(0.5, 'rgba(255,255,255,0)'); gr.addColorStop(1, 'rgba(255,255,255,0.08)'); g.fillStyle = gr; g.fillRect(0, 0, W, Hh);
-    for (let x = 0; x < W; x += 16) { g.fillStyle = '#e8ecee'; g.fillRect(x, 0, 3, Hh); g.fillStyle = 'rgba(40,50,58,0.35)'; g.fillRect(x + 3, 0, 2, Hh); }   // vertical fins
-    for (let y = 0; y < Hh; y += 32) { g.fillStyle = 'rgba(220,226,230,0.55)'; g.fillRect(0, y, W, 2); }                                                   // floor lines
+// ------------------------------------------------------------------ the landmark: 연서 하늘타워 (original design)
+// Rounded-square plan with four deep re-entrant corner notches, so the shaft reads as four "petal" wings;
+// a convex taper; the notches deepen with height until, near the top, the four wings separate into four
+// blades of staggered height around a glass lantern and a spire. Bright sky-lobby bands mark the shaft.
+export function landmarkTower(ctx, { x, z, y0, H = 520, base = 60, name = '연서 하늘타워' }) {
+  const B = ctx.landmarkBatch || ctx.batch, N = 96;
+  const finTex = tex('hanul-fins', 512, 512, (g, W, Hh, rnd) => {
+    g.fillStyle = '#93a6b2'; g.fillRect(0, 0, W, Hh);
+    const gr = g.createLinearGradient(0, 0, W, 0); gr.addColorStop(0, 'rgba(255,255,255,0.12)'); gr.addColorStop(0.5, 'rgba(255,255,255,0)'); gr.addColorStop(1, 'rgba(255,255,255,0.1)'); g.fillStyle = gr; g.fillRect(0, 0, W, Hh);
+    for (let x = 0; x < W; x += 16) { g.fillStyle = '#eef2f4'; g.fillRect(x, 0, 3, Hh); g.fillStyle = 'rgba(40,50,58,0.35)'; g.fillRect(x + 3, 0, 2, Hh); }
+    for (let y = 0; y < Hh; y += 32) { g.fillStyle = 'rgba(220,226,230,0.5)'; g.fillRect(0, y, W, 2); }
     for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(255,255,255,${rnd() * 0.06})`; g.fillRect(rnd() * W, rnd() * Hh, 30 + rnd() * 80, 10 + rnd() * 30); }
   });
-  const skin = new THREE.MeshStandardMaterial({ map: finTex, roughness: 0.3, metalness: 0.3, envMapIntensity: 0.8 });
-  const seamM = flatMat(0x2c3640, { roughness: 0.3, metalness: 0.5, key: 'seam' });
-  const prof = (t) => 1 - 0.72 * Math.pow(t, 1.18) - 0.06 * Math.sin(t * Math.PI);   // half-size factor: gentle convex taper
-  const rad = (t) => 0.18 + 0.32 * t;                                                   // corner radius grows toward the top
-  const ringAt = (t) => { const s = base * prof(t); return outline('round', s, s, { r: s * rad(t) }); };
-  const split = 0.84;     // the crown opens above this height
-  for (let i = 0; i <= 40; i++) { const t = (i / 40) * split; rings.push({ y: y0 + t * H, pts: ringAt(t) }); }
+  const skin = new THREE.MeshStandardMaterial({ map: finTex, color: 0xdfe8ee, roughness: 0.18, metalness: 0.5, envMapIntensity: 1.3 });
+  const notchM = flatMat(0x2a3440, { roughness: 0.25, metalness: 0.6, key: 'hanulNotch' });
+  const lobbyM = new THREE.MeshStandardMaterial({ color: 0xf4f6f6, emissive: 0xdde6ea, emissiveIntensity: 0.25, roughness: 0.4 });
+  const half = (t) => (base / 2) * (1 - 0.7 * Math.pow(t, 1.25) - 0.07 * Math.sin(t * Math.PI));   // convex taper
+  const notch = (t) => 0.14 + 0.3 * Math.pow(t, 1.6);                                                 // corner notch depth (fraction)
+  const ring = (t, depthMul = 1) => { const pts = [], hs = half(t), nd = notch(t) * depthMul;
+    for (let i = 0; i < N; i++) { const a = (i / N) * Math.PI * 2, c = Math.abs(Math.cos(a)), sn = Math.abs(Math.sin(a));
+      let r = hs / Math.pow(Math.pow(c, 2.8) + Math.pow(sn, 2.8), 1 / 2.8);                          // rounded square
+      const dc = Math.min(...[0.25, 0.75, 1.25, 1.75].map((k) => Math.abs(a / Math.PI - k)));   // distance to a corner (in pi units)
+      r *= 1 - nd * Math.exp(-Math.pow(dc / 0.06, 2));
+      pts.push([Math.cos(a) * r, Math.sin(a) * r]); }
+    return pts; };
+  const split = 0.86, rings = [];
+  for (let i = 0; i <= 48; i++) { const t = (i / 48) * split; rings.push({ y: y0 + t * H, pts: ring(t) }); }
   const g = shell(rings, { uTiles: 64, vM: 16 }); g.translate(x, 0, z); B.add(g, skin);
-  // four seams down the middle of each face
-  for (const [sx, sz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-    const sr = []; for (let i = 0; i <= 20; i++) { const t = (i / 20) * split, s = base * prof(t) / 2 + 0.25; const w = 1.6 * prof(t) + 0.4;
-      sr.push({ y: y0 + t * H, pts: sx ? [[sx * s, -w], [sx * (s + 0.3), -w], [sx * (s + 0.3), w], [sx * s, w]] : [[-w, sz * s], [-w, sz * (s + 0.3)], [w, sz * (s + 0.3)], [w, sz * s]] }); }
-    const sg = shell(sr, { uM: 4, vM: 4 }); sg.translate(x, 0, z); B.add(sg, seamM);
+  // dark glazing deep in each notch (reads as the four vertical seams)
+  for (const ac of [0.25, 0.75, 1.25, 1.75]) { const sr = [];
+    for (let i = 0; i <= 24; i++) { const t = (i / 24) * split, hs = half(t), a = ac * Math.PI, r0 = hs * 1.2 * (1 - notch(t)) * 0.97;
+      const w = 0.9 + 1.6 * (1 - t); sr.push({ y: y0 + t * H, pts: [[Math.cos(a) * r0 - Math.sin(a) * w, Math.sin(a) * r0 + Math.cos(a) * w], [Math.cos(a) * r0 + Math.sin(a) * w, Math.sin(a) * r0 - Math.cos(a) * w], [Math.cos(a) * (r0 - 2), Math.sin(a) * (r0 - 2)]] }); }
+    const sg = shell(sr, { uM: 4, vM: 4 }); sg.translate(x, 0, z); B.add(sg, notchM); }
+  // sky-lobby bands
+  for (const t of [0.22, 0.44, 0.64, 0.8]) B.add(rim(ring(t), y0 + t * H - 1.6, 3.2, 0.5, { cx: x, cz: z }), lobbyM);
+  // crown: four blades (one per petal) of staggered height, open between them; glass lantern + spire in the middle
+  const bladeTop = [1.0, 0.95, 0.985, 0.94];
+  for (let k = 0; k < 4; k++) {
+    const a0 = (k * 0.5 + 0.25 + 0.05) * Math.PI, a1 = (k * 0.5 + 0.75 - 0.05) * Math.PI, br = [];
+    for (let i = 0; i <= 14; i++) { const t = split + (i / 14) * (bladeTop[k] - split), hs = half(t), pts = [];
+      const thin = 1 - (i / 14) * 0.55;
+      for (let j = 0; j <= 12; j++) { const a = a0 + (a1 - a0) * (0.5 + (j / 12 - 0.5) * thin); pts.push([Math.cos(a) * hs, Math.sin(a) * hs]); }
+      for (let j = 12; j >= 0; j--) { const a = a0 + (a1 - a0) * (0.5 + (j / 12 - 0.5) * thin); pts.push([Math.cos(a) * (hs - 3), Math.sin(a) * (hs - 3)]); }
+      br.push({ y: y0 + t * H, pts }); }
+    const bg = shell(br, { uTiles: 14, vM: 16 }); bg.translate(x, 0, z); B.add(bg, skin);
   }
-  // crown: two halves rising on either side of an open slot (x), with an open lattice skin
-  const lattice = new THREE.MeshStandardMaterial({ map: tex('lwt-lattice', 256, 256, (q, W, Hh) => { q.clearRect(0, 0, W, Hh); q.strokeStyle = '#e8ecee'; q.lineWidth = 6; for (let i = -W; i < W * 2; i += 32) { q.beginPath(); q.moveTo(i, 0); q.lineTo(i + Hh, Hh); q.stroke(); q.beginPath(); q.moveTo(i, Hh); q.lineTo(i + Hh, 0); q.stroke(); } q.lineWidth = 10; q.strokeRect(0, 0, W, Hh); }),
-    transparent: true, alphaTest: 0.4, side: THREE.DoubleSide, roughness: 0.4, metalness: 0.6 });
-  for (const sgn of [-1, 1]) {
-    const cr = [];
-    for (let i = 0; i <= 12; i++) { const t = split + (i / 12) * (1 - split), gap = 1.5 + ((t - split) / (1 - split)) * base * 0.12;
-      cr.push({ y: y0 + t * H, pts: ringAt(t).map(([px, pz]) => [sgn * Math.max(gap, sgn * px), pz]) }); }
-    const cg = shell(cr, { uTiles: 24, vM: 10 }); cg.translate(x, 0, z); B.add(cg, lattice, { cast: false });
-  }
-  // core + roof inside the crown, observation deck plate
-  const tc = ringAt(split); B.add(cap(tc, y0 + split * H, { cx: x, cz: z }), flatMat(0x9a9c98, { key: 'lwtroof' }));
-  const core = outline('rect', base * prof(split) * 0.35, base * prof(split) * 0.35); B.add(shell([{ y: y0 + split * H, pts: core }, { y: y0 + 0.95 * H, pts: core }], { cx: x, cz: z }), seamM);
-  const pts0 = ringAt(0);
-  const it = ctx.plan.add({ kind: 'building', id: 'landmark', use: 'officeTall', zone: 'business', rect: outlineRect(pts0, x, z), y0, h: H, entrances: [], colliders: outlineColliders(ctx.world, pts0, x, z, y0, 120, { strips: 8 }) });
-  // aircraft warning light on the top
-  const beacon = new THREE.Mesh(new THREE.SphereGeometry(1.2, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff3020 })); beacon.position.set(x, y0 + H + 2, z); beacon.userData.lodAlways = true; ctx.scene.add(beacon);
+  const lr = half(split) * 0.42, lantern = new THREE.MeshStandardMaterial({ color: 0xb8d0dc, emissive: 0x8aa8b8, emissiveIntensity: 0.35, roughness: 0.1, metalness: 0.4 });
+  B.add(new THREE.CylinderGeometry(lr * 0.7, lr, H * 0.1, 24).translate(x, y0 + (split + 0.05) * H, z), lantern);
+  B.add(new THREE.ConeGeometry(lr * 0.35, H * 0.14, 12).translate(x, y0 + (split + 0.1) * H + H * 0.07, z), flatMat(0xdfe4e6, { roughness: 0.3, metalness: 0.8, key: 'spire' }));
+  B.add(cap(ring(split), y0 + split * H, { cx: x, cz: z }), flatMat(0x9a9c98, { key: 'lwtroof' }));
+  const pts0 = ring(0);
+  const it = ctx.plan.add({ kind: 'building', id: 'landmark', use: 'officeTall', zone: 'business', rect: outlineRect(pts0, x, z), y0, h: H * 1.1, entrances: [], colliders: outlineColliders(ctx.world, pts0, x, z, y0, 120, { strips: 8 }) });
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(1.2, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff3020 })); beacon.position.set(x, y0 + (split + 0.24) * H, z); beacon.userData.lodAlways = true; ctx.scene.add(beacon);
   return it;
 }

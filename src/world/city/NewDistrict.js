@@ -94,7 +94,7 @@ export function buildNewDistrict(ctx) {
   footbridge(ctx, { x0: stBlock.x1 - 30, z0: -116, x1: bx1 + L.walk + 10, z1: -84 + L.sw + 8 });   // lands on the landmark forecourt
   plan.walk(new Rect(bx1 + L.walk, -224 + 4, 520, -104 - L.sw), 'plaza');   // the landing on the east side
   // ---------------------------------------------------------------- the landmark + podium mall (east of the boulevard, facing the lakes)
-  const T = L.tower; landmarkTower(ctx, { x: T.x, z: T.z, y0: CURB, H: 470, base: 56, name: '연서 하늘타워' });
+  const T = L.tower; landmarkTower(ctx, { x: T.x, z: T.z, y0: CURB, H: 520, base: 58, name: '연서 하늘타워' });
   // podium mall north / east of the tower: a long retail block and a rounded "dome" department store
   modernTower(ctx, { x: 566, z: -50, y0: CURB, sections: [{ kind: 'round', w: 80, d: 56, r: 14, h: 36, mat: 'grid', floorH: 6, rims: 1 }], crown: 'plant', zone: 'business', use: 'shops', front: [-1, 0], palette: { frame: 0xeeeae0, glass: 0x5a6a74, key: 'mall' } });
   domeStore(ctx, { x: 560, z: -128, w: 50, d: 30, h: 26 });
