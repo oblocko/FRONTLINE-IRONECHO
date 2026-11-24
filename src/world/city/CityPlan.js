@@ -193,9 +193,9 @@ export class Batch {
       }
       // split into chunks so frustum culling still works on a big city
       const chunks = new Map();
-      for (const g of geos) { g.computeBoundingBox(); const c = g.boundingBox.getCenter(new THREE.Vector3()); const key = `${Math.floor(c.x / 60)},${Math.floor(c.z / 60)}`; if (!chunks.has(key)) chunks.set(key, []); chunks.get(key).push(g); }
+      for (const g of geos) { g.computeBoundingBox(); const c = g.boundingBox.getCenter(new THREE.Vector3()); const key = `${Math.floor(c.x / 120)},${Math.floor(c.z / 120)}`; if (!chunks.has(key)) chunks.set(key, []); chunks.get(key).push(g); }
       for (const [key, list] of chunks) {
-        const merged = mergeAll(list); const m = new THREE.Mesh(merged, mat); m.castShadow = b.cast; m.receiveShadow = true; m.userData.cell = key; if (this.lodAlways || !b.cast) m.userData.lodAlways = true; this.scene.add(m); out.push(m);   // ground / road surfaces (no shadow) always draw
+        const merged = mergeAll(list); const m = new THREE.Mesh(merged, mat); m.castShadow = b.cast; m.receiveShadow = true; m.userData.cell = key; m.userData.cellSize = 120; if (this.lodAlways || !b.cast) m.userData.lodAlways = true; this.scene.add(m); out.push(m);   // ground / road surfaces (no shadow) always draw
       }
     }
     this.buckets.clear(); return out;

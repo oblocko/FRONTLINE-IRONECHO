@@ -167,21 +167,42 @@ export function buildCar(type = 'sedan', opts = {}) {
   g.userData.type = type; g.userData.size = V(T.W, 1.6, T.L);
   return g;
 }
-// static cars as instances: one InstancedMesh per (part geometry, material) for the whole level
+// static cars as instances. Per type the parts are merged into three geometries — paint (coloured per
+// instance), fixed parts (tyres, trim, lights, plates: vertex colours) and glass (tinted per instance:
+// dark, or black when broken) — so a whole street of cars costs three draw calls per type per cell.
+const mergedCache = new Map();
+function mergedType(type) {
+  if (mergedCache.has(type)) return mergedCache.get(type);
+  const m = mats(), G = typeGeo(type), fixed = [], paintG = [], glassG = [];
+  const fixedCol = { black: m.black.color, trim: m.trim.color, head: m.head.color, tail: m.tail.color, amber: m.amber.color, plate: new THREE.Color(0xe8e8e2), tyre: m.tyre.color, rim: m.rim.color, bed: m.bed.color, taxi: new THREE.Color(0xf0eee6) };
+  for (const [k, geo] of Object.entries(G)) {
+    const g = geo.clone(); g.rotateY(-Math.PI / 2);
+    if (k === 'paint') paintG.push(g); else if (k === 'glass') glassG.push(g);
+    else { const c = fixedCol[k] || new THREE.Color(0x222222), n = g.attributes.position.count, arr = new Float32Array(n * 3); for (let i = 0; i < n; i++) { arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(arr, 3)); fixed.push(g); }
+  }
+  const out = { paint: mergeGeometries(paintG), glass: mergeGeometries(glassG), fixed: mergeGeometries(fixed) }; mergedCache.set(type, out); return out;
+}
+const batchMats = {};
 export class CarBatch {
-  constructor(scene) { this.scene = scene; this.groups = new Map(); }
+  constructor(scene) { this.scene = scene; this.list = []; }
   add(type, opts, x, y, z, rotY, owner) {
-    const mtx = new THREE.Matrix4().compose(V(x, y, z), new THREE.Quaternion().setFromAxisAngle(V(0, 1, 0), rotY - Math.PI / 2), V(1, 1, 1));
-    for (const { k, geo, mat } of carParts(type, opts)) { const key = geo.uuid + mat.uuid; if (!this.groups.has(key)) this.groups.set(key, { geo, mat, k, list: [] }); this.groups.get(key).list.push({ mtx, owner }); }
+    const state = opts.state || 'dusty', burnt = state === 'burnt', broken = burnt || state === 'damaged';
+    const col = type === 'taxi' ? (opts.color === 0xe6e6e2 ? opts.color : 0xd8822a) : opts.color;
+    this.list.push({ type, owner, mtx: new THREE.Matrix4().compose(V(x, y, z), new THREE.Quaternion().setFromAxisAngle(V(0, 1, 0), rotY), V(1, 1, 1)),
+      paint: new THREE.Color(burnt ? 0x2a2420 : col).multiplyScalar(state === 'clean' ? 1 : 0.88), glass: new THREE.Color(broken ? 0x050607 : 0x1a2228) });
   }
   build(removed = new Set()) {
-    const p = new THREE.Vector3();
-    for (const { geo, mat, k, list } of this.groups.values()) {
-      const cells = new Map();
-      for (const e of list) { if (removed.has(e.owner)) continue; p.setFromMatrixPosition(e.mtx); const key = `${Math.floor(p.x / 60)},${Math.floor(p.z / 60)}`; if (!cells.has(key)) cells.set(key, []); cells.get(key).push(e); }
-      for (const [key, l] of cells) {
-        const im = new THREE.InstancedMesh(geo, mat, l.length); l.forEach((e, i) => im.setMatrixAt(i, e.mtx));
-        im.castShadow = k === 'paint' || k === 'glass' || k === 'bed'; im.receiveShadow = true; im.computeBoundingSphere(); im.userData.cell = key; im.userData.lodMid = true; this.scene.add(im);
+    batchMats.paint ||= new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.5, roughness: 0.4, envMapIntensity: 0.9 });
+    batchMats.glass ||= new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.6, roughness: 0.06, envMapIntensity: 1.3 });
+    batchMats.fixed ||= new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.3, roughness: 0.6 });
+    const groups = new Map(), p = new THREE.Vector3();
+    for (const e of this.list) { if (removed.has(e.owner)) continue; p.setFromMatrixPosition(e.mtx); const key = `${e.type}|${Math.floor(p.x / 120)},${Math.floor(p.z / 120)}`; if (!groups.has(key)) groups.set(key, []); groups.get(key).push(e); }
+    for (const [key, l] of groups) {
+      const [type, cell] = key.split('|'), G = mergedType(type);
+      for (const part of ['paint', 'glass', 'fixed']) {
+        const im = new THREE.InstancedMesh(G[part], batchMats[part], l.length);
+        l.forEach((e, i) => { im.setMatrixAt(i, e.mtx); if (part !== 'fixed') im.setColorAt(i, e[part]); });
+        im.castShadow = part === 'paint'; im.receiveShadow = true; im.computeBoundingSphere(); im.userData.cell = cell; im.userData.cellSize = 120; im.userData.lodNear = true; this.scene.add(im);
       }
     }
   }

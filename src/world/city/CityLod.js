@@ -1,4 +1,4 @@
-// Level-of-detail for the planned city, per 60 m cell:
+// Level-of-detail for the planned city, per 120 m cell:
 //   near   (< NEAR)  everything: window frames / rails / AC units / signs / small furniture
 //   mid    (< MID)   building masses, window glass (interior mapping), floor bands, cars, trees
 //   far    (>= MID)  HLOD: the cell's buildings as one merged proxy (boxes with a window-grid texture,
@@ -10,7 +10,7 @@
 // Objects that must always draw (the landmark) carry userData.lodAlways.
 import * as THREE from 'three';
 
-export const CELL = 60;
+export const CELL = 120;   // LOD / HLOD / occlusion cell; the merged meshes and instances use the same 120 m grid
 const NEAR = 160, MID = 420;
 export const cellKey = (x, z) => `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
 
@@ -42,7 +42,11 @@ export class CityLod {
     const box = new THREE.Box3(), sph = new THREE.Sphere();
     for (const o of scene.children) {
       if (o.userData.lodAlways || o.userData.dynamic || o.isLight || o.isCamera) continue;
-      if (o.userData.cell) { const c = this.cell(o.userData.cell); if (o.userData.facade) (DETAIL.has(o.userData.facade) ? c.near : c.mid).push(o); else if (o.userData.lodMid) c.mid.push(o); else c.full.push(o); continue; }
+      if (o.userData.cell) {
+        let key = o.userData.cell; const sz = o.userData.cellSize;
+        if (sz && sz !== CELL) { const [i, j] = key.split(',').map(Number); key = cellKey((i + 0.5) * sz, (j + 0.5) * sz); }   // a coarser instancing cell: judged at its centre
+        const c = this.cell(key);
+        if (o.userData.facade) (DETAIL.has(o.userData.facade) ? c.near : c.mid).push(o); else if (o.userData.lodNear) c.near.push(o); else if (o.userData.lodMid) c.mid.push(o); else c.full.push(o); continue; }
       box.setFromObject(o); if (box.isEmpty()) continue; box.getBoundingSphere(sph);
       if (sph.radius < 10 && !o.isInstancedMesh) { const c = this.cell(cellKey(sph.center.x, sph.center.z)); c.near.push(o); }
     }

@@ -119,11 +119,11 @@ export class TreeBatch {
     const geos = { leaf: leafTreeGeo(), pine: pineGeo() };
     for (const [k, pts] of Object.entries(this.list)) {
       if (!pts.length) continue;
-      const cells = new Map(); for (const p of pts) { const key = `${Math.floor(p.x / 60)},${Math.floor(p.z / 60)}`; if (!cells.has(key)) cells.set(key, []); cells.get(key).push(p); }
+      const cells = new Map(); for (const p of pts) { const key = `${Math.floor(p.x / 120)},${Math.floor(p.z / 120)}`; if (!cells.has(key)) cells.set(key, []); cells.get(key).push(p); }
       for (const [key, list] of cells) for (const [part, mat] of geos[k]) {
         const im = new THREE.InstancedMesh(part, mat, list.length);
         list.forEach((p, i) => { d.position.set(p.x, p.y, p.z); d.rotation.set(0, p.r, 0); d.scale.setScalar(p.s); d.updateMatrix(); im.setMatrixAt(i, d.matrix); });
-        im.castShadow = true; im.receiveShadow = true; im.computeBoundingSphere(); im.userData.cell = key; im.userData.lodMid = true; scene.add(im);
+        im.castShadow = true; im.receiveShadow = true; im.computeBoundingSphere(); im.userData.cell = key; im.userData.cellSize = 120; im.userData.lodMid = true; scene.add(im);
       }
     }
   }
