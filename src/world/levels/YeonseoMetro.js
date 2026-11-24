@@ -61,7 +61,7 @@ export class YeonseoMetro {
       const y0 = ctx.ground(x, z); const rect = Rect.c(x, z, 1.6, 2.4); if (!plan.free(rect, { reserved: false })) continue;
       const p = g.props.box(V(1.6, 6.05 - y0, 2.4), V(x, y0 + (6.05 - y0) / 2, z), conc, { surface: 'concrete' });
       const cap = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.9, 11), conc); cap.position.set(x, 6.5, z); cap.castShadow = true; scene.add(cap);
-      plan.add({ kind: 'structure', id: `pier${x}`, rect, y0, h: 6.05 - y0, obj: p, colliders: [p.userData.collider] });
+      plan.add({ kind: 'structure', id: `pier${x}`, rect, y0, h: 6.05 - y0, obj: p, colliders: [p.userData.collider], tags: ['support'] });
     }
   }
   update(dt) { this.sky?.update(dt, this.game.renderer.camera); this.lod.update(dt); this.region?.update(dt); }

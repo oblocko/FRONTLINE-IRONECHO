@@ -105,7 +105,8 @@ export class CityPlan {
     // 2. buildings / structures vs roads, reserved corridors, sidewalks
     for (const it of [...this.items]) {
       if (!solid(it) || it.tags.includes('onRoad')) continue;
-      const bad = this.roads.find((r) => r.rect.hits(it.rect)) || this.reserved.find((r) => r.kind !== 'vehicle' && r.rect.hits(it.rect)) ||
+      const inBand = it.tags.includes('support');   // piers of an overpass / viaduct stand in its reserved band
+      const bad = this.roads.find((r) => r.rect.hits(it.rect)) || (!inBand && this.reserved.find((r) => r.kind !== 'vehicle' && r.rect.hits(it.rect))) ||
         (it.kind === 'building' && this.walks.find((w) => w.kind === 'sidewalk' && w.rect.hits(it.rect)));
       if (bad) { err('road', it, `${it.id} intrudes ${bad.kind} ${bad.rect}`); remove(it, 'road intrusion'); }
     }
@@ -115,6 +116,7 @@ export class CityPlan {
       const a = solids[i], b = solids[j];
       if (!this.items.includes(a) || !this.items.includes(b)) continue;
       if (a.tags.includes('attached') && b.tags.includes('attached') && a.group === b.group) continue;
+      if ((a.tags.includes('elevated') && b.tags.includes('support')) || (b.tags.includes('elevated') && a.tags.includes('support'))) continue;   // a deck resting on its support
       if (a.rect.hits(b.rect, 0.05) && !(a.y0 + a.h <= b.y0 + 0.01 || b.y0 + b.h <= a.y0 + 0.01)) { err('overlap', b, `${b.id} overlaps ${a.id}`); remove(b, `overlap with ${a.id}`); }
     }
     // 4. props / cars inside solids, cars off the carriageway / parking, cars in vehicle corridors, cars overlapping
@@ -193,7 +195,7 @@ export class Batch {
       const chunks = new Map();
       for (const g of geos) { g.computeBoundingBox(); const c = g.boundingBox.getCenter(new THREE.Vector3()); const key = `${Math.floor(c.x / 60)},${Math.floor(c.z / 60)}`; if (!chunks.has(key)) chunks.set(key, []); chunks.get(key).push(g); }
       for (const [key, list] of chunks) {
-        const merged = mergeAll(list); const m = new THREE.Mesh(merged, mat); m.castShadow = b.cast; m.receiveShadow = true; m.userData.cell = key; if (this.lodAlways || !b.cast) m.userData.lodAlways = true;   // ground / road surfaces always draw this.scene.add(m); out.push(m);
+        const merged = mergeAll(list); const m = new THREE.Mesh(merged, mat); m.castShadow = b.cast; m.receiveShadow = true; m.userData.cell = key; if (this.lodAlways || !b.cast) m.userData.lodAlways = true; this.scene.add(m); out.push(m);   // ground / road surfaces (no shadow) always draw
       }
     }
     this.buckets.clear(); return out;

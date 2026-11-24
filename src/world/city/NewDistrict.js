@@ -15,15 +15,16 @@ import { modernTower, landmarkTower, shell, cap, outline, outlineColliders, outl
 import { channelSign } from '../korea/Signs.js';
 import { furnishSidewalk, placeCar, parkAlong, CURB } from './Streets.js';
 import { carType } from '../korea/Cars.js';
+import { buildCentralStation, footbridge } from './Station.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 export const ND = {
   x0: 216, x1: 720, boulevard: [408, 432], walk: 6, sw: 4, connector: [200, 216],
   roadsX: [[-104, -84, 216, 720], [-236, -224, 216, 720], [150, 162, 216, 720], [-16, -4, 432, 720]],     // E-W [z0, z1, x0, x1]
-  roadsZ: [[270, 282], [612, 624]],                                                                     // N-S [x0, x1] (full length)
-  rail: { z0: -172, z1: -132, y: 9 },
+  roadsZ: [[270, 282, -300, -224], [270, 282, -104, 300], [612, 624, -300, 300]],                      // N-S [x0, x1, z0, z1] (the west one stops at the station block)
+  rail: { z0: -206, z1: -166, y: 9 },
   lakes: [{ cx: 522, cz: 70, rx: 72, rz: 44 }, { cx: 345, cz: 95, rx: 52, rz: 44 }],
-  tower: V(488, 0, -50), station: { x0: 288, x1: 402, z0: -200, z1: -124 },
+  tower: V(488, 0, -50),
 };
 // lakes are below the land: water at -0.9 inside the ellipse (heightFn uses this)
 export function inLake(x, z, grow = 0) { return ND.lakes.some((l) => ((x - l.cx) / (l.rx + grow)) ** 2 + ((z - l.cz) / (l.rz + grow)) ** 2 < 1); }
@@ -34,14 +35,16 @@ export function buildNewDistrict(ctx) {
   plan.road(new Rect(L.connector[0], -300, L.connector[1], 300), 'arterial', 'z');
   plan.road(new Rect(bx0, -300, bx1, 300), 'arterial', 'z');
   for (const [z0, z1, x0, x1] of L.roadsX) plan.road(new Rect(x0, z0, x1, z1), z1 - z0 > 15 ? 'arterial' : 'local', 'x');
-  for (const [x0, x1] of L.roadsZ) plan.road(new Rect(x0, -300, x1, 300), 'local', 'z');
+  for (const [x0, x1, z0, z1] of L.roadsZ) plan.road(new Rect(x0, z0, x1, z1), 'local', 'z');
   plan.reserve(new Rect(L.connector[1], L.rail.z0, L.x1, L.rail.z1), 'overpass', 'rail viaduct');
   // blocks = the cells between roads (per side), sidewalks along every edge that meets a road
   const xCuts = { W: [[216, 270], [282, bx0]], E: [[bx1, 612], [624, L.x1]] };
   const zCuts = { W: [[-300, -236], [-224, -104], [-84, 150], [162, 300]], E: [[-300, -236], [-224, -104], [-84, -16], [-4, 150], [162, 300]] };
   const cells = [];
   for (const side of ['W', 'E']) for (const [x0, x1] of xCuts[side]) for (const [z0, z1] of zCuts[side]) {
-    const r = new Rect(x0, z0, x1, z1); cells.push(r);
+    // the station block west of the boulevard is one large block (no street through it)
+    if (side === 'W' && z0 === -224 && x0 === 282) continue;
+    const r = new Rect(side === 'W' && z0 === -224 && x0 === 216 ? 216 : x0, z0, side === 'W' && z0 === -224 && x0 === 216 ? bx0 : x1, z1); cells.push(r);
     plan.block(r, side === 'E' ? 'business' : 'residential', `N${side}${x0},${z0}`);
     const onRoad = (x, z) => plan.carriageways.some((q) => q.rect.has(x, z));
     const bw = (nx) => (nx && (x0 === bx1 || x1 === bx0) ? L.walk : L.sw);
@@ -78,71 +81,23 @@ export function buildNewDistrict(ctx) {
   const deck = new Rect(L.connector[1], R.z0, L.x1, R.z1);
   batch.box(conc, deck.w, 1.6, deck.d, deck.cx, R.y - 0.8, deck.cz);
   for (const s of [-1, 1]) batch.box(conc, deck.w, 1.2, 0.4, deck.cx, R.y + 0.6, deck.cz + s * (deck.d / 2 - 0.2));
-  for (let x = deck.x0 + 12; x < deck.x1; x += 26) { const pr = Rect.c(x, deck.cz, 2.2, 6); if (plan.carriageways.some((r) => r.rect.hits(pr))) continue;
-    batch.box(conc, 2.2, R.y - 1.6, 6, x, (R.y - 1.6) / 2 + 0.07, deck.cz); plan.add({ kind: 'structure', id: `railpier${x | 0}`, rect: pr, y0: CURB, h: R.y - 1.6, colliders: [world.addBox(V(pr.x0, 0, pr.z0), V(pr.x1, R.y - 1.6, pr.z1), { surface: 'concrete' })] }); }
+  for (let x = deck.x0 + 12; x < deck.x1; x += 26) { const pr = Rect.c(x, deck.cz, 2.2, 6); if (plan.carriageways.some((r) => r.rect.hits(pr)) || (x > 255 && x < 368)) continue;   // the station concourse carries the deck there
+    batch.box(conc, 2.2, R.y - 1.6, 6, x, (R.y - 1.6) / 2 + 0.07, deck.cz); plan.add({ kind: 'structure', id: `railpier${x | 0}`, rect: pr, y0: CURB, h: R.y - 1.6 - CURB, tags: ['support'], colliders: [world.addBox(V(pr.x0, 0, pr.z0), V(pr.x1, R.y - 1.6, pr.z1), { surface: 'concrete' })] }); }
   plan.add({ kind: 'structure', id: 'viaduct', rect: deck, y0: R.y - 1.6, h: 3, tags: ['elevated', 'onRoad'] });
   // tracks
   const rail2 = flatMat(0x6a6460, { roughness: 0.5, metalness: 0.7, key: 'rail' });
   for (const tz of [R.z0 + 2, R.z0 + 6.5, R.z1 - 6.5, R.z1 - 2]) for (const s of [-0.72, 0.72]) batch.box(rail2, deck.w, 0.16, 0.08, deck.cx, R.y + 0.1, tz + s, 0, { cast: false });
-  // 연서중앙역 — a through station on the viaduct:
-  //   train shed   a 320 m glass barrel vault along the tracks (steel ribs every 8 m), over the viaduct
-  //   concourse    a north-south glass hall crossing the shed, entered from the plaza
-  //   gate offices two glass office slabs either side of the concourse, bridging over the shed
-  //   portal       a big steel arch on the plaza front with glass infill; a wave lattice canopy over the plaza
-  const steel = flatMat(0xd8dcde, { roughness: 0.4, metalness: 0.7, key: 'steelw' });
-  const vaultGlass = new THREE.MeshStandardMaterial({ color: 0x9ab0bc, roughness: 0.08, metalness: 0.4, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false });
-  const shed = { x0: 236, x1: 556, z0: R.z0 - 2, z1: R.z1 + 2 }, spring = R.y + 7, rise = 15;
-  { const n = 18, pos = [], idx = [];
-    for (let i = 0; i <= n; i++) { const a = i / n, zz = shed.z0 + a * (shed.z1 - shed.z0), yy = spring + Math.sin(a * Math.PI) * rise; pos.push(shed.x0, yy, zz, shed.x1, yy, zz); }
-    for (let i = 0; i < n; i++) idx.push(i * 2, i * 2 + 2, i * 2 + 1, i * 2 + 1, i * 2 + 2, i * 2 + 3);
-    const vg = new THREE.BufferGeometry(); vg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); vg.setIndex(idx); vg.computeVertexNormals(); const vm = new THREE.Mesh(vg, vaultGlass); vm.userData.cell = `${Math.floor(396 / 60)},${Math.floor(-152 / 60)}`; scene.add(vm);
-    for (let x = shed.x0; x <= shed.x1 + 0.01; x += 8) for (let i = 0; i < n; i++) { const a0 = i / n, a1 = (i + 1) / n; const z0 = shed.z0 + a0 * (shed.z1 - shed.z0), z1 = shed.z0 + a1 * (shed.z1 - shed.z0), y0 = spring + Math.sin(a0 * Math.PI) * rise, y1 = spring + Math.sin(a1 * Math.PI) * rise;
-      const len = Math.hypot(z1 - z0, y1 - y0); const g = new THREE.BoxGeometry(0.4, 0.6, len); g.rotateX(-Math.atan2(y1 - y0, z1 - z0)); g.translate(x, (y0 + y1) / 2, (z0 + z1) / 2); batch.add(g, steel); }
-    for (const zz of [shed.z0, shed.z1]) { batch.box(steel, shed.x1 - shed.x0, 0.8, 0.8, (shed.x0 + shed.x1) / 2, spring, zz); for (let x = shed.x0; x <= shed.x1; x += 16) batch.box(steel, 0.6, spring - R.y, 0.6, x, (spring + R.y) / 2, zz); }
-    // platforms + canopy edge lights under the vault
-    for (const zz of [R.z0 + 9, R.z1 - 9, (R.z0 + R.z1) / 2]) batch.box(flatMat(0xb0aca4, { key: 'platform' }), shed.x1 - shed.x0, 1.0, 5, (shed.x0 + shed.x1) / 2, R.y + 0.5, zz); }
-  // concourse hall (crosses the shed), glass with fine mullions
-  const hall = new Rect(S.x0 + 30, S.z0, S.x1 - 30, S.z1), hy = spring + rise + 4;
-  const glassHall = curtainMat({ glass: 0x6a8494, spandrel: 0xb8c0c4, mullion: 0xe0e4e6, bays: 8, floorH: 6, spandrelH: 0.25, key: 'hall' });
-  batch.add(shell([{ y: CURB, pts: outline('rect', hall.w, hall.d) }, { y: hy, pts: outline('rect', hall.w, hall.d) }], { cx: hall.cx, cz: hall.cz, uM: 6, vM: 6 }), glassHall);
-  batch.add(cap(outline('rect', hall.w + 2, hall.d + 2), hy, { cx: hall.cx, cz: hall.cz }), flatMat(0xd8dcde, { roughness: 0.4, metalness: 0.5, key: 'hallroof' }));
-  // gate offices: legs north and south of the shed, a bridge block over it
-  const offM = curtainMat({ glass: 0x4e6878, spandrel: 0x8a96a0, mullion: 0xc8d0d4, floorH: 4, key: 'gate' });
-  for (const [x0, x1] of [[S.x0, hall.x0 - 1], [hall.x1 + 1, S.x1]]) {
-    const w = x1 - x0, cx = (x0 + x1) / 2, top = hy + 14;
-    for (const [z0, z1] of [[S.z0, shed.z0 - 1], [shed.z1 + 1, S.z1]]) { const pts = outline('rect', w, z1 - z0); batch.add(shell([{ y: CURB, pts }, { y: top, pts }], { cx, cz: (z0 + z1) / 2, uM: 6, vM: 4 }), offM); batch.add(cap(pts, top, { cx, cz: (z0 + z1) / 2 }), flatMat(0x8a8c88, { key: 'mroof' }));
-      plan.add({ kind: 'building', id: `gate${x0}${z0}`, use: 'office', zone: 'business', rect: new Rect(x0, z0, x1, z1), y0: CURB, h: top, colliders: [world.addBox(V(x0, CURB, z0), V(x1, top, z1), { surface: 'concrete', cover: true, walkable: false })], entrances: [] }); }
-    const bp = outline('rect', w, shed.z1 - shed.z0 + 2); batch.add(shell([{ y: hy - 2, pts: bp }, { y: top, pts: bp }], { cx, cz: (shed.z0 + shed.z1) / 2, uM: 6, vM: 4 }), offM); batch.add(cap(bp, hy - 2, { cx, cz: (shed.z0 + shed.z1) / 2 }), steel); batch.add(cap(bp, top, { cx, cz: (shed.z0 + shed.z1) / 2 }), flatMat(0x8a8c88, { key: 'mroof' }));
-  }
-  // portal arch on the plaza front with glass infill + name
-  const portalR = Math.min(hall.w / 2 - 2, 22);
-  { const tg = new THREE.TorusGeometry(portalR, 1.1, 8, 32, Math.PI); tg.translate(hall.cx, CURB + 4, hall.z1 + 1.2); batch.add(tg, steel);
-    const disc = new THREE.CircleGeometry(portalR - 1, 32, 0, Math.PI); disc.translate(hall.cx, CURB + 4, hall.z1 + 0.6); const dm = new THREE.Mesh(disc, vaultGlass); scene.add(dm);
-    for (const s2 of [-1, 1]) batch.box(steel, 2.2, 4, 2.2, hall.cx + s2 * portalR, CURB + 2, hall.z1 + 1.2); }
-  const sn = channelSign('연서중앙역', '#1d3f8a', 3.2, { raceway: null }); sn.position.set(hall.cx, hy - 3.5, hall.z1 + 0.1); scene.add(sn);
-  const se = channelSign('YEONSEO CENTRAL STATION', '#1d3f8a', 1.3, { raceway: null }); se.position.set(hall.cx, hy - 6.4, hall.z1 + 0.1); scene.add(se);
-  const st = plan.add({ kind: 'building', id: 'central-station', use: 'civic', zone: 'public', rect: hall, y0: CURB, h: hy, entrances: [{ x: hall.cx, z: hall.z1, nx: 0, nz: 1 }],
-    colliders: [world.addBox(V(hall.x0, CURB, hall.z0), V(hall.x1, hy, hall.z1), { surface: 'concrete', cover: true, walkable: false })] });
-  // wave lattice canopy over the plaza (two humps), on slim columns
-  { const lat = new THREE.MeshStandardMaterial({ map: (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); g.strokeStyle = '#3a4046'; g.lineWidth = 5; for (let i = -128; i < 256; i += 22) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i + 128, 128); g.stroke(); g.beginPath(); g.moveTo(i, 128); g.lineTo(i + 128, 0); g.stroke(); } const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; })(), transparent: true, alphaTest: 0.3, side: THREE.DoubleSide, metalness: 0.6, roughness: 0.4 });
-    const cx0 = S.x0 + 4, cx1 = S.x1 - 4, cz0 = S.z1 + 2, cz1 = S.z1 + 18, nx = 24, nz = 4, pos = [], uv = [], idx = [];
-    for (let i = 0; i <= nx; i++) for (let j = 0; j <= nz; j++) { const u = i / nx, v = j / nz; pos.push(cx0 + u * (cx1 - cx0), CURB + 9 + Math.sin(u * Math.PI * 2) * 2.5 + Math.sin(v * Math.PI) * 1.2, cz0 + v * (cz1 - cz0)); uv.push(u * 12, v * 2); }
-    for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) { const a = i * (nz + 1) + j, b = a + nz + 1; idx.push(a, b, a + 1, a + 1, b, b + 1); }
-    const cg = new THREE.BufferGeometry(); cg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); cg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); cg.setIndex(idx); cg.computeVertexNormals(); scene.add(new THREE.Mesh(cg, lat));
-    for (let x = cx0 + 6; x < cx1; x += 18) for (const zz of [cz0 + 3, cz1 - 3]) batch.box(steel, 0.35, 8.5, 0.35, x, CURB + 4.25, zz); }
-  // bus bays + taxi rank on 올림픽로 in front of the plaza
-  for (const [x, rot] of [[312, Math.PI / 2], [344, Math.PI / 2]]) { const b = ctx.kit?.bus?.({ x, z: -100.5, rotY: rot, color: 0x2a6ab0 }); if (b) { b.userData.dynamic = false; } }
-  for (let i = 0; i < 5; i++) placeCar(ctx, 'taxi', 362 + i * 5.2, -101.2, Math.PI / 2, { state: 'clean', tags: ['onRoad'] });
-  // station plaza between the hall and the z -40 street; taxi rank lane, trees, benches
-  const plaza = new Rect(S.x0, S.z1, S.x1, -104 - L.sw); plan.walk(plaza, 'plaza');
-  batch.add(cap(outline('rect', plaza.w, plaza.d), CURB + 0.015, { cx: plaza.cx, cz: plaza.cz }), groundMat('plaza', { color: 0xd0ccc4 }), { cast: false });
-  ctx.trees([...Array(8)].map((_, i) => [plaza.x0 + 8 + i * (plaza.w - 16) / 7, plaza.z1 - 3]));
-
+  // 연서중앙역 (world/city/Station.js): train shed + concourse vault + arched glass front, twin towers, plaza with
+  // a sunken metro plaza, bus terminal and taxi rank; a footbridge to the landmark
+  const stBlock = new Rect(216 + 4, -224 + 4, bx0 - L.walk, -104 - L.sw);
+  const station = buildCentralStation(ctx, { block: stBlock, rail: R });
+  footbridge(ctx, { x0: stBlock.x1 - 30, z0: -116, x1: bx1 + L.walk + 10, z1: -84 + L.sw + 8 });   // lands on the landmark forecourt
+  plan.walk(new Rect(bx1 + L.walk, -224 + 4, 520, -104 - L.sw), 'plaza');   // the landing on the east side
   // ---------------------------------------------------------------- the landmark + podium mall (east of the boulevard, facing the lakes)
   const T = L.tower; landmarkTower(ctx, { x: T.x, z: T.z, y0: CURB, H: 470, base: 56, name: '연서 하늘타워' });
   // podium mall north / east of the tower: a long retail block and a rounded "dome" department store
   modernTower(ctx, { x: 566, z: -50, y0: CURB, sections: [{ kind: 'round', w: 80, d: 56, r: 14, h: 36, mat: 'grid', floorH: 6, rims: 1 }], crown: 'plant', zone: 'business', use: 'shops', front: [-1, 0], palette: { frame: 0xeeeae0, glass: 0x5a6a74, key: 'mall' } });
-  domeStore(ctx, { x: 472, z: -117, w: 46, d: 18, h: 24 });
+  domeStore(ctx, { x: 560, z: -128, w: 50, d: 30, h: 26 });
   // forecourt between the tower and the boulevard
   { const fc = new Rect(bx1 + L.walk, -80, T.x - 30, -20); plan.walk(fc, 'plaza'); batch.add(cap(outline('rect', fc.w, fc.d), CURB + 0.015, { cx: fc.cx, cz: fc.cz }), groundMat('plaza', { color: 0xc8c4bc }), { cast: false }); }
 
@@ -187,6 +142,7 @@ export function buildNewDistrict(ctx) {
     const east = p.cx > bx1, resid = !east || p.cz > 150, dist = Math.hypot(p.cx - T.x, p.cz - T.z);
     const f = resid ? apartment(p) : office(p, dist), front = east ? [-1, 0] : [1, 0];
     modernTower(ctx, { x: p.cx, z: p.cz, y0: CURB, ...f, front, zone: resid ? 'residential' : 'business', use: resid ? 'apartment' : 'office' });
+    plan.walk(p.inset(-3), 'grounds');   // the lot around the tower (forecourt, paths) is walkable
   }
 
 

@@ -69,12 +69,13 @@ export class CityLod {
     }
   }
   // is a point hidden from the eye by an occluder (ray march through the occluder grid)?
-  blocked(eye, tx, ty, tz, skipCell) {
+  blocked(eye, tx, ty, tz, skipCell, cellRect = null) {
     const dx = tx - eye.x, dy = ty - eye.y, dz = tz - eye.z, len = Math.hypot(dx, dy, dz); const steps = Math.ceil(len / (CELL * 0.5)); const seen = new Set();
     for (let s = 0; s <= steps; s++) {
       const t = s / steps, k = `${Math.floor((eye.x + dx * t) / CELL)},${Math.floor((eye.z + dz * t) / CELL)}`; if (seen.has(k)) continue; seen.add(k);
       for (const o of this.grid.get(k) || []) {
         if (o.cell === skipCell) continue;
+        if (cellRect && o.x1 > cellRect.x0 && o.x0 < cellRect.x1 && o.z1 > cellRect.z0 && o.z0 < cellRect.z1) continue;   // a building standing in the cell cannot hide that cell
         // slab test, ray segment [0, 0.98]
         let t0 = 0, t1 = 0.98;
         for (const [p, d, a, b] of [[eye.x, dx, o.x0, o.x1], [eye.y, dy, -1, o.y1], [eye.z, dz, o.z0, o.z1]]) {
@@ -94,7 +95,8 @@ export class CityLod {
       let visible = true;
       if (d > 30 && c.maxH > 0) {   // occlusion: the cell's top centre and four top corners
         const top = c.maxH, h = CELL / 2;
-        visible = [[c.cx, top, c.cz], [c.cx - h, top, c.cz - h], [c.cx + h, top, c.cz - h], [c.cx - h, top, c.cz + h], [c.cx + h, top, c.cz + h], [c.cx, top * 0.5, c.cz]].some(([x, y, z]) => !this.blocked(eye, x, y, z, c.key));
+        const cr = { x0: c.cx - h, z0: c.cz - h, x1: c.cx + h, z1: c.cz + h };
+        visible = [[c.cx, top, c.cz], [c.cx - h, top, c.cz - h], [c.cx + h, top, c.cz - h], [c.cx - h, top, c.cz + h], [c.cx + h, top, c.cz + h], [c.cx, top * 0.5, c.cz]].some(([x, y, z]) => !this.blocked(eye, x, y, z, c.key, cr));
       }
       const far = d >= MID;
       for (const o of c.near) o.visible = visible && d < NEAR;
