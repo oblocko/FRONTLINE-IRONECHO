@@ -13,6 +13,8 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 export function outline(kind, w, d, { r = 6, c = 6, bulge = 6, n = 72 } = {}) {
   const pts = [], hw = w / 2, hd = d / 2;
   if (kind === 'ellipse') { for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2; pts.push([Math.cos(a) * hw, Math.sin(a) * hd]); } return pts; }
+  // plus-shaped tower plan (four wings), arm width a = 45% of the size
+  if (kind === 'cross') { const a = Math.min(hw, hd) * 0.45; return [[-a, -hd], [a, -hd], [a, -a], [hw, -a], [hw, a], [a, a], [a, hd], [-a, hd], [-a, a], [-hw, a], [-hw, -a], [-a, -a]]; }
   if (kind === 'chamfer') return [[-hw + c, -hd], [hw - c, -hd], [hw, -hd + c], [hw, hd - c], [hw - c, hd], [-hw + c, hd], [-hw, hd - c], [-hw, -hd + c]];
   if (kind === 'rect') return [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]];
   if (kind === 'bulge') {   // the +z face bows out as an arc

@@ -37,14 +37,28 @@ const css = (h) => `#${new THREE.Color(h).getHexString()}`;
 const mats = new Map();
 function mat(key, make) { if (!mats.has(key)) mats.set(key, make()); return mats.get(key); }
 // apartment: balcony bands per floor (2.8 m), wide glazing, tile = 6.8 x 2.8
-const aptMat = (wall) => mat(`apt${wall}`, () => { const m = new THREE.MeshStandardMaterial({ roughness: 0.75, map: tex(`apt${wall}`, (g, W, H, r) => {
+// style 0: wide balcony glazing with a white slab band; 1: punched windows between vertical piers (older);
+// 2: horizontal white bands + dark glass (newer); tile = 6.8 x 2.8 (one unit, one floor)
+const aptMat = (wall, style = 0) => mat(`apt${wall}${style}`, () => { const m = new THREE.MeshStandardMaterial({ roughness: 0.75, map: tex(`apt${wall}${style}`, (g, W, H, r) => {
   g.fillStyle = css(wall); g.fillRect(0, 0, W, H);
-  for (let i = 0; i < 2; i++) { const x = i * W / 2; g.fillStyle = r() < 0.5 ? '#41505a' : '#55626a'; g.fillRect(x + 10, H * 0.18, W / 2 - 20, H * 0.55); if (r() < 0.5) { g.fillStyle = 'rgba(220,214,200,0.6)'; g.fillRect(x + 10, H * 0.18, (W / 2 - 20) * (0.2 + r() * 0.4), H * 0.55); } }
-  g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(0, H * 0.75, W, H * 0.06); g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(0, H * 0.73, W, 4);
+  if (style === 1) { for (let i = 0; i < 4; i++) { const x = i * W / 4; g.fillStyle = '#3e4a52'; g.fillRect(x + 12, H * 0.2, W / 4 - 24, H * 0.5); g.fillStyle = 'rgba(255,255,255,0.25)'; g.fillRect(x + 12, H * 0.2, W / 4 - 24, 4); }
+    g.fillStyle = 'rgba(0,0,0,0.12)'; for (let i = 0; i <= 4; i++) g.fillRect(i * W / 4 - 3, 0, 6, H); }
+  else if (style === 2) { g.fillStyle = '#2e3a44'; g.fillRect(0, H * 0.12, W, H * 0.62); for (let i = 0; i < 6; i++) { if (r() < 0.5) { g.fillStyle = 'rgba(210,206,196,0.5)'; g.fillRect(i * W / 6 + 3, H * 0.12, W / 6 - 6, H * 0.62 * (0.2 + r() * 0.5)); } g.fillStyle = 'rgba(200,210,214,0.35)'; g.fillRect(i * W / 6, H * 0.12, 3, H * 0.62); }
+    g.fillStyle = '#f2f0ea'; g.fillRect(0, H * 0.74, W, H * 0.26); }
+  else { for (let i = 0; i < 2; i++) { const x = i * W / 2; g.fillStyle = r() < 0.5 ? '#41505a' : '#55626a'; g.fillRect(x + 10, H * 0.18, W / 2 - 20, H * 0.55); if (r() < 0.5) { g.fillStyle = 'rgba(220,214,200,0.6)'; g.fillRect(x + 10, H * 0.18, (W / 2 - 20) * (0.2 + r() * 0.4), H * 0.55); } }
+    g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(0, H * 0.75, W, H * 0.06); g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(0, H * 0.73, W, 4); }
 }) }); m.userData.uM = 6.8; m.userData.vM = 2.8; return m; });
+// office façades beyond curtain wall / grid: vertical fins, ribbon windows (tile 6 x 4)
+const finMat = (glass, fin) => mat(`fin${glass}${fin}`, () => { const m = new THREE.MeshStandardMaterial({ roughness: 0.3, metalness: 0.35, map: tex(`fin${glass}${fin}`, (g, W, H) => {
+  g.fillStyle = css(glass); g.fillRect(0, 0, W, H); for (let x = 0; x < W; x += W / 8) { g.fillStyle = css(fin); g.fillRect(x, 0, 10, H); g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(x + 10, 0, 4, H); } g.fillStyle = 'rgba(255,255,255,0.18)'; g.fillRect(0, H - 8, W, 4);
+}) }); m.userData.uM = 6; m.userData.vM = 4; return m; });
+const ribbonMat = (wall, glass) => mat(`rib${wall}${glass}`, () => { const m = new THREE.MeshStandardMaterial({ roughness: 0.45, metalness: 0.2, map: tex(`rib${wall}${glass}`, (g, W, H) => {
+  g.fillStyle = css(wall); g.fillRect(0, 0, W, H); g.fillStyle = css(glass); g.fillRect(0, H * 0.1, W, H * 0.55); g.fillStyle = 'rgba(255,255,255,0.2)'; for (let x = 0; x < W; x += W / 4) g.fillRect(x, H * 0.1, 3, H * 0.55);
+}) }); m.userData.uM = 6; m.userData.vM = 4; return m; });
 // commercial / older mid-rise: windows on tile, tile = 3 x 3.3
-const comMat = (wall, glass) => mat(`com${wall}${glass}`, () => { const m = new THREE.MeshStandardMaterial({ roughness: 0.8, map: tex(`com${wall}${glass}`, (g, W, H, r) => {
-  g.fillStyle = css(wall); g.fillRect(0, 0, W, H); g.fillStyle = css(glass); g.fillRect(W * 0.1, H * 0.2, W * 0.8, H * 0.55); g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(W * 0.1, H * 0.2, W * 0.8, 6);
+const comMat = (wall, glass, signs = false) => mat(`com${wall}${glass}${signs}`, () => { const m = new THREE.MeshStandardMaterial({ roughness: 0.8, map: tex(`com${wall}${glass}${signs}`, (g, W, H, r) => {
+  g.fillStyle = css(wall); g.fillRect(0, 0, W, H);
+  if (signs) { const cols = ['#c83a2a', '#1d4f8a', '#2a8a4a', '#d8a020', '#7a2a8a', '#e86a1a']; g.fillStyle = cols[Math.floor(r() * cols.length)]; g.fillRect(W * 0.05, 0, W * 0.9, H * 0.16); g.fillStyle = 'rgba(255,255,255,0.8)'; g.fillRect(W * 0.2, H * 0.05, W * 0.6, H * 0.05); } g.fillStyle = css(glass); g.fillRect(W * 0.1, H * 0.2, W * 0.8, H * 0.55); g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(W * 0.1, H * 0.2, W * 0.8, 6);
   for (let i = 0; i < 400; i++) { g.fillStyle = `rgba(40,36,30,${r() * 0.08})`; g.fillRect(r() * W, r() * H, 3, 3); }
 }) }); m.userData.uM = 3; m.userData.vM = 3.3; return m; });
 // villa (다세대): brick with small windows, tile = 3.2 x 2.8
@@ -210,7 +224,7 @@ function fillBlock(spec, r, D, T, { edge, hotter, rnd, pick, occl }) {
   const lawn = (x0, z0, x1, z1) => flat(() => boxGeo(x1 - x0, 0.05, z1 - z0, (x0 + x1) / 2, CURB, (z0 + z1) / 2), () => groundMat('lawn'), (x0 + x1) / 2, (z0 + z1) / 2, [x0, z0, x1, z1, 0.05], 0x56603a);
   const pave = (x0, z0, x1, z1, c = 0x9a9890) => flat(() => boxGeo(x1 - x0, 0.04, z1 - z0, (x0 + x1) / 2, CURB, (z0 + z1) / 2), () => groundMat('plaza', { color: c }), (x0 + x1) / 2, (z0 + z1) / 2, [x0, z0, x1, z1, 0.04], c);
   const COM = [0xd8d2c4, 0xb8b4aa, 0xc9c0ae, 0x9aa0a4, 0xe0dcd0, 0xa89c88, 0xcfc6b4], GL = [0x46586a, 0x3e4a52, 0x5a6a74];
-  const comBox = (x, z, w, d, h) => { const wc = pick(COM), gc = pick(GL); put(x, z, w, d, h, () => comMat(wc, gc), wc); };
+  const comBox = (x, z, w, d, h) => { const wc = pick(COM), gc = pick(GL), sg = rnd() < 0.35; put(x, z, w, d, h, () => comMat(wc, gc, sg), wc); };
   // perimeter frontage: buildings of varied width / height along the chosen block faces, depth dep
   const frontage = (faces, dep, hmin, hmax) => {
     for (const f of faces) {
@@ -252,7 +266,9 @@ function fillBlock(spec, r, D, T, { edge, hotter, rnd, pick, occl }) {
         if (hotter >= 2 && (z < r.z0 + 19 || z + lotD > r.z1 - 19)) continue;
         if (rnd() < 0.06) { pave(x, z, x + lotW, z + lotD, 0x7a7a76); continue; }   // a small parking lot / empty lot
         const corner = x < r.x0 + 2 || x + lotW > r.x1 - 2; const fl = 3 + Math.floor(rnd() * 2) + (corner ? 1 : 0), bc = pick([0x8a4a3a, 0x9a5a44, 0xd0c8b8, 0xc8c0b0, 0x7a4234, 0xb8a890]);
-        put(x + lotW / 2, z + lotD / 2, lotW - 1.4, lotD - 1.4, 2.6 + 2.8 * fl, () => villaMat(bc), bc, roofGreen);
+        const vh = 2.6 + 2.8 * fl, vx = x + lotW / 2, vz = z + lotD / 2;
+        put(vx, vz, lotW - 1.4, lotD - 1.4, vh, () => villaMat(bc), bc, roofGreen);
+        if (rnd() < 0.3) spec(vx, vz, { geo: () => { const g = new THREE.CylinderGeometry(0.01, (lotW - 1) / Math.SQRT2, 2.2, 4, 1); g.rotateY(Math.PI / 4); g.scale(1, 1, (lotD - 1) / (lotW - 1)); g.translate(vx, CURB + vh + 1.6, vz); return g; }, mat: () => flatMat(pick([0x5a3a2a, 0x3a4650, 0x4a5a4a]), { key: 'vroof' }), box: [vx - 1, vz - 1, vx + 1, vz + 1, 0.1], color: 0x5a3a2a });
       }
       return;
     }
@@ -272,13 +288,17 @@ function fillBlock(spec, r, D, T, { edge, hotter, rnd, pick, occl }) {
         if (D.type === 'mixed') { // 주상복합: a commercial podium + slender residential tower
           comBox(cx, cz, gw - 6, gd - 6, 14);
           const h = T.h[0] + rnd() * (T.h[1] - T.h[0]), w = Math.min(28, gw - 16), wall = pick([0xe8e4da, 0xd8d4cc, 0xc8ccd0]);
-          spec(cx, cz, { geo: () => shell([{ y: CURB + 14, pts: outline(pick(['round', 'chamfer']), w, w * 0.8, { r: 5, c: 4, n: 20 }) }, { y: CURB + 14 + h, pts: outline('round', w, w * 0.8, { r: 5, n: 20 }) }], { cx, cz, uM: 6.8, vM: 2.8 }), mat: () => aptMat(wall), box: [cx - w / 2, cz - w * 0.4, cx + w / 2, cz + w * 0.4, 14 + h], color: wall });
+          const MP = outline(pick(['round', 'chamfer', 'cross']), w, w * 0.8, { r: 5, c: 4, n: 20 }), mst = pick([0, 2]);   // one outline for both rings (same vertex count)
+          spec(cx, cz, { geo: () => shell([{ y: CURB + 14, pts: MP }, { y: CURB + 14 + h, pts: MP }], { cx, cz, uM: 6.8, vM: 2.8 }), mat: () => aptMat(wall, mst), box: [cx - w / 2, cz - w * 0.4, cx + w / 2, cz + w * 0.4, 14 + h], color: wall });
+          spec(cx, cz, { geo: () => cap(MP, CURB + 14 + h, { cx, cz }), mat: roofM, box: [cx - 1, cz - 1, cx + 1, cz + 1, 0.1], color: 0x6e7270 });
           occl(cx - w / 2, cz - w * 0.4, cx + w / 2, cz + w * 0.4, h); continue;
         }
         const H = Math.max(T.h[0], T.h[1] - dSeed * 0.12) * (0.65 + rnd() * 0.45);
         const kind = pick(['rect', 'round', 'chamfer', 'ellipse', 'rect']), w = Math.min(gw - 14, 24 + rnd() * 18), d = Math.min(gd - 14, 20 + rnd() * 16), fh = 4;
         const curtain = rnd() < 0.65, gl = pick([0x4e6a80, 0x5a7486, 0x56707e, 0x4a6478, 0x62767e, 0x6a7a80]), sp = pick([0x6a7884, 0x9aa2a8, 0x7e8a92, 0x5a6268]), fr = pick([0xd6cfc0, 0xc8c4ba, 0xe2ddd2, 0xb0aaa0]);
-        const mm = () => (curtain ? curtainMat({ glass: gl, spandrel: sp, floorH: fh, key: 'reg' }) : gridMat({ frame: fr, floorH: 3.8, key: 'reg' })), uM = curtain ? 6 : 3, vM = curtain ? fh : 3.8, tint = curtain ? gl : fr;
+        const sys = curtain ? pick(['curtain', 'curtain', 'fins', 'ribbon']) : 'grid';   // façade system
+        const mm = () => (sys === 'curtain' ? curtainMat({ glass: gl, spandrel: sp, floorH: fh, key: 'reg' }) : sys === 'fins' ? finMat(gl, pick([0xd8dcde, 0xb8bcc0, 0x9aa0a4])) : sys === 'ribbon' ? ribbonMat(pick([0xe8e6e0, 0xc8ccd0, 0x9aa2a8]), gl) : gridMat({ frame: fr, floorH: 3.8, key: 'reg' }));
+        const uM = sys === 'grid' ? 3 : 6, vM = sys === 'grid' ? 3.8 : fh, tint = curtain ? gl : fr;
         const pts = outline(kind, w, d, { r: 6, c: 5, n: 24 }), podH = 8 + Math.floor(rnd() * 3) * 4;
         put(cx, cz, Math.min(gw - 4, w + 12), Math.min(gd - 4, d + 12), podH, () => comMat(pick([0x9aa0a4, 0xb8b4aa, 0x7e8488]), 0x3e4a52), 0x9aa0a4);
         const tiers = H > 120 ? 3 : H > 70 ? 2 : 1; let y = CURB + podH, k = 1;
@@ -296,19 +316,31 @@ function fillBlock(spec, r, D, T, { edge, hotter, rnd, pick, occl }) {
       lawn(r.x0 + 4, r.z0 + 4, r.x1 - 4, r.z1 - 4);
       const sh = arterialFaces.includes('s') ? 's' : arterialFaces[0] || 's';
       if (sh === 's' || sh === 'n') comBox(r.x0 + 30, sh === 's' ? r.z1 - 14 : r.z0 + 14, 50, 20, 8); else comBox(sh === 'w' ? r.x0 + 14 : r.x1 - 14, r.z0 + 30, 20, 50, 8);
+      const style = D.type === 'slab' ? pick([0, 1, 1]) : pick([0, 2, 2]);       // one façade design per complex
+      const crown = pick(['frame', 'plant', 'brand']);
       if (D.type === 'highrise') {
-        const fl = 28 + Math.floor(rnd() * 14);
+        const fl = 28 + Math.floor(rnd() * 14), plans = [pick(['round', 'chamfer', 'rect', 'cross']), pick(['round', 'chamfer', 'cross'])];
+        let k = 0;
         for (let z = r.z0 + 30; z < r.z1 - 36; z += 46) for (let x = r.x0 + 22; x < r.x1 - 30; x += 40) {
-          const plan = pick(['round', 'chamfer', 'rect']), w = 26, d = 20, h = 3 + 2.8 * (fl + Math.floor(rnd() * 6));
-          spec(x + 13, z + 10, { geo: () => shell([{ y: CURB, pts: outline(plan, w, d, { r: 4, c: 4, n: 16 }) }, { y: CURB + h, pts: outline(plan, w, d, { r: 4, c: 4, n: 16 }) }], { cx: x + 13, cz: z + 10, uM: 6.8, vM: 2.8 }), mat: () => aptMat(wall), box: [x, z, x + w, z + d, h], color: wall });
-          spec(x + 13, z + 10, { geo: () => cap(outline(plan, w, d, { r: 4, c: 4, n: 16 }), CURB + h, { cx: x + 13, cz: z + 10 }), mat: roofM, box: [x + 12, z + 9, x + 14, z + 11, 0.1], color: 0x6e7270 });
-          spec(x + 13, z + 10, { geo: () => boxGeo(1.2, h - 6, 4, x + 0.4, CURB + 3, z + 10), mat: () => flatMat(acc, { key: 'acc' + acc }), box: [x, z + 8, x + 1, z + 12, h - 3], color: acc });
-          occl(x, z, x + w, z + d, h);
+          const plan = plans[k++ % 2], w = plan === 'cross' ? 28 : 26, d = plan === 'cross' ? 28 : 20, h = 3 + 2.8 * (fl + Math.floor(rnd() * 8) - (k % 3 === 0 ? 6 : 0)), cx = x + 13, cz = z + 10;
+          const P = outline(plan, w, d, { r: 4, c: 4, n: 16 });
+          spec(cx, cz, { geo: () => shell([{ y: CURB, pts: P }, { y: CURB + h, pts: P }], { cx, cz, uM: 6.8, vM: 2.8 }), mat: () => aptMat(wall, style), box: [cx - w / 2, cz - d / 2, cx + w / 2, cz + d / 2, h], color: wall });
+          spec(cx, cz, { geo: () => cap(P, CURB + h, { cx, cz }), mat: roofM, box: [cx - 1, cz - 1, cx + 1, cz + 1, 0.1], color: 0x6e7270 });
+          spec(cx, cz, { geo: () => boxGeo(1.2, h - 6, 4, cx - w / 2 + 0.2, CURB + 3, cz), mat: () => flatMat(acc, { key: 'acc' + acc }), box: [cx - w / 2, cz - 2, cx - w / 2 + 1, cz + 2, h - 3], color: acc });
+          // roof crown: an open frame, a plant room, or the complex's brand box
+          if (crown === 'frame') spec(cx, cz, { geo: () => { const Q = P.map(([a, b]) => [a * 0.9, b * 0.9]); return shell([{ y: CURB + h, pts: Q }, { y: CURB + h + 5, pts: Q }], { cx, cz, uM: 2, vM: 5 }); }, mat: () => flatMat(acc, { key: 'accf' + acc }), box: [cx - 1, cz - 1, cx + 1, cz + 1, h + 5], color: acc });
+          else spec(cx, cz, { geo: () => boxGeo(w * 0.45, crown === 'brand' ? 6 : 3.5, d * 0.4, cx, CURB + h, cz), mat: () => (crown === 'brand' ? flatMat(acc, { key: 'acc' + acc }) : flatMat(0x9a9c98, { key: 'plant' })), box: [cx - 4, cz - 3, cx + 4, cz + 3, h + 6], color: crown === 'brand' ? acc : 0x9a9c98 });
+          occl(cx - w / 2, cz - d / 2, cx + w / 2, cz + d / 2, h);
         }
       } else {
+        // slab rows: each slab in two parts of different height (a stepped skyline), gable accent, lift rooms
         const fl = 12 + Math.floor(rnd() * 4), len = Math.min(W - 40, 60 + rnd() * 20);
-        for (let z = r.z0 + 30; z < r.z1 - 26; z += 40) for (let x = r.x0 + 18; x + len <= r.x1 - 14; x += len + 18) { const h = 3 + 2.8 * fl; put(x + len / 2, z + 6, len, 12, h, () => aptMat(wall), wall);
-          spec(x + len / 2, z + 6, { geo: () => boxGeo(2, h - 4, 12.2, x + 1, CURB + 2, z + 6), mat: () => flatMat(acc, { key: 'acc' + acc }), box: [x, z, x + 2, z + 12, h], color: acc }); }
+        for (let z = r.z0 + 30; z < r.z1 - 26; z += 40) for (let x = r.x0 + 18; x + len <= r.x1 - 14; x += len + 18) {
+          const cut = len * (0.4 + rnd() * 0.2), h1 = 3 + 2.8 * fl, h2 = 3 + 2.8 * (fl - 2 - Math.floor(rnd() * 3));
+          put(x + cut / 2, z + 6, cut, 12, h1, () => aptMat(wall, style), wall); put(x + cut + (len - cut) / 2, z + 6, len - cut, 12, h2, () => aptMat(wall, style), wall);
+          spec(x + 1, z + 6, { geo: () => boxGeo(2, h1 - 4, 12.2, x + 1, CURB + 2, z + 6), mat: () => flatMat(acc, { key: 'acc' + acc }), box: [x, z, x + 2, z + 12, h1], color: acc });
+          for (const lx of [x + cut * 0.5, x + cut + (len - cut) * 0.5]) spec(lx, z + 6, { geo: () => boxGeo(5, 3, 6, lx, CURB + (lx < x + cut ? h1 : h2), z + 6), mat: () => flatMat(0x9a9c98, { key: 'plant' }), box: [lx - 2, z + 4, lx + 2, z + 8, 3], color: 0x9a9c98 });
+        }
       }
       return;
     }
