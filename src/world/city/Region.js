@@ -18,7 +18,7 @@ import { Batch } from './CityPlan.js';
 import { wallMat, flatMat, groundMat } from './CityMaterials.js';
 import { curtainMat, gridMat, outline, shell, cap } from './Modern.js';
 import { CURB } from './Streets.js';
-import { HAND } from './HandStreets.js';
+import { DISTRICT as HAND } from './HaneulDistrict.js';
 
 const EXT = { x0: -1500, x1: 1900, z0: -1400, z1: 1400 };
 const CORE = { x0: -206, x1: 726, z0: -306, z1: 306 };
@@ -73,7 +73,7 @@ const roofGreen = () => mat('roofg', () => flatMat(0x4c6e58, { roughness: 0.8, k
 // ------------------------------------------------------------------ helpers
 const inCore = (x0, z0, x1, z1) => x1 > CORE.x0 && x0 < CORE.x1 && z1 > CORE.z0 && z0 < CORE.z1;
 // the hand-made quarter (HandStreets.js) replaces the generated blocks, their streets and trees
-const inHand = (x0, z0, x1, z1) => x1 > HAND.x0 - 6 && x0 < HAND.x1 + 6 && z1 > HAND.z0 - 6 && z0 < HAND.z1 + 6;
+const inHand = (x0, z0, x1, z1) => x1 > HAND.x0 - 2 && x0 < HAND.x1 + 2 && z1 > HAND.z0 - 2 && z0 < HAND.z1 + 2;
 const inRiver = (z0, z1) => z1 > RIVER.z0 - 40 && z0 < RIVER.z1 + 40;
 function boxGeo(w, h, d, x, y, z) { return new THREE.BoxGeometry(w, h, d).translate(x, y + h / 2, z); }
 
@@ -98,7 +98,7 @@ export class Region {
     for (const h of holes) sh.holes.push(new THREE.Path([[h[0], -h[1]], [h[0], -h[3]], [h[2], -h[3]], [h[2], -h[1]]].map(([a, b]) => new THREE.Vector2(a, b))));
     const g = new THREE.ExtrudeGeometry(sh, { depth: 0.3, bevelEnabled: false }); g.rotateX(-Math.PI / 2); g.translate(0, CURB - 0.31, 0); return g; };
   const gm = groundMat('plaza', { color: 0x8a8882 });
-  if (!DBG.includes('noground')) B.add(slab(EXT.x0 - 160, RIVER.z1, EXT.x1 + 160, EXT.z1 + 160, [[-200, -270, 200, 270], [200, -300, 720, 300]]), gm, { cast: false });
+  if (!DBG.includes('noground')) B.add(slab(EXT.x0 - 160, RIVER.z1, EXT.x1 + 160, EXT.z1 + 160, [[-200, -270, 200, 270], [200, -300, 720, 300], [HAND.x0, HAND.z0, HAND.x1, HAND.z1]]), gm, { cast: false });
   if (!DBG.includes('noground')) B.add(slab(EXT.x0 - 160, EXT.z0 - 160, EXT.x1 + 160, RIVER.z0, []), gm, { cast: false });
   const water = new THREE.Mesh(new THREE.PlaneGeometry(9000, RIVER.z1 - RIVER.z0), new THREE.MeshStandardMaterial({ color: 0x4a6468, roughness: 0.08, metalness: 0.35, envMapIntensity: 1.1 }));
   water.rotation.x = -Math.PI / 2; water.position.set(200, -2.0, (RIVER.z0 + RIVER.z1) / 2); if (!DBG.includes('nowater')) scene.add(water);
@@ -108,7 +108,7 @@ export class Region {
   for (const z of [RIVER.z0, RIVER.z1]) B.add(boxGeo(9000, CURB + 4, 1, 200, -4, z), wallMat('stone', 0x9a968c), { cast: false });   // embankments
   const asph = groundMat('asphalt', { roughness: 0.85 });
   // arterials (30 m) and the ring road around the core
-  for (const x of ARTX) for (const [z0, z1] of [[EXT.z0, RIVER.z0], [RIVER.z1, EXT.z1]]) { if (x > CORE.x0 - 20 && x < CORE.x1 + 20 && false) continue; B.add(boxGeo(30, 0.05, z1 - z0, x, CURB - 0.02, (z0 + z1) / 2), asph, { cast: false }); }
+  for (const x of ARTX) for (const [a0, a1] of [[EXT.z0, RIVER.z0], [RIVER.z1, EXT.z1]]) for (const [z0, z1] of (x > HAND.x0 && x < HAND.x1 ? [[a0, Math.min(a1, HAND.z0)], [Math.max(a0, HAND.z1), a1]] : [[a0, a1]])) { if (z1 - z0 < 1) continue; B.add(boxGeo(30, 0.05, z1 - z0, x, CURB - 0.02, (z0 + z1) / 2), asph, { cast: false }); }
   for (const z of ARTZ) B.add(boxGeo(EXT.x1 - EXT.x0, 0.05, 30, (EXT.x0 + EXT.x1) / 2, CURB - 0.02, z), asph, { cast: false });
   for (const z of [CORE.z0 - 14, CORE.z1 + 14]) B.add(boxGeo(CORE.x1 - CORE.x0 + 56, 0.05, 24, (CORE.x0 + CORE.x1) / 2, CURB - 0.02, z), asph, { cast: false });
   for (const x of [CORE.x0 - 14, CORE.x1 + 14]) B.add(boxGeo(24, 0.05, CORE.z1 - CORE.z0 + 56, x, CURB - 0.02, 0), asph, { cast: false });

@@ -30,7 +30,7 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const ZS = [[-416, -230], [-216, 60], [80, 416]];              // between the E-W roads
 const ART = { x0: -495, x1: -465 }, HR = { z0: 60, z1: 80 }, WR = { z0: -230, z1: -216 };
 const PLAZA = { x0: -465, x1: -290, z0: 80, z1: 200 };
-const SQ = { x0: -722, x1: -646, z0: -90, z1: -10 };            // small square
+const SQ = { x0: -722, x1: -646, z0: -93, z1: -7 };            // small square
 const CONN = { z0: -53, z1: -45 };                              // 보행로 (lines up with the 하늘길 passage)
 const PARK = { x0: -700, x1: -670 };
 
@@ -59,9 +59,9 @@ export function buildHaneulDistrict(ctx) {
   // the cafe alleys along the park (they pass the small square as shared paving, no road there)
   for (const [z0, z1] of [[-416, -230], [-216, SQ.z0], [SQ.z1, 60], [80, 416]]) { road(-706, z0, -700, z1, 'alley', 'z'); road(-670, z0, -664, z1, 'alley', 'z'); }
   // the 하늘길 service road continues north and south out of the hand-made street
-  road(-358, -216, -349, HAND.z0, 'local', 'z'); road(-358, HAND.z1, -349, HR.z0, 'local', 'z');
+  road(-358, -416, -349, -230, 'local', 'z'); road(-358, -216, -349, HAND.z0, 'local', 'z'); road(-358, HAND.z1, -349, HR.z0, 'local', 'z');
   // small E-W alleys in the villa quarter and the commercial blocks (hand-placed cuts, ~65 m apart)
-  const EW = { villa: [-323, -150, -60, 160, 240, 320], comm: [-323, 160, 300] };
+  const EW = { villa: [-323, -150, -96, -4, 160, 240, 320], comm: [-323, -96, -4, 160, 300] };
   for (const z of EW.villa) road(DISTRICT.x0, z - 3, -706, z + 3, 'alley', 'x');
   for (const z of EW.comm) road(-664, z - 3, ART.x0, z + 3, 'alley', 'x');
 
@@ -83,7 +83,8 @@ export function buildHaneulDistrict(ctx) {
 
   // ---- a) villa quarter (x -945..-706): double-loaded along the N-S alleys
   const villaCols = [[DISTRICT.x0, -888], [-882, -833], [-827, -778], [-772, -706]];
-  for (const [z0, z1] of ZS) for (const [cz0, cz1] of cuts(z0, z1, EW.villa)) for (const [x0, x1] of villaCols) {
+  for (const [z0, z1] of ZS) for (const [cz0, cz1] of cuts(z0, z1, EW.villa)) for (const [x0, xx1] of villaCols) {
+    const x1 = xx1 === -706 && cz0 >= SQ.z0 && cz1 <= SQ.z1 ? SQ.x0 : xx1;
     const inner = block(x0, cz0, x1, cz1, { name: '하늘길 주거' });
     // the last column's east part is the west cafe row (along the park): it faces the cafe alley
     const cafeEdge = x1 === -706; const vx1 = cafeEdge ? -722 : inner.x1;
@@ -102,14 +103,13 @@ export function buildHaneulDistrict(ctx) {
   }
   // ---- b) 하늘숲길 park (x -700..-670) and the small square
   for (const [z0, z1] of [[-416, -230], [-216, SQ.z0], [SQ.z1, 60], [80, 416]]) parkStrip(ctx, z0, z1);
-  for (const [z0, z1] of [[-230, -216], [60, 80]]) { land(PARK.x0, z0, PARK.x1, z1); }   // the park crosses the roads? no: road gaps stay roads
   smallSquare(ctx);
   // ---- c) commercial blocks between the park and the arterial
   for (const [z0, z1] of ZS) for (const [cz0, cz1] of cuts(z0, z1, [...EW.comm, ...(z0 === -216 ? [CONN.z0 + 3, CONN.z1 - 3] : [])])) {
     const inSq = cz1 > SQ.z0 && cz0 < SQ.z1;
     // east cafe row + mixed block (x -664..-575)
-    const inA = block(-664, cz0, -575, cz1, { name: '하늘길 카페거리' });
-    if (!inSq || cz0 >= SQ.z1 || cz1 <= SQ.z0) cafeRow(ctx, parcel, new Rect(-664, inA.z0, -646, inA.z1), [-1, 0]);
+    const inA = block(inSq ? SQ.x1 : -664, cz0, -575, cz1, { name: '하늘길 카페거리' });
+    if (!inSq) cafeRow(ctx, parcel, new Rect(-664, inA.z0, -646, inA.z1), [-1, 0]);
     commRow(ctx, parcel, new Rect(-618, inA.z0, inA.x1, inA.z1), [1, 0], { floors: [4, 7] });
     backLot(ctx, new Rect(-646, inA.z0, -618, inA.z1));
     // block along the arterial (x -565..-495): a row on the mid road, taller row on the arterial
@@ -129,7 +129,8 @@ export function buildHaneulDistrict(ctx) {
   // ---- e) 하늘 광장 and the plaza towers, villas behind
   mainPlaza(ctx);
   plazaTowers(ctx, parcel);
-  for (const [cz0, cz1] of cuts(266, 416, [340])) { road(ART.x1, 337, -290, 343, 'alley', 'x');
+  road(ART.x1, 337, -290, 343, 'alley', 'x');
+  for (const [cz0, cz1] of cuts(266, 416, [340])) {
     const inner = block(ART.x1, cz0, -290, cz1, { name: '하늘길 주거' }); const mid = (inner.z0 + inner.z1) / 2;
     for (const [rz0, rz1, fz] of [[inner.z0, mid, -1], [mid, inner.z1, 1]]) { let x = inner.x0 + 0.5, k = 0; while (inner.x1 - x > 11) { const wdt = Math.min(inner.x1 - x, 14 + Math.floor(rnd() * 4));
       if (k % 4 === 0) B.commercial(ctx, parcel(x, rz0, x + wdt - 0.8, rz1, 'residential', [0, fz]), { use: 'mixedShops', floors: 5, upper: 'villa', cats: ['cafe', 'restaurant', 'store'], vacant: 0.05 });
@@ -157,7 +158,7 @@ export function buildHaneulDistrict(ctx) {
 function cafeRow(ctx, parcel, r, front) {
   const rnd = ctx.rnd; let z = r.z0 + 0.4, k = 0;
   while (r.z1 - z > 8) { const wdt = Math.min(r.z1 - z, 9 + Math.floor(rnd() * 5));
-    B.commercial(ctx, parcel(r.x0, z, r.x1, z + wdt - 0.5, 'commercial', front), { use: 'mixedShops', floors: 3 + (k % 3), upper: k % 2 ? 'villa' : undefined, cats: ['cafe', 'cafe', 'restaurant', 'cafe', 'store', 'salon'], wall: { kind: ['brick', 'render', 'tile', 'stone'][k % 4], color: [0x9a5a44, 0xece8e0, 0xd8d0c0, 0x6a6460][k % 4] }, signStyle: 'mixed', vacant: 0.04, lit: 0.6 });
+    B.commercial(ctx, parcel(r.x0, z, r.x1, z + wdt - 0.5, 'residential', front), { use: 'mixedShops', floors: 3 + (k % 3), upper: k % 2 ? 'villa' : undefined, cats: ['cafe', 'cafe', 'restaurant', 'cafe', 'store', 'salon'], wall: { kind: ['brick', 'render', 'tile', 'stone'][k % 4], color: [0x9a5a44, 0xece8e0, 0xd8d0c0, 0x6a6460][k % 4] }, signStyle: 'mixed', vacant: 0.04, lit: 0.6 });
     z += wdt; k++; }
 }
 function commRow(ctx, parcel, r, front, { floors = [4, 7], wide = false } = {}) {
@@ -223,7 +224,7 @@ function terrace(ctx, cx, cz, wdt, dep) {
 // 보행로: paving, planters with seats, catenary lights over it, crosswalk paint on the roads it crosses
 function connector(ctx) {
   const { plan, batch } = ctx, z0 = CONN.z0, z1 = CONN.z1, zc = (z0 + z1) / 2;
-  for (const [x0, x1] of [[SQ.x1, -575], [-565, ART.x0]]) { const r = new Rect(x0, z0, x1, z1); plan.walk(r, 'plaza'); batch.box(groundMat('pavers', { color: 0xd0c4b0 }), r.w, 0.03, r.d, r.cx, CURB + 0.015, r.cz, 0, { cast: false });
+  for (const [x0, x1] of [[SQ.x1, -575], [-565, ART.x0]]) { const r = new Rect(x0, z0, x1, z1); plan.block(r, 'commercial', '하늘 보행로'); plan.walk(r, 'plaza'); batch.box(groundMat('pavers', { color: 0xd0c4b0 }), r.w, 0.03, r.d, r.cx, CURB + 0.015, r.cz, 0, { cast: false });
     for (let x = x0 + 8; x < x1 - 6; x += 14) { batch.box(wallMat('stone', 0xb0a898), 3, 0.5, 1.4, x, CURB + 0.25, z0 + 1.2); bench(ctx, x + 4, z0 + 1.2, false); tree(ctx, x, z0 + 1.2, 0.8); } }
   const bulb = new THREE.MeshBasicMaterial({ color: 0xffe0a0, toneMapped: false }), wire = flatMat(0x1a1a1a, { key: 'hd_wire' });
   for (let x = SQ.x1 + 4; x < ART.x0 - 2; x += 6) { if (x > -577 && x < -563) continue; batch.add(new THREE.CylinderGeometry(0.01, 0.01, z1 - z0, 4).rotateX(Math.PI / 2).translate(x, CURB + 6, zc), wire); for (let z = z0 + 0.5; z < z1; z += 1.2) batch.add(new THREE.SphereGeometry(0.07, 6, 4).translate(x, CURB + 6 - 0.5 * Math.sin(((z - z0) / (z1 - z0)) * Math.PI), z), bulb, { cast: false }); }
@@ -280,7 +281,7 @@ function mainPlaza(ctx) {
 function plazaTowers(ctx, parcel) {
   const specs = [[ART.x1 + 2, -410, 22, 'tour', '하늘 플라자'], [-406, -350, 28, 'music', 'K-ARENA'], [-348, -292, 18, 'cinema', 'MOTION 하늘']];
   for (const [x0, x1, floors, ad, name] of specs) {
-    const it = B.officeTower(ctx, parcel(x0, 204, x1, 262, 'commercial', [0, -1]), { floors, setback: 3, name });
+    const it = B.officeTower(ctx, parcel(x0, 204, x1, 262, 'business', [0, -1]), { floors, setback: 3, name });
     // the giant screen on the plaza face (podium top to mid tower), and a rooftop board
     const scr = SK.screen(ledTex(ad), Math.min(x1 - x0 - 12, 34), 16); scr.position.set((x0 + x1) / 2, CURB + 18, 207 + 3 - 0.35); scr.rotation.y = Math.PI; SK.bake(ctx, scr);
     const rb = SK.roofBoard(name, { bg: '#101418', fg: '#ffffff', w: Math.min(x1 - x0 - 16, 26), h: 4 }); rb.position.set((x0 + x1) / 2, (it?.y0 ?? CURB) + (it?.h ?? 60), 214); rb.rotation.y = Math.PI; SK.bake(ctx, rb);

@@ -21,7 +21,7 @@ import { buildGround, markings, median, furnishSidewalk, TreeBatch, placeCar, pa
 import { CityKit } from '../CityProps.js';
 import { groundMat } from './CityMaterials.js';
 import { buildNewDistrict, inLake } from './NewDistrict.js';
-import { buildHandStreets } from './HandStreets.js';
+import { buildHaneulDistrict } from './HaneulDistrict.js';
 import { CityLod } from './CityLod.js';
 import { Region } from './Region.js';
 import { carType } from '../korea/Cars.js';
@@ -166,7 +166,7 @@ export function buildSeoul(game, { station = null, early = null, corridors = [],
   // the new district east of the old centre (its own roads, blocks, landmark, central station)
   if (district) buildNewDistrict(ctx);
   // the hand-made quarter west of the old centre (하늘길 …)
-  if (district) buildHandStreets(ctx);
+  if (district) buildHaneulDistrict(ctx);
 
   // ---------------------------------------------------------------- 5. streetscape
   const junctions = zc.map((z) => ({ z0: z - ch, z1: z + ch }));
