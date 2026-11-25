@@ -170,7 +170,11 @@ export function awning(name, { w = 4, depth = 1.3, drop = 0.6, color = '#1e4a3a'
   const slopeT = face(`${name}|awn|${color}|${stripes}|${shape}`, w, Math.hypot(depth, drop), { bg: color, fg: ink, font, stripes }, (gg, W, H) => { if (!stripes) { gg.fillStyle = ink; gg.textAlign = 'center'; gg.textBaseline = 'middle'; fit(gg, name, W * 0.6, H * 0.36, 'bold', fam(font)); gg.fillText(name, W / 2, H * 0.55); } });
   const valT = face(`${name}|val|${color}|${sub}`, w, 0.25, { bg: stripes ? stripes[1] : color, fg: ink, font: 'sans' }, (gg, W, H) => { gg.fillStyle = ink; gg.textAlign = 'center'; gg.textBaseline = 'middle'; fit(gg, sub ?? name, W * 0.5, H * 0.7, 'normal', SANS); gg.fillText(sub ?? name, W / 2, H * 0.55); });
   const fab = new THREE.MeshStandardMaterial({ map: slopeT, roughness: 0.85, side: THREE.DoubleSide });
-  if (shape === 'dome') { const geo = new THREE.CylinderGeometry(depth, depth, w, 20, 1, true, 0, Math.PI / 2); geo.rotateZ(Math.PI / 2); const m = new THREE.Mesh(geo, fab); m.scale.set(1, drop / depth + 0.2, 1); m.position.set(0, 0, 0); g.add(m); }
+  if (shape === 'dome') { const n = 6; for (let k = 0; k < n; k++) { const a0 = (k / n) * Math.PI / 2, a1 = ((k + 1) / n) * Math.PI / 2;
+      const p0 = [Math.sin(a0) * depth, -(1 - Math.cos(a0)) * drop * 1.6], p1 = [Math.sin(a1) * depth, -(1 - Math.cos(a1)) * drop * 1.6];
+      const len = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]), f = new THREE.Mesh(new THREE.PlaneGeometry(w, len), fab);
+      f.rotation.x = -(Math.PI / 2 - Math.atan2(-(p1[1] - p0[1]), p1[0] - p0[0]));
+      f.position.set(0, (p0[1] + p1[1]) / 2, (p0[0] + p1[0]) / 2); g.add(f); } drop = drop * 1.6; }
   else { const s = new THREE.Mesh(new THREE.PlaneGeometry(w, Math.hypot(depth, drop)), fab); s.rotation.x = -(Math.PI / 2 - Math.atan2(drop, depth)); s.position.set(0, -drop / 2, depth / 2); g.add(s); }
   const v = plane(w, 0.25, new THREE.MeshStandardMaterial({ map: valT, roughness: 0.85, side: THREE.DoubleSide }), depth); v.position.y = -drop - 0.125; g.add(v);
   for (const sx of [-1, 1]) { const tri = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(depth, -drop), new THREE.Vector2(depth, -drop - 0.25), new THREE.Vector2(0, -drop - 0.25)].map((p) => p)); const sg = new THREE.ShapeGeometry(tri); sg.rotateY(-Math.PI / 2); const sm = new THREE.Mesh(sg, new THREE.MeshStandardMaterial({ color: stripes ? stripes[1] : color, roughness: 0.85, side: THREE.DoubleSide })); sm.position.x = sx * w / 2; g.add(sm); }
