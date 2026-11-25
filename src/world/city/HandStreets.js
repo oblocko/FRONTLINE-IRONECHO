@@ -157,7 +157,7 @@ export function modernBuilding(ctx, b) {
   });
   { const [px, pz] = at(len / 2 - 0.15, 0.06); B.box(m.mullion, 0.3, GF, 0.3, px, y0 + GF / 2, pz); }
   // canopy over the shop fronts (thin aluminium blade)
-  { const [cx, cz] = at(0, 1.2); B.box(m.alu, 2.4, 0.14, len - 0.4, cx, y0 + GF - 1.25, cz, 0, { cast: true }); }
+  { const cd = b.canopy ?? 2.4, [cx, cz] = at(0, cd / 2); B.box(m.alu, cd, 0.14, len - 0.4, cx, y0 + GF - 1.25, cz, 0, { cast: true }); }
   // upper retail floors: frameless glass with slim mullions every 3 m, floor lines, lit interiors
   const up = pH - GF;
   if (up > 0.5) {

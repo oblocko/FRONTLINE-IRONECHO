@@ -90,26 +90,29 @@ export function buildHaneulDistrict(ctx) {
     const inner = block(x0, cz0, x1, cz1, { name: '하늘길 주거' });
     // the last column's east part is the west cafe row (along the park): it faces the cafe alley
     const cafeEdge = x1 === -706; const vx1 = cafeEdge ? -722 : inner.x1;
-    if (cafeEdge && !(cz1 > SQ.z0 && cz0 < SQ.z1)) modernRow(ctx, new Rect(-722, inner.z0, -706, inner.z1), 1, 'cafe', { min: 10, max: 16 });
+    if (cafeEdge && !(cz1 > SQ.z0 && cz0 < SQ.z1)) modernRow(ctx, new Rect(-722, inner.z0, -706, inner.z1), 1, 'cafe', { min: 10, max: 16, canopy: 1.0 });
     const mid = (inner.x0 + vx1) / 2;
     // the middle band (between 와우로 and 하늘로) is the quarter's culture / food alleys, not housing
     if (z0 === -216) { const th = COL_THEME[villaCols.findIndex((c) => c[0] === x0)] ?? ['food', 'culture'];
-      if (cafeEdge || x1 === SQ.x0) { modernRow(ctx, new Rect(inner.x0, inner.z0, vx1 - 0.5, inner.z1), -1, th[0], { min: 12, max: 20 }); continue; }   // backs onto the cafe row
-      modernRow(ctx, new Rect(inner.x0, inner.z0, mid - 0.5, inner.z1), -1, th[0], { min: 12, max: 20 }); modernRow(ctx, new Rect(mid + 0.5, inner.z0, vx1, inner.z1), 1, th[1], { min: 12, max: 20 }); continue; }
-    for (const [rx0, rx1, fx] of [[inner.x0, mid, -1], [mid, vx1, 1]]) {
+      if (cafeEdge || x1 === SQ.x0) { modernRow(ctx, new Rect(inner.x0, inner.z0, vx1 - 0.5, inner.z1), -1, th[0], { min: 12, max: 20, canopy: 1.0 }); continue; }   // backs onto the cafe row
+      modernRow(ctx, new Rect(inner.x0, inner.z0, mid - 0.5, inner.z1), -1, th[0], { min: 12, max: 20, canopy: x0 === DISTRICT.x0 ? undefined : 1.0 }); modernRow(ctx, new Rect(mid + 0.5, inner.z0, vx1, inner.z1), 1, th[1], { min: 12, max: 20, canopy: 1.0 }); continue; }
+    // next to the cafe row only one row (facing the alley); the strip behind it is the residents' garden
+    const rows = cafeEdge || x1 === SQ.x0 ? [[inner.x0, inner.x0 + 22, -1]] : [[inner.x0, mid, -1], [mid, vx1, 1]];
+    if (rows.length === 1 && vx1 - inner.x0 > 30) pocketGarden(ctx, new Rect(inner.x0 + 23, inner.z0 + 0.5, vx1 - 1, inner.z1 - 0.5));
+    for (const [rx0, rx1, fx] of rows) {
       if (rx1 - rx0 < 10) continue;
       let z = inner.z0 + 0.5, k = 0;
       while (inner.z1 - z > 11) { const wdt = Math.min(inner.z1 - z, 13 + Math.floor(rnd() * 4)); const a = z, b2 = z + wdt - 0.8;
         // corners (first / last parcel on a road) are shop-houses, the rest villas (two hand-picked heights)
         const corner = k === 0 || inner.z1 - (z + wdt) < 11;
-        if (corner) B.commercial(ctx, parcel(rx0, a, rx1, b2, 'residential', [fx, 0]), { use: 'mixedShops', floors: 4, upper: 'villa', cats: ['cafe', 'restaurant', 'store', 'salon', 'cafe'], wall: { kind: rnd() < 0.6 ? 'brick' : 'tile', color: rnd() < 0.5 ? 0x8a5444 : 0xd0c8b8 }, vacant: 0.08 });
+        if (corner) modernVilla(ctx, new Rect(rx0, a, rx1, b2), [fx, 0], VI++, { shop: true });
         // the row repeats a hand-made sequence of plot types: villas of 3-5 floors, a narrow shop-house, a
         // resident parking lot, a pocket garden — shifted per row so neighbouring rows don't line up
         else { const T = ROW_PATTERN[(k + Math.round(rx0 / 7)) % ROW_PATTERN.length];
           if (T === 'park') B.parkingLot(ctx, parcel(rx0, a, rx1, b2, 'residential', [fx, 0]), { fill: 0.5 });
           else if (T === 'garden') pocketGarden(ctx, new Rect(rx0, a, rx1, b2));
-          else if (T === 'shop') B.commercial(ctx, parcel(rx0, a, rx1, b2, 'residential', [fx, 0]), { use: 'mixedShops', floors: 3, upper: 'villa', cats: ['store', 'salon', 'restaurant', 'cafe'], wall: { kind: 'render', color: [0xece6d8, 0xd8e0e4, 0xe8d8c8][k % 3] }, vacant: 0.1 });
-          else B.villa(ctx, parcel(rx0, a, rx1, b2, 'residential', [fx, 0]), { floors: T }); }
+          else if (T === 'shop') modernVilla(ctx, new Rect(rx0, a, rx1, b2), [fx, 0], VI++, { shop: true });
+          else modernVilla(ctx, new Rect(rx0, a, rx1, b2), [fx, 0], VI++, { floors: T }); }
         z += wdt; k++; }
     }
   }
@@ -121,7 +124,7 @@ export function buildHaneulDistrict(ctx) {
     const inSq = cz1 > SQ.z0 && cz0 < SQ.z1;
     // east cafe row + mixed block (x -664..-575)
     const inA = block(inSq ? SQ.x1 : -664, cz0, -575, cz1, { name: '하늘길 카페거리' });
-    if (!inSq) modernRow(ctx, new Rect(-664, inA.z0, -646, inA.z1), -1, 'cafe', { min: 10, max: 16 });
+    if (!inSq) modernRow(ctx, new Rect(-664, inA.z0, -646, inA.z1), -1, 'cafe', { min: 10, max: 16, canopy: 1.0 });
     modernRow(ctx, new Rect(-618, inA.z0, inA.x1, inA.z1), 1, 'food');
     backLot(ctx, new Rect(-646, inA.z0, -618, inA.z1));
     // block along the arterial (x -565..-495): a row on the mid road, taller row on the arterial
@@ -142,11 +145,12 @@ export function buildHaneulDistrict(ctx) {
   mainPlaza(ctx);
   plazaTowers(ctx, parcel);
   road(ART.x1, 337, -290, 343, 'alley', 'x');
+  { const lane = new Rect(ART.x1, 262.5, -290, 266.4); ctx.plan.walk(lane, 'path'); ctx.batch.box(lightPave(), lane.w, 0.03, lane.d, lane.cx, CURB + 0.015, lane.cz, 0, { cast: false }); }   // lane between the plaza towers and the housing
   for (const [cz0, cz1] of cuts(266, 416, [340])) {
     const inner = block(ART.x1, cz0, -290, cz1, { name: '하늘길 주거' }); const mid = (inner.z0 + inner.z1) / 2;
     for (const [rz0, rz1, fz] of [[inner.z0, mid, -1], [mid, inner.z1, 1]]) { let x = inner.x0 + 0.5, k = 0; while (inner.x1 - x > 11) { const wdt = Math.min(inner.x1 - x, 14 + Math.floor(rnd() * 4));
-      if (k % 4 === 0) B.commercial(ctx, parcel(x, rz0, x + wdt - 0.8, rz1, 'residential', [0, fz]), { use: 'mixedShops', floors: 5, upper: 'villa', cats: ['cafe', 'restaurant', 'store'], vacant: 0.05 });
-      else B.villa(ctx, parcel(x, rz0, x + wdt - 0.8, rz1, 'residential', [0, fz]), { floors: 4 }); x += wdt; k++; } }
+      if (k % 4 === 0) modernVilla(ctx, new Rect(x, rz0, x + wdt - 0.8, rz1), [0, fz], VI++, { shop: true });
+      else modernVilla(ctx, new Rect(x, rz0, x + wdt - 0.8, rz1), [0, fz], VI++, {}); x += wdt; k++; } }
   }
   // ---- f) high-rise edge (x -278..-232) facing 동교로: towers that step up toward the old centre
   for (const [z0, z1] of ZS) { const inner = block(-278, z0, DISTRICT.x1, z1); let z = inner.z0 + 1, k = 0;
@@ -221,12 +225,77 @@ function themedSpec(theme, i, len, depth) {
 }
 let SPEC_I = 0;
 // a row of themed buildings along z, fronts facing [fx, 0]
-function modernRow(ctx, r, fx, theme, { min = 12, max = 24 } = {}) {
+function modernRow(ctx, r, fx, theme, { min = 12, max = 24, canopy = undefined } = {}) {
   if (r.x1 - r.x0 < 9) return;
   let z = r.z0 + 0.3;
   while (r.z1 - z > min - 1) { const i = SPEC_I++; let wdt = min + ((i * 7) % (max - min + 1)); if (r.z1 - (z + wdt) < min) wdt = r.z1 - z - 0.3;
-    modernBuilding(ctx, { ...themedSpec(theme, i, wdt - 0.6, r.x1 - r.x0), x0: r.x0, x1: r.x1, z0: z, z1: z + wdt - 0.6, front: [fx, 0] });
+    modernBuilding(ctx, { ...themedSpec(theme, i, wdt - 0.6, r.x1 - r.x0), canopy, x0: r.x0, x1: r.x1, z0: z, z1: z + wdt - 0.6, front: [fx, 0] });
     z += wdt; }
+}
+
+
+// ------------------------------------------------------------------ modern 다세대 (the quarter's housing)
+// Each one its own: wall (white render / dark brick / grey panel / beige stone / black panel), ribbon windows,
+// glass balconies, a wood or aluminium accent, pilotis parking (or a small shop) on the ground floor, a set-back
+// top floor on some, and a roof that reads from above: garden, solar array, deck with umbrellas, coloured
+// membrane or a mono-pitch metal roof. No water tanks.
+let VI = 0;
+const VSTYLE = [
+  { wall: ['render', 0xf2f0ec], accent: 'wood', glass: 0x3a4650 }, { wall: ['brick', 0x3a3432], accent: 'alu', glass: 0x2a3036 },
+  { wall: ['panel', 0x8a9096], accent: 'wood', glass: 0x34404a }, { wall: ['stone', 0xd8ccb8], accent: 'dark', glass: 0x3a4650 },
+  { wall: ['panel', 0x1e2022], accent: 'wood', glass: 0x26303a }, { wall: ['render', 0xe4ddd0], accent: 'dark', glass: 0x34404a },
+  { wall: ['brick', 0x9a8070], accent: 'alu', glass: 0x2e3a44 },
+];
+const ROOFS = ['garden', 'solar', 'deck', 'membrane', 'slope', 'garden', 'membrane', 'solar', 'deck', 'slope', 'membrane'];
+function modernVilla(ctx, r0, [fx, fz], i, { floors = null, shop = false } = {}) {
+  const Bt = ctx.batch, w = ctx.world, y0 = CURB, rect = new Rect(r0.x0 + 0.4, r0.z0 + 0.4, r0.x1 - 0.4, r0.z1 - 0.4);
+  if (rect.w < 7 || rect.d < 7) return;
+  const st = VSTYLE[(i * 3 + 1) % VSTYLE.length], roof = ROOFS[(i * 5 + 2) % ROOFS.length];
+  const F = floors ?? 4 + ((i * 7) % 3), gH = shop ? 3.6 : 2.8, fH = 2.9, top = (i % 3 === 0) ? 1 : 0;   // set-back penthouse on every third
+  const H = gH + F * fH;
+  const it = ctx.plan.add({ kind: 'building', id: `다세대-${i}`, use: shop ? 'mixedShops' : 'villa', zone: 'residential', rect, y0, h: H + 1, entrances: [] }); ctx.ownBegin(it);
+  const wall = wallMat(st.wall[0], st.wall[1]), glass = flatMat(st.glass, { roughness: 0.08, metalness: 0.5, key: `vg${st.glass}` });
+  const accent = st.accent === 'wood' ? flatMat(0x9a7048, { roughness: 0.7, key: 'v_wood' }) : st.accent === 'alu' ? flatMat(0xc8ccd0, { roughness: 0.35, metalness: 0.7, key: 'v_alu' }) : flatMat(0x2a2c2e, { roughness: 0.5, key: 'v_dark' });
+  const rail = flatMat(0x9ab4bc, { roughness: 0.05, metalness: 0.3, key: 'v_rail' }), conc = wallMat('concrete', 0xb8b6b0);
+  const e = B.edge(rect, fx, fz), along = fx ? rect.d : rect.w, deep = fx ? rect.w : rect.d, rot = Math.atan2(fx, fz);
+  const at = (a, o = 0) => B.onFace(e, fx, fz, a, o);
+  const boxF = (mat, wA, h, d, a, y, o) => { const [x, z] = at(a, o); Bt.box(mat, fx ? d : wA, h, fx ? wA : d, x, y, z); };   // box sized along / out of the front face
+  // upper mass (on pilotis) — the top floor shrinks back from the front on the penthouse ones
+  const upF = F - top, upH = upF * fH;
+  Bt.box(wall, rect.w, upH, rect.d, rect.cx, y0 + gH + upH / 2, rect.cz);
+  it.colliders.push(w.addBox(V(rect.x0, y0 + gH, rect.z0), V(rect.x1, y0 + gH + upH, rect.z1), { surface: 'concrete', cover: true, walkable: false }));
+  const ph = top ? new Rect(rect.x0 + (fx > 0 ? 0 : fx < 0 ? 3 : 0), rect.z0 + (fz < 0 ? 3 : 0), rect.x1 - (fx > 0 ? 3 : 0), rect.z1 - (fz > 0 ? 3 : 0)) : null;
+  if (ph) { Bt.box(wall, ph.w, fH, ph.d, ph.cx, y0 + gH + upH + fH / 2, ph.cz); boxF(rail, along - 0.6, 1.0, 0.05, 0, y0 + gH + upH + 0.5, -0.1); }
+  // ground floor: pilotis parking with columns and a back core, or a small glass shop
+  const core = fx ? new Rect(fx > 0 ? rect.x0 : rect.x1 - deep * 0.35, rect.z0, fx > 0 ? rect.x0 + deep * 0.35 : rect.x1, rect.z1) : new Rect(rect.x0, fz > 0 ? rect.z0 : rect.z1 - deep * 0.35, rect.x1, fz > 0 ? rect.z0 + deep * 0.35 : rect.z1);
+  Bt.box(conc, core.w, gH, core.d, core.cx, y0 + gH / 2, core.cz); it.colliders.push(w.addBox(V(core.x0, y0, core.z0), V(core.x1, y0 + gH, core.z1), { surface: 'concrete', cover: true, walkable: false }));
+  for (const a of [-along / 2 + 0.4, along / 2 - 0.4, 0]) { const [x, z] = at(a, -0.5); Bt.box(conc, 0.45, gH, 0.45, x, y0 + gH / 2, z); w.addBoxCentered(V(x, y0 + gH / 2, z), V(0.45, gH, 0.45), { surface: 'concrete', walkable: false }); }
+  if (shop) { const sx = SK.flex(pickN(NAMES.cafe.concat(NAMES.food), i), { bg: pickN(Object.values(COLORS), i)[0], fg: pickN(Object.values(COLORS), i)[1], w: Math.min(5, along - 2), h: 0.7 });
+    boxF(glass, along - 1.2, gH - 0.6, 0.06, 0, y0 + (gH - 0.6) / 2 + 0.1, -0.6); const [x, z] = at(0, 0.02); sx.position.set(x, y0 + gH - 0.35, z); sx.rotation.y = rot; SK.bake(ctx, sx); }
+  else { const cm = flatMat(0xe8e4d8, { key: 'v_stall' }); for (let a = -along / 2 + 1.2; a < along / 2 - 1; a += 2.5) boxF(cm, 0.1, 0.01, deep * 0.55, a, y0 + 0.02, -deep * 0.3); }
+  // facades: ribbon windows on front and back each floor, glass balconies on the front (alternate floors), accent strip
+  for (let f = 0; f < upF; f++) { const yy = y0 + gH + f * fH + 1.45;
+    for (const [ff, o] of [[1, 0.03], [-1, 0.03]]) { const ee = B.edge(rect, fx * ff, fz * ff); const [x, z] = B.onFace(ee, fx * ff, fz * ff, 0, o); Bt.box(glass, fx ? 0.06 : along * 0.78, 1.35, fx ? along * 0.78 : 0.06, x, yy, z); }
+    if ((f + i) % 2 === 0) { boxF(conc, along * 0.5, 0.14, 1.2, along * 0.18, yy - 1.4, 0.6); boxF(rail, along * 0.5, 1.0, 0.04, along * 0.18, yy - 0.85, 1.18); } }
+  boxF(accent, 0.9, upH, 0.25, (i % 2 ? 1 : -1) * (along / 2 - 0.45), y0 + gH + upH / 2, 0.12);
+  // side windows (narrow vertical slots)
+  for (const s2 of [-1, 1]) { const sx2 = fz ? s2 : 0, sz2 = fx ? s2 : 0, ee = B.edge(rect, sx2, sz2); for (let f = 0; f < upF; f++) { const [x, z] = B.onFace(ee, sx2, sz2, 0, 0.03); Bt.box(glass, sx2 ? 0.06 : 1.0, 1.6, sx2 ? 1.0 : 0.06, x, y0 + gH + f * fH + 1.4, z); } }
+  // the roof
+  const R = ph ?? rect, ry = y0 + gH + upH + (ph ? fH : 0);
+  Bt.box(wall, R.w + 0.1, 0.5, R.d + 0.1, R.cx, ry + 0.25, R.cz);   // parapet cap
+  const roofRect = new Rect(R.x0 + 0.3, R.z0 + 0.3, R.x1 - 0.3, R.z1 - 0.3);
+  if (roof === 'garden') { Bt.box(groundMat('lawn'), roofRect.w, 0.08, roofRect.d, roofRect.cx, ry + 0.3, roofRect.cz, 0, { cast: false });
+    for (let k = 0; k < 3; k++) { const x = roofRect.x0 + roofRect.w * (0.25 + k * 0.25), z = roofRect.cz + (k - 1) * roofRect.d * 0.2; Bt.box(conc, 1.4, 0.5, 1.4, x, ry + 0.5, z); Bt.add(new THREE.IcosahedronGeometry(0.9, 1).translate(x, ry + 1.4, z), flatMat(0x4e7a38, { roughness: 0.9, key: 'v_leaf' })); } }
+  else if (roof === 'solar') { Bt.box(flatMat(0x8a8c8e, { key: 'v_roofg' }), roofRect.w, 0.06, roofRect.d, roofRect.cx, ry + 0.28, roofRect.cz, 0, { cast: false });
+    const pv = flatMat(0x1a2a4a, { roughness: 0.15, metalness: 0.6, key: 'v_pv' }); for (let a = roofRect.z0 + 1; a < roofRect.z1 - 1.5; a += 2.2) { const g = new THREE.BoxGeometry(roofRect.w - 1.6, 0.06, 1.6); g.rotateX(-0.35); g.translate(roofRect.cx, ry + 0.75, a + 0.8); Bt.add(g, pv); } }
+  else if (roof === 'deck') { Bt.box(flatMat(0x9a7450, { roughness: 0.75, key: 'v_deck' }), roofRect.w, 0.1, roofRect.d, roofRect.cx, ry + 0.3, roofRect.cz, 0, { cast: false });
+    const umb = flatMat(pickN([0xe8e0d0, 0x2a4a3a, 0xc8641a, 0x1a2a4a], i), { roughness: 0.9, key: `v_umb${i % 4}` }); for (const [dx, dz] of [[-0.25, -0.25], [0.25, 0.25]]) { const x = roofRect.cx + dx * roofRect.w, z = roofRect.cz + dz * roofRect.d; Bt.add(new THREE.ConeGeometry(1.3, 0.45, 8, 1, true).translate(x, ry + 2.5, z), umb); Bt.box(accent, 0.05, 2.2, 0.05, x, ry + 1.4, z); } }
+  else if (roof === 'membrane') { Bt.box(flatMat(pickN([0xb0583a, 0x3a6a6a, 0x3a3c40, 0x8a9a5a, 0xc8b89a], i), { roughness: 0.8, key: `v_mem${i % 5}` }), roofRect.w, 0.06, roofRect.d, roofRect.cx, ry + 0.28, roofRect.cz, 0, { cast: false }); }
+  else { const g = new THREE.BoxGeometry(fx ? R.w + 0.4 : R.w + 0.4, 0.12, fx ? R.d + 0.4 : R.d + 0.4); if (fx) g.rotateZ(0.22 * fx); else g.rotateX(-0.22 * fz); g.translate(R.cx, ry + 1.3, R.cz); Bt.add(g, flatMat(pickN([0x4a4e52, 0x6a3a2a, 0x2a3a4a], i), { roughness: 0.4, metalness: 0.5, key: `v_slope${i % 3}` })); }
+  // stair head on the roof (small, offset), no tanks
+  if (roof !== 'slope') { const sx3 = R.x0 + R.w * 0.2, sz3 = R.z0 + R.d * 0.25; Bt.box(wall, 2.4, 2.4, 2.8, sx3, ry + 1.45, sz3); }
+  const [dx, dz] = at(0, 0.8); it.entrances.push({ x: dx, z: dz, nx: fx, nz: fz });
+  ctx.ownEnd(); return it;
 }
 
 // ------------------------------------------------------------------ zone builders
