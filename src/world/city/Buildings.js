@@ -9,6 +9,7 @@
 // office / officeTall, bank, apartment (단지), villa (다세대), house (단독), school, hospital, park,
 // warehouse, factory, logistics, gas, parking, plaza.
 import * as THREE from 'three';
+import * as SK from './SignKit.js';
 import { Rect, rotRect } from './CityPlan.js';
 import { wallMat, flatMat, groundMat, paintMat } from './CityMaterials.js';
 import { windowSlots, FACADE } from '../Facade.js';
@@ -139,17 +140,45 @@ function shopfronts(ctx, item, rect, nx, nz, { y0, gfH = 4.2, cats, lobby = true
     // sign
     const sw = u.w - 0.5, sy = y0 + gfH - 0.62;
     if (closed && r() < 0.6) { const b = banner('임대 문의', '010-0000-0000 · 상가 임대', Math.min(4, sw), 0.8); const [bx, bz] = P(c, 0.02); b.position.set(bx, sy, bz); b.rotation.y = rot; ctx.scene.add(b); ctx.own(b); continue; }
-    const style = signStyle === 'mixed' ? (r() < 0.5 ? 'box' : 'channel') : signStyle;
+    // sign: the kind follows the trade (rules), the details vary per shop (SignKit.js)
+    const fg = cols[0] === '#ffffff' || cols[0] === '#f2ede2' || cols[0] === '#f5ecd8' ? cols[1] : cols[0];
+    const kind = signKind(cat, signStyle, r);
     let s;
-    if (style === 'channel') { s = channelSign(name, cols[0] === '#ffffff' || cols[0] === '#f2ede2' || cols[0] === '#f5ecd8' ? cols[1] : cols[0], 0.62, { outline: '#ffffff', raceway: '#2a2a2a' }); if (s.userData.width > sw) s.scale.setScalar(sw / s.userData.width); }
-    else s = boxSign(name, sub, cols, sw, 0.95, { style: ['plain', 'split', 'logo', 'border'][Math.floor(r() * 4)], lit: lit > 0.5 });
-    const [sx, sz] = P(c, 0.18); s.position.set(sx, sy, sz); s.rotation.y = rot; ctx.scene.add(s); ctx.own(s);
-    // fabric awning on some cafes / restaurants / bakeries
+    if (kind === 'box') s = boxSign(name, sub, cols, sw, 0.95, { style: ['plain', 'split', 'logo', 'border'][Math.floor(r() * 4)], lit: lit > 0.5 });
+    else if (kind === 'channel') { s = r() < 0.6 ? channelSign(name, fg, 0.62, { outline: '#ffffff', raceway: '#2a2a2a' }) : SK.channel(name, { color: fg, h: 0.6, light: r() < 0.5 ? 'halo' : 'front', returns: '#2a2a2a' }); }
+    else if (kind === 'flex') s = SK.flex(name, { sub: sub || null, bg: cols[0], fg: cols[1], accent: cols[2], w: Math.min(sw, 7), h: 0.95, bulbs: cat === 'restaurant' && r() < 0.35, logo: r() < 0.25 ? [...name][0] : null });
+    else if (kind === 'wood') s = SK.wood(name, { tone: ['#6a4a2e', '#8a6440', '#3a2a1e'][Math.floor(r() * 3)], ink: '#f4ecd8', h: 0.55, sub: sub || null });
+    else if (kind === 'scashi') s = SK.scashi(name, { color: '#2a2a2a', panel: ['#f4f2ee', '#e8e4dc', null][Math.floor(r() * 3)], h: 0.5, font: r() < 0.5 ? 'serif' : 'sans', lamps: sw > 4 ? 3 : 2, w: Math.min(sw - 0.2, 5) });
+    else if (kind === 'neon') s = SK.neon(name, { color: ['#ff4aa0', '#ffb040', '#7ad8ff', '#c060ff'][Math.floor(r() * 4)], h: 0.6 });
+    else s = SK.metal(name, { kind: ['brass', 'black', 'steel'][Math.floor(r() * 3)], h: 0.6, font: 'serif' });
+    if (s.userData.width > sw) s.scale.setScalar(sw / s.userData.width);
+    const [sx, sz] = P(c, kind === 'box' ? 0.18 : 0.12); s.position.set(sx, sy, sz); s.rotation.y = rot; if (kind === 'box' || (kind === 'channel' && !s.userData.kit)) { ctx.scene.add(s); ctx.own(s); } else SK.bake(ctx, s);
+    // awning on some cafes / restaurants / bakeries (printed fabric, slope or dome)
     if ((cat === 'cafe' || cat === 'restaurant') && r() < 0.45) {
-      const am = flatMat(new THREE.Color(cols[2]).getHex(), { roughness: 0.9, key: 'awn' }); const [ax, az] = P(c, 0.65);
-      const g = new THREE.BoxGeometry(sw, 0.05, 1.3); g.rotateX(0.32); g.rotateY(rot); g.translate(ax, gy + gh + 0.05, az); B.add(g, am);
+      const aw = SK.awning(name, { w: Math.min(sw, 5), depth: 1.2, drop: 0.5, color: cols[2] === '#ffffff' ? cols[0] : cols[2], ink: '#ffffff', stripes: r() < 0.3 ? ['#f4f0e6', cols[0]] : null, shape: r() < 0.3 ? 'dome' : 'slope', sub: sub || name });
+      const [ax, az] = P(c, 0.02); aw.position.set(ax, gy + gh + 0.02, az); aw.rotation.y = rot; SK.bake(ctx, aw);
     }
+    // a small projecting point sign at the unit edge (some shops)
+    if (r() < 0.22) { const pt = SK.point(cat === 'pharmacy' ? '약' : [...name].slice(0, 2).join(''), { shape: ['square', 'round', 'cube'][Math.floor(r() * 3)], bg: cols[0], fg: cols[1], size: 0.6 });
+      const [qx2, qz2] = P(u.a + 0.35, 0); pt.position.set(qx2, y0 + gfH + 0.6, qz2); pt.rotation.y = rot; SK.bake(ctx, pt); }
+    // a free-standing board in front of the door (A-frame, stand or X-banner), only on open ground
+    if (r() < 0.3) { const [fx2, fz2] = P(dc + ds * 1.3, 1.3);
+      if (ctx.plan.walkable(fx2, fz2) && !ctx.plan.items.some((o) => o.kind === 'building' && o.rect.has(fx2, fz2))) {
+        const kind2 = cat === 'cafe' || cat === 'restaurant' ? 'aFrame' : r() < 0.5 ? 'stand' : 'xBanner';
+        const bd = kind2 === 'aFrame' ? SK.aFrame(name, { sub: sub || '오늘의 메뉴', bg: cols[0], fg: cols[1], chalk: cat === 'cafe' }) : kind2 === 'stand' ? SK.stand(name, { sub: sub || '', bg: cols[0], fg: cols[1] }) : SK.xBanner(name, { sub: sub || 'OPEN', bg: '#ffffff', fg: '#1a1a1a', accent: cols[2] === '#ffffff' ? cols[0] : cols[2] });
+        bd.position.set(fx2, y0, fz2); bd.rotation.y = rot; SK.bake(ctx, bd); ctx.world.addBoxCentered(new THREE.Vector3(fx2, y0 + 0.5, fz2), new THREE.Vector3(0.6, 1, 0.6), { surface: 'wood', walkable: false });
+      } }
   }
+}
+// which sign a trade gets: cafés lean wood / scashi / neon, restaurants flex / wood, clinics and offices
+// channel / metal, chains a lit box; a street's signStyle ('box' | 'channel') keeps its say
+function signKind(cat, style, r) {
+  const x = r();
+  if (style === 'box' && x < 0.7) return 'box';
+  if (style === 'channel' && x < 0.6) return 'channel';
+  const T = { cafe: ['wood', 'scashi', 'neon', 'channel', 'flex'], restaurant: ['flex', 'flex', 'wood', 'box', 'neon'], store: ['box', 'flex', 'channel', 'channel'], pharmacy: ['flex', 'box'], salon: ['neon', 'metal', 'scashi', 'channel'],
+    clinic: ['channel', 'metal', 'flex'], office: ['channel', 'metal', 'box'], phone: ['flex', 'channel', 'box'], optician: ['flex', 'channel', 'scashi'] }[cat] ?? ['box', 'channel', 'flex'];
+  return T[Math.floor(r() * T.length)];
 }
 
 // ------------------------------------------------------------------ generators

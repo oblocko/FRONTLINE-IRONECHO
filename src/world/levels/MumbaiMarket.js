@@ -14,6 +14,7 @@ import { pbr } from '../../render/TextureFactory.js';
 import { Sky } from '../../render/Sky.js';
 import { settings } from '../../core/Settings.js';
 import { signTexture } from '../CityProps.js';
+import * as SK from '../city/SignKit.js';
 import { Facades } from '../Facade.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -216,6 +217,16 @@ export class MumbaiMarket {
     // neon / shop signs (fictional)
     const signs = [['SHREE MOBILE', '#40e0ff'], ['CHAI 24H', '#ffb040'], ['MEHTA SAREES', '#ff50a0'], ['RAJ ELECTRICALS', '#60ff80'], ['NOOR STORES', '#ffe060'], ['LUCKY TAILORS', '#ff7040'], ['SAI MEDICALS', '#40ff90'], ['GOLDEN BAKERY', '#ffd040']];
     signs.forEach(([t, c], i) => { const s = i % 2 ? 1 : -1; this.neon(s * 6.98, 4.2 + (i % 3) * 0.6, -48 + i * 16, s > 0 ? -Math.PI / 2 : Math.PI / 2, t, c); });
+    // a few more kinds, placed by hand above the stalls: lit flex boxes (one with marquee bulbs), projecting
+    // blades for the hotel and the clinic upstairs, small point signs (fictional)
+    { const sc = this.game.renderer.scene, put = (g, side, y, z) => { g.position.set(side * 6.98, y, z); g.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2; sc.add(g); };
+      put(SK.flex('PATEL SWEETS', { sub: 'since 1962 · pure ghee', bg: '#f4d040', fg: '#8a1a10', w: 4.2, h: 0.9, bulbs: true }), -1, 3.4, -40);
+      put(SK.flex('KRISHNA XEROX', { sub: 'print · lamination · courier', bg: '#ffffff', fg: '#1a3a8a', accent: '#d8261c', w: 4.0, h: 0.85 }), 1, 3.4, -8);
+      put(SK.flex('BOMBAY CHAAT HOUSE', { sub: 'pani puri · bhel · sev puri', bg: '#c8261c', fg: '#ffffff', w: 4.6, h: 0.9 }), -1, 3.4, 24);
+      put(SK.blade('HOTEL SAGAR', { bg: '#1a2a6a', fg: '#ffd040', w: 0.7, h: 4 }), 1, 6.4, 40);
+      put(SK.blade('DR. DESAI CLINIC', { bg: '#ffffff', fg: '#1e6a3a', w: 0.7, h: 4.6 }), -1, 6.6, -4);
+      put(SK.point('ATM', { shape: 'square', bg: '#1a4a8a', fg: '#ffffff', size: 0.6 }), 1, 3.6, 52);
+      put(SK.point('Rx', { shape: 'round', bg: '#ffffff', fg: '#1e8a4a', size: 0.6 }), -1, 3.7, 58); }
     // overhead wires + bulb strings across the lane
     const scene = this.game.renderer.scene;
     for (let z = -50; z < 80; z += 7) { const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 14, 4), this.M.wire); wire.rotation.z = Math.PI / 2; wire.position.set(0, 5.5 + Math.sin(z) * 0.3, z); scene.add(wire);

@@ -84,5 +84,5 @@ export class SeoulMetro {
       plan.add({ kind: 'structure', id: `pier${x}`, rect, y0, h: 6.05 - y0, obj: p, colliders: [p.userData.collider], tags: ['support'] });
     }
   }
-  update(dt) { this.sky?.update(dt, this.game.renderer.camera); this.lod.update(dt); this.region?.update(dt); this.traffic?.update(dt); this.crowd?.update(dt); }
+  update(dt) { this.sky?.update(dt, this.game.renderer.camera); this.lod.update(dt); this.region?.update(dt); this.traffic?.update(dt); this.crowd?.update(dt); for (const s of this.city?.ctx?.spinners ?? []) s.rotation.y += dt * 3; }
 }

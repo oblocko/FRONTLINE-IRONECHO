@@ -19,6 +19,9 @@ import { CURB } from './Streets.js';
 import { rooftop, edge, onFace } from './Buildings.js';
 import { curtainMat, gridMat, balustradeMat } from './Modern.js';
 import { boxSign, channelSign } from '../korea/Signs.js';
+import * as SK from './SignKit.js';
+import { shopInterior, interiorBatch, buildInteriors } from './ShopInterior.js';
+const THEME_OF = { 0: 'store', 1: 'cafe', 2: 'salad', 3: 'pharmacy', 4: 'bank', 5: 'glasses', 6: 'music' };
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 export const HAND = { x0: -444, x1: -290, z0: -140, z1: 40 };   // grows as more of the quarter is built by hand
@@ -76,6 +79,7 @@ function mats() {
   if (M.pave) return M;
   M.pave = new THREE.MeshStandardMaterial({ map: paveTex(), roughness: 0.7 }); M.pave.userData.uM = 4.8; M.pave.userData.vM = 4.8;
   M.asph = new THREE.MeshStandardMaterial({ color: 0x3a3c3e, roughness: 0.92 });
+  M.clear = new THREE.MeshStandardMaterial({ color: 0xdfeaf0, transparent: true, opacity: 0.16, roughness: 0.03, metalness: 0.3, depthWrite: false, envMapIntensity: 1.4 });
   M.glass = new THREE.MeshStandardMaterial({ color: 0x34444e, roughness: 0.05, metalness: 0.65, envMapIntensity: 1.3 });
   M.mullion = flatMat(0x2a2c2e, { roughness: 0.35, metalness: 0.7, key: 'hs_mull' });
   M.alu = flatMat(0xc8ccd0, { roughness: 0.35, metalness: 0.7, key: 'hs_alu' });
@@ -113,22 +117,40 @@ function modernBuilding(ctx, b) {
   const rect = new Rect(b.x0, b.z0, b.x1, b.z1), T = b.tower, pH = b.podium, tH = T.floors * FH, H = pH + tH;
   const it = ctx.plan.add({ kind: 'building', id: b.name, use: 'shops', zone: 'commercial', rect, y0, h: H, entrances: [] }); ctx.ownBegin(it);
   const e = edge(rect, nx, 0), at = (a, o = 0) => onFace(e, nx, 0, a, o);
-  // podium: the solid body (sides / back in light stone), the whole front glazed
-  const body = wallMat('panel', b.body ?? 0xd8d6d0);
-  B.box(body, rect.w, pH, rect.d, rect.cx, y0 + pH / 2, rect.cz);
-  it.colliders.push(w.addBox(V(rect.x0, y0, rect.z0), V(rect.x1, y0 + pH, rect.z1), { surface: 'concrete', cover: true, walkable: false }));
-  const len = e.len;
-  // ground floor shops: tall glass between slim dark piers, each shop's own channel letters on a black fascia
+  // podium: ground floor is D deep of walk-in shops behind real glass; behind them and above the ground
+  // floor the podium is solid (sides / back in light stone)
+  const body = wallMat('panel', b.body ?? 0xd8d6d0), D = 11, CH = 4.0, len = e.len;
+  const back = nx > 0 ? new Rect(rect.x0, rect.z0, rect.x1 - D, rect.z1) : new Rect(rect.x0 + D, rect.z0, rect.x1, rect.z1);
+  B.box(body, back.w, pH, back.d, back.cx, y0 + pH / 2, back.cz);
+  it.colliders.push(w.addBox(V(back.x0, y0, back.z0), V(back.x1, y0 + pH, back.z1), { surface: 'concrete', cover: true, walkable: false }));
+  const fr = nx > 0 ? new Rect(rect.x1 - D, rect.z0, rect.x1, rect.z1) : new Rect(rect.x0, rect.z0, rect.x0 + D, rect.z1);
+  B.box(body, fr.w, pH - CH, fr.d, fr.cx, y0 + CH + (pH - CH) / 2, fr.cz);
+  it.colliders.push(w.addBox(V(fr.x0, y0 + CH, fr.z0), V(fr.x1, y0 + pH, fr.z1), { surface: 'concrete', cover: true, walkable: false }));
+  for (const zz of [rect.z0 + 0.15, rect.z1 - 0.15]) { B.box(body, D, CH, 0.3, fr.cx, y0 + CH / 2, zz); w.addBoxCentered(V(fr.cx, y0 + CH / 2, zz), V(D, CH, 0.3), { surface: 'concrete', cover: true, walkable: false }); }
+  // ground floor shops: each a real interior behind clear glass with a door opening, slim dark piers
+  // between them, the shop's own sign on a black fascia
   let a = -len / 2; const total = b.shops.reduce((s, sh) => s + (sh.w ?? 0), 0), free = b.shops.filter((sh) => !sh.w).length;
-  for (const sh of b.shops) {
+  const IB = interiorBatch(ctx);
+  b.shops.forEach((sh, si) => {
     const sw = sh.w ?? (len - total) / free, c = a + sw / 2;
     const [px, pz] = at(a + 0.15, 0.06); B.box(m.mullion, 0.3, GF, 0.3, px, y0 + GF / 2, pz);
-    const [sx, sz] = at(c, 0.03); ctx.fac.get('commercial').shop(sx, y0 + 2.1, sz, rot, sw - 0.6, 4.0, { type: sh.type, lit: 1 });
+    if (si > 0) { const [wx, wz] = at(a, -D / 2); B.box(body, D, CH, 0.2, wx, y0 + CH / 2, wz); w.addBoxCentered(V(wx, y0 + CH / 2, wz), V(D, CH, 0.2), { surface: 'concrete', cover: true, walkable: false }); }
+    // glass with a 2 m door opening, a transom above it
+    const du = c + (sh.doorAt ?? 0.22) * sw, d0 = du - 1.0, d1 = du + 1.0;
+    for (const [u0, u1] of [[a + 0.3, d0], [d1, a + sw - 0.15]]) { if (u1 - u0 < 0.2) continue; const [gx, gz] = at((u0 + u1) / 2, -0.04);
+      B.box(m.clear, 0.03, CH + 0.35, u1 - u0, gx, y0 + (CH + 0.35) / 2, gz, 0, { cast: false });
+      const gc = w.addBoxCentered(V(gx, y0 + (CH + 0.35) / 2, gz), V(0.1, CH + 0.35, u1 - u0), { surface: 'glass', cover: false, walkable: false }); if (gc) gc.seeThrough = true; }
+    { const [gx, gz] = at(du, -0.04); B.box(m.mullion, 0.08, 0.12, 2.0, gx, y0 + 2.4, gz); B.box(m.clear, 0.03, CH + 0.35 - 2.46, 2.0, gx, y0 + 2.46 + (CH + 0.35 - 2.46) / 2, gz, 0, { cast: false });
+      for (const sgn of [-1, 1]) { const [qx, qz] = at(du + sgn * 1.0, -0.04); B.box(m.mullion, 0.08, 2.4, 0.06, qx, y0 + 1.2, qz); } }
+    const theme = sh.in ?? THEME_OF[sh.type] ?? 'store';
+    const [ix, iz] = at(c, 0); const nm = sh.sign ? sh.sign[1] : sh.ch?.[0] ?? b.name;
+    shopInterior(ctx, IB, { fx: ix - nx * 0.06, zc: iz, nx, w: sw - 0.4, D: D - 0.1, y0, h: CH - 0.4, theme, name: sh.inName ?? nm.replace(/\n/g, ' '), color: sh.color ?? (sh.sign?.[2]?.color) ?? '#ffffff', metal: sh.metal ?? (theme === 'pharmacy' || theme === 'bank' ? 'silver' : theme === 'cafe' || theme === 'books' ? 'brass' : 'black'), seed: 11 + si * 31 + Math.round(Math.abs(b.z0) * 7), doorU: du - c });
     const [fx, fz] = at(c, 0.1); B.box(m.black, 0.2, 1.1, sw - 0.3, fx, y0 + GF - 0.55, fz);
-    if (sh.ch) { const cs = channelSign(sh.ch[0], sh.ch[1], 0.75, { raceway: null, lit: true }); const [gx, gz] = at(c, 0.22); cs.position.set(gx, y0 + GF - 0.55, gz); cs.rotation.y = rot; ctx.scene.add(cs); ctx.own(cs); }
-    const [dx, dz] = at(c, 0.6); it.entrances.push({ x: dx, z: dz, nx, nz: 0 });
+    if (sh.sign) { const [kind, ...args] = sh.sign; const sg = SK[kind](...args); const [gx, gz] = at(c, 0.12); sg.position.set(gx, y0 + GF - 0.55, gz); sg.rotation.y = rot; SK.bake(ctx, sg); }
+    else if (sh.ch) { const cs = channelSign(sh.ch[0], sh.ch[1], 0.75, { raceway: null, lit: true }); const [gx, gz] = at(c, 0.22); cs.position.set(gx, y0 + GF - 0.55, gz); cs.rotation.y = rot; ctx.scene.add(cs); ctx.own(cs); }
+    const [dx, dz] = at(du, 0.6); it.entrances.push({ x: dx, z: dz, nx, nz: 0 });
     a += sw;
-  }
+  });
   { const [px, pz] = at(len / 2 - 0.15, 0.06); B.box(m.mullion, 0.3, GF, 0.3, px, y0 + GF / 2, pz); }
   // canopy over the shop fronts (thin aluminium blade)
   { const [cx, cz] = at(0, 1.2); B.box(m.alu, 2.4, 0.14, len - 0.4, cx, y0 + GF - 1.25, cz, 0, { cast: true }); }
@@ -139,7 +161,7 @@ function modernBuilding(ctx, b) {
     for (let u = -len / 2 + 0.2; u <= len / 2 - 0.1; u += 3) { const [mx, mz] = at(u, 0.08); B.box(m.mullion, 0.08, up - 0.2, 0.06, mx, y0 + GF + up / 2, mz); }
     const nf = Math.round(up / 4.4);
     for (let f = 0; f <= nf; f++) { const [mx, mz] = at(0, 0.1); B.box(m.mullion, 0.1, 0.16, len - 0.4, mx, y0 + GF + f * (up / nf), mz); }
-    for (let u = -len / 2 + 1.7; u < len / 2 - 1; u += 3) for (let f = 0; f < nf; f++) { const [wx, wz] = at(u, 0.0); ctx.fac.get('commercial').shop(wx, y0 + GF + f * (up / nf) + up / nf / 2, wz, rot, 2.8, up / nf - 0.4, { type: b.upperType ?? 0, lit: 1 }); }
+    for (let u = -len / 2 + 1.7; u < len / 2 - 1; u += 3) for (let f = 0; f < nf; f++) { const [wx, wz] = at(u, 0.0); ctx.fac.get('commercial').shop(wx, y0 + GF + f * (up / nf) + up / nf / 2, wz, rot, 2.8, up / nf - 0.4, { type: b.upperType ?? 0, lit: 0.6 }); }
   }
   // the podium brand across the upper retail glass
   if (b.brand) { const br = b.brand; const cs = channelSign(br.text, br.color, br.h ?? 2, { raceway: null, lit: true }); const [bx, bz] = at(br.a ?? 0, 0.3); cs.position.set(bx, y0 + pH - (br.h ?? 2) / 2 - 0.6, bz); cs.rotation.y = rot; ctx.scene.add(cs); ctx.own(cs); }
@@ -163,6 +185,13 @@ function modernBuilding(ctx, b) {
   // LED screen on the front of the tower or podium, crown letters on the roof
   if (b.led) { const L = b.led; const [lx, lz] = onFace(edge(L.onPodium ? rect : tr, nx, 0), nx, 0, L.a ?? 0, 0); ledScreen(ctx, L.kind, L.w, L.h, lx, y0 + L.y, lz, rot); }
   if (b.crown) { const cs = channelSign(b.crown[0], b.crown[1], b.crown[2] ?? 2.4, { raceway: '#2a2a2a', lit: true }); const te = edge(tr, nx, 0); const [cx, cz] = onFace(te, nx, 0, 0, -0.6); cs.position.set(cx, y0 + H + 1.2 + (b.crown[2] ?? 2.4) / 2, cz); cs.rotation.y = rot; ctx.scene.add(cs); ctx.own(cs); }
+  // the building's other signs, placed one by one: [kind, args, a (along the front, m from centre), y (m above ground), out (m off the wall), on ('podium' | 'tower')]
+  for (const [kind, args, aa, yy, out = 0, on = 'podium'] of b.extra ?? []) {
+    const sg = SK[kind](...args), fe = on === 'tower' ? edge(tr, nx, 0) : e, [sx, sz] = onFace(fe, nx, 0, aa, out);
+    sg.position.set(sx, y0 + (yy === 'top' ? (on === 'tower' ? H : pH) : yy), sz); sg.rotation.y = rot; SK.bake(ctx, sg);
+    if (sg.userData.spin) (ctx.spinners ??= []).push(sg.userData.spin);
+    if (out > 0.5 && yy < 0.5) w.addBoxCentered(V(sx, y0 + 0.6, sz), V(0.7, 1.2, 0.7), { surface: 'metal', walkable: false });
+  }
   rooftop(ctx, new Rect(tr.x0 + 2, tr.z0 + 2, tr.x1 - 2, tr.z1 - 2), y0 + H, [-nx, 0], { units: 3, tank: false });
   // the back (service lane): plain service doors
   { const be = edge(rect, -nx, 0); for (let u = -be.len / 2 + 4; u < be.len / 2 - 2; u += 9) { const [dx, dz] = onFace(be, -nx, 0, u, 0.03); B.box(m.steel, 0.06, 2.2, 1.2, dx, y0 + 1.1, dz); } }
@@ -170,56 +199,90 @@ function modernBuilding(ctx, b) {
 }
 
 // ------------------------------------------------------------------ 1. 하늘길: the buildings (one by one)
+// Signs per shop: ['channel' | 'flex' | 'scashi' | 'metal' | 'neon' | 'wood', text, options] (SignKit.js), on the fascia.
+// extra: the building's other signs, each placed by hand: [kind, [args], a, y, out, on]
 const W_ROW = [
   { name: '스카이몰 하늘점', z0: -130, z1: -100, podium: 11, body: 0xd0d4d8, upperType: 0,
-    shops: [{ w: 12, type: 0, ch: ['SKYMALL', '#ffffff'] }, { type: 1, ch: ['블루보틀 하우스', '#9ad0ff'] }],
+    shops: [{ in: 'fashion', w: 12, type: 0, sign: ['channel', 'SKYMALL', { color: '#ffffff', h: 0.85, light: 'front' }] }, { in: 'cafe', type: 1, sign: ['channel', '블루보틀 하우스', { color: '#9ad0ff', h: 0.7, light: 'halo', returns: '#1a2a3a' }] }],
     tower: { floors: 15, setback: 5, skin: 'curtain', glass: 0x3e6a8a, spandrel: 0x6a8aa0, frame: 0xd0d8e0, bays: 5, band: [0x2a7ab8, -1] },
-    brand: { text: '스카이몰', color: '#7ac8ff', h: 2.4 }, crown: ['SKYMALL', '#7ac8ff', 3], led: { kind: 'tour', w: 12, h: 8, y: 22, a: 2 } },
+    brand: { text: '스카이몰', color: '#7ac8ff', h: 2.4 }, crown: ['SKYMALL', '#7ac8ff', 3], led: { kind: 'tour', w: 12, h: 8, y: 22, a: 2 },
+    extra: [['point', ['SKY\nMALL', { shape: 'cube', bg: '#1a4a7a', fg: '#ffffff', size: 0.9 }], 14.4, 3.4],
+            ['stand', ['스카이몰', { sub: 'B1 푸드홀 · 1F 뷰티 · 2F 패션', bg: '#1a4a7a', fg: '#ffffff' }], -9, 0, 2.4],
+            ['xBanner', ['겨울 정기 세일', { sub: '최대 50%', accent: '#2a7ab8' }], 3, 0, 1.6]] },
   { name: '코너스톤 뷰티', z0: -100, z1: -76, podium: 10, body: 0xeeece8,
-    shops: [{ w: 10, type: 0, ch: ['CORNERSTONE', '#1a1a1a'] }, { type: 5, ch: ['렌즈 스튜디오', '#2a6a9a'] }],
+    shops: [{ in: 'cosmetics', w: 12, type: 0, sign: ['scashi', 'CORNERSTONE', { color: '#2a2a2a', panel: '#f4f2ee', h: 0.6, font: 'serif', lamps: 4, w: 10.5 }] }, { in: 'glasses', type: 5, sign: ['flex', '렌즈 스튜디오', { sub: '콘택트렌즈 · 안경', bg: '#ffffff', fg: '#1a3a6a', accent: '#2a7ab8', w: 9, h: 1.0 }] }],
     tower: { floors: 6, setback: 0, skin: 'grid', frame: 0xf0eeea, glass: 0x3e4e5a, fins: true, finStep: 1.2 },
-    brand: { text: 'CORNERSTONE', color: '#c8a060', h: 1.6 } },
+    brand: { text: 'CORNERSTONE', color: '#c8a060', h: 1.6 },
+    extra: [['aFrame', ['오늘의 추천', { sub: '수분 크림 1+1', bg: '#2a2c2e', fg: '#f4ecd8', chalk: true }], 5, 0, 1.4],
+            ['blade', ['하늘피부과', { bg: '#f4f2ee', fg: '#6a3a8a', w: 0.7 }], -11.4, 7.6]] },
   { name: '모노 스포츠 플래그십', z0: -76, z1: -53, podium: 10, body: 0x2a2c30,
-    shops: [{ type: 0, ch: ['MONO SPORTS', '#ffffff'] }],
+    shops: [{ in: 'sports', type: 0, sign: ['channel', 'MONO SPORTS', { color: '#ffffff', h: 0.8, light: 'side' }] }],
     tower: { floors: 8, setback: 3, skin: 'curtain', glass: 0x22282e, spandrel: 0x1a1c1e, frame: 0x3a3e42, bays: 3 },
-    brand: { text: 'MONO', color: '#ffffff', h: 3 }, led: { kind: 'shoes', w: 9, h: 6.5, y: 15, onPodium: false } },
+    brand: { text: 'MONO', color: '#ffffff', h: 3 }, led: { kind: 'shoes', w: 9, h: 6.5, y: 15, onPodium: false },
+    extra: [['blade', ['필라테스 MOVE', { bg: '#101010', fg: '#ff5a3a', w: 0.75 }], 10.9, 13.5, 0, 'tower'],
+            ['xBanner', ['RUN SEOUL 2026', { sub: '러닝화 신상', accent: '#ff5a3a', bg: '#101418', fg: '#ffffff' }], -6, 0, 1.6]] },
   { name: '하루 코스메틱', z0: -45, z1: -20, podium: 10, body: 0xe6e0d8,
-    shops: [{ w: 14, type: 0, ch: ['HARU', '#2a8aaa'] }, { type: 3, ch: ['하늘약국', '#1e8a4a'] }],
+    shops: [{ in: 'cosmetics', w: 14, type: 0, sign: ['metal', 'HARU', { kind: 'brass', h: 0.9, light: '#fff0c8', sub: 'COSMETICS' }] }, { in: 'pharmacy', type: 3, sign: ['flex', '하늘약국', { bg: '#1e8a4a', fg: '#ffffff', w: 8, h: 1.0, logo: '약' }] }],
     tower: { floors: 5, setback: 4, skin: 'grid', frame: 0xd8d0c4, glass: 0x4a5a66 },
-    brand: { text: '하루 코스메틱', color: '#5ab8d8', h: 2 }, led: { kind: 'serum', w: 8, h: 6, y: 1.5 + GF, onPodium: true, a: -4 } },
+    brand: { text: '하루 코스메틱', color: '#5ab8d8', h: 2 }, led: { kind: 'serum', w: 8, h: 6, y: 1.5 + GF, onPodium: true, a: -4 },
+    extra: [['point', ['약', { shape: 'round', bg: '#1e8a4a', fg: '#ffffff', size: 0.8 }], -12.1, 3.6],
+            ['stand', ['하늘약국', { sub: '감기약 · 영양제 · 연중무휴', bg: '#ffffff', fg: '#1e8a4a' }], -9, 0, 1.4]] },
   { name: 'K-뮤직 홀', z0: -20, z1: 6, podium: 11, body: 0x3a3440,
-    shops: [{ w: 9, type: 6, ch: ['K-MUSIC HALL', '#ff7ad8'] }, { type: 1, ch: ['카페 온도', '#f0d8b0'] }],
+    shops: [{ in: 'music', w: 12, type: 6, sign: ['neon', 'K-Music Hall', { color: '#ff4ad8', h: 1.0 }] }, { in: 'cafe', type: 1, sign: ['wood', '카페 온도', { font: 'serif', tone: '#6a4a2e', sub: 'COFFEE & BAKERY', h: 0.75 }] }],
     tower: { floors: 10, setback: 0, skin: 'fins', glass: 0x3a3a4e, spandrel: 0x2a2a34, frame: 0x4a4a58, finStep: 1.8 },
-    led: { kind: 'music', w: 10, h: 7.5, y: 20 }, crown: ['K-MUSIC', '#ff7ad8', 2.4] },
+    led: { kind: 'music', w: 10, h: 7.5, y: 20 }, crown: ['K-MUSIC', '#ff7ad8', 2.4],
+    extra: [['awning', ['카페 온도', { w: 6, depth: 1.5, color: '#1e3a2e', ink: '#f0e6d0', sub: 'since 2019' }], -6.5, 4.1],
+            ['aFrame', ['오늘의 원두', { sub: '에티오피아 예가체프', bg: '#1e3a2e', fg: '#f0e6d0', chalk: true }], -4.5, 0, 2.2],
+            ['blade', ['연습실 대관', { bg: '#2a0a4a', fg: '#ff9ae8', w: 0.7 }], 12.6, 7.2],
+            ['xBanner', ['LIVE TONIGHT', { sub: '7PM 공연', accent: '#ff4ad8', bg: '#1a1020', fg: '#ffffff' }], 4, 0, 1.8]] },
   { name: '온도 로스터리', z0: 6, z1: 30, podium: 6, body: 0xf0ede6,
-    shops: [{ w: 13, type: 1, ch: ['ONDO ROASTERY', '#3a2a1a'] }, { type: 5, ch: ['북스 하늘', '#3a2a1a'] }],
-    tower: { floors: 4, setback: 4, skin: 'fins', finMat: 'wood', glass: 0x4a5660, spandrel: 0xe8e4dc, frame: 0xe8e4dc, finStep: 1.0 } },
+    shops: [{ in: 'cafe', w: 13, type: 1, sign: ['scashi', 'ONDO ROASTERY', { color: '#3a2a1a', panel: null, h: 0.7, font: 'serif', lamps: 3, w: 10 }] }, { in: 'books', type: 5, sign: ['wood', '북스 하늘', { tone: '#a07a50', ink: '#2a1a10', font: 'serif', sub: 'BOOKS & TEA', h: 0.7 }] }],
+    tower: { floors: 4, setback: 4, skin: 'fins', finMat: 'wood', glass: 0x4a5660, spandrel: 0xe8e4dc, frame: 0xe8e4dc, finStep: 1.0 },
+    extra: [['awning', ['ONDO', { w: 11, depth: 1.8, drop: 0.7, stripes: ['#f4f0e6', '#2a2a2a'], ink: '#ffffff', sub: 'ONDO ROASTERY · 커피 볶는 집' }], 5.2, 4.0],
+            ['point', ['BOOKS', { shape: 'square', bg: '#f4ecd8', fg: '#2a1a10', size: 0.7 }], -11.6, 3.6],
+            ['aFrame', ['북스 하늘', { sub: '이달의 책 · 신간 입고', bg: '#f4ecd8', fg: '#2a1a10' }], -7, 0, 1.4]] },
 ];
 const E_ROW = [
   { name: '한빛 타워', z0: -130, z1: -98, podium: 11, body: 0xb8c0c4,
-    shops: [{ w: 14, type: 0, ch: ['HANBIT', '#d8b060'] }, { type: 4, ch: ['우리은행', '#3a7ac8'] }],
+    shops: [{ in: 'fashion', w: 16, type: 0, sign: ['channel', 'HANBIT GALLERIA', { color: '#d8b060', h: 0.8, light: 'halo', returns: '#2a2418', font: 'serif' }] }, { in: 'bank', type: 4, sign: ['flex', '하늘은행', { sub: 'HANEUL BANK', bg: '#1a5aa8', fg: '#ffffff', w: 9, h: 1.1, logo: '하' }] }],
     tower: { floors: 17, setback: 4, sideInset: 2, skin: 'curtain', glass: 0x4a6a64, spandrel: 0x7a8a86, frame: 0xc0c8c4, bays: 4 },
-    brand: { text: '한빛 갤러리아', color: '#d8b060', h: 2.2 }, crown: ['HANBIT', '#d8b060', 3.2] },
+    brand: { text: '한빛 갤러리아', color: '#d8b060', h: 2.2 }, crown: ['HANBIT', '#d8b060', 3.2],
+    extra: [['pylon', ['한빛 타워', [['한빛 갤러리아', '#2a2418', '#d8b060'], ['하늘은행', '#1a5aa8', '#ffffff'], ['한빛 치과', '#ffffff', '#1a6a8a'], ['서울 영어', '#c8141a', '#ffffff'], ['한빛 내과', '#ffffff', '#2a6a3a']], { h: 6.5 }], 13, 0, 5.2],
+            ['point', ['ATM', { shape: 'square', bg: '#1a5aa8', fg: '#ffffff', size: 0.7 }], -15.6, 3.6]] },
   { name: '보라 뷰티', z0: -98, z1: -74, podium: 10, body: 0xe8e0ea,
-    shops: [{ type: 0, ch: ['BORA BEAUTY', '#a050c8'] }],
+    shops: [{ in: 'cosmetics', type: 0, sign: ['neon', 'bora beauty', { color: '#c060ff', h: 1.0 }] }],
     tower: { floors: 7, setback: 0, skin: 'grid', frame: 0xdcd8e0, glass: 0x48506a, fins: true, finStep: 2.4 },
-    brand: { text: 'BORA', color: '#c070e8', h: 2.6 } },
+    brand: { text: 'BORA', color: '#c070e8', h: 2.6 },
+    extra: [['point', ['BORA', { shape: 'round', bg: '#f4eaf8', fg: '#8a3ab8', size: 0.8 }], 11.6, 3.6],
+            ['hologram', ['BORA', { color: '#d07aff' }], -6, 0, 1.6],
+            ['blade', ['네일 · 속눈썹', { bg: '#f4eaf8', fg: '#8a3ab8', w: 0.65 }], -11.6, 7.0]] },
   { name: '블랙 스완', z0: -74, z1: -53, podium: 10, body: 0x18181a,
-    shops: [{ type: 0, ch: ['BLACK SWAN', '#d8b060'] }],
+    shops: [{ in: 'fashion', type: 0, sign: ['metal', 'BLACK SWAN', { kind: 'black', h: 0.8, light: '#e8c070', font: 'serif' }] }],
     tower: { floors: 9, setback: 2, skin: 'curtain', glass: 0x1e2226, spandrel: 0x121416, frame: 0x8a7a50, bays: 3 },
-    brand: { text: '블랙 스완', color: '#d8b060', h: 2 } },
+    brand: { text: '블랙 스완', color: '#d8b060', h: 2 },
+    extra: [['metal', ['BLACK SWAN', { kind: 'corten', h: 1.0, w: 4.2, light: '#ffcf80', vertical: true }], -10.2, 7.5],
+            ['stand', ['BLACK SWAN', { sub: 'LOUNGE · 2F', bg: '#18181a', fg: '#d8b060' }], 4, 0, 1.4]] },
   { name: '그린 리프', z0: -45, z1: -22, podium: 10, body: 0xdedad0,
-    shops: [{ w: 12, type: 0, ch: ['GREEN LEAF', '#4a8a3a'] }, { type: 2, ch: ['샐러드 하우스', '#4a8a3a'] }],
+    shops: [{ in: 'cosmetics', w: 12, type: 0, sign: ['wood', 'GREEN LEAF', { tone: '#4a6a3a', ink: '#f4f0e0', font: 'sans', h: 0.7 }] }, { in: 'salad', type: 2, sign: ['flex', '샐러드 하우스', { sub: 'SALAD · BOWL', bg: '#f4f8ec', fg: '#3a6a2a', accent: '#8ab84a', w: 8.5, h: 1.0, border: '#8ab84a' }] }],
     tower: { floors: 6, setback: 3, skin: 'fins', finMat: 'wood', glass: 0x46564a, spandrel: 0xdedad0, frame: 0xdedad0, finStep: 1.2 },
-    led: { kind: 'tea', w: 7, h: 5, y: 1.5 + GF, onPodium: true, a: 3 } },
+    led: { kind: 'tea', w: 7, h: 5, y: 1.5 + GF, onPodium: true, a: 3 },
+    extra: [['awning', ['샐러드 하우스', { w: 7.5, depth: 1.4, color: '#5a8a3a', ink: '#ffffff', shape: 'dome', sub: '오늘의 샐러드' }], -6.8, 4.2],
+            ['aFrame', ['런치 세트', { sub: '샐러드 + 수프 9,900원', bg: '#f4f8ec', fg: '#3a6a2a' }], -5, 0, 2.3]] },
   { name: '올리브 하우스', z0: -22, z1: 4, podium: 10, body: 0xeeeeea,
-    shops: [{ w: 10, type: 3, ch: ['올리브 하우스', '#6a9a1a'] }, { type: 5, ch: ['밝은안경', '#1a2a4a'] }],
+    shops: [{ in: 'pharmacy', w: 14, type: 3, sign: ['flex', '올리브 하우스', { sub: 'HEALTH & BEAUTY', bg: '#ffffff', fg: '#5a8a1a', w: 12, h: 1.1 }] }, { in: 'glasses', type: 5, sign: ['flex', '밝은안경', { bg: '#1a2a4a', fg: '#ffffff', w: 8, h: 1.0, bulbs: true }] }],
     tower: { floors: 8, setback: 0, skin: 'grid', frame: 0xf2f2ee, glass: 0x405060 },
-    brand: { text: 'OLIVE HOUSE', color: '#6a9a1a', h: 1.8 } },
+    brand: { text: 'OLIVE HOUSE', color: '#6a9a1a', h: 1.8 },
+    extra: [['roofBoard', ['올리브 하우스', { sub: 'HEALTH & BEAUTY', bg: '#ffffff', fg: '#5a8a1a', w: 16, h: 3.6 }], 0, 'top', -2, 'tower'],
+            ['point', ['안경', { shape: 'round', bg: '#1a2a4a', fg: '#ffffff', size: 0.75 }], -12.6, 3.6],
+            ['blade', ['서울 수학학원', { bg: '#1d3f8a', fg: '#ffffff', w: 0.7 }], 12.6, 7.8]] },
   { name: '모션 시네마', z0: 4, z1: 30, podium: 12, body: 0x26282c,
-    shops: [{ w: 12, type: 0, ch: ['MOTION CINEMA', '#ffb040'] }, { type: 1, ch: ['팝콘 팩토리', '#ffb040'] }],
+    shops: [{ in: 'cinema', w: 14, type: 0, sign: ['channel', 'MOTION CINEMA', { color: '#ffb040', h: 0.9, light: 'front', raceway: '#1a1a1a' }] }, { in: 'cafe', type: 1, sign: ['flex', '팝콘 팩토리', { bg: '#f4d040', fg: '#c8261c', w: 8, h: 1.0, bulbs: true, font: 'sans' }] }],
     tower: { floors: 11, setback: 0, skin: 'curtain', glass: 0x2a3640, spandrel: 0x1c2024, frame: 0x50565c, bays: 4, band: [0xd8801a, 1] },
-    led: { kind: 'cinema', w: 11, h: 8, y: 26 }, crown: ['MOTION', '#ffb040', 2.6] },
+    led: { kind: 'cinema', w: 11, h: 8, y: 26 }, crown: ['MOTION', '#ffb040', 2.6],
+    extra: [['blade', ['MOTION CINEMA', { bg: '#1a1a1a', fg: '#ffb040', w: 0.9, h: 6.5 }], 12.6, 8.5],
+            ['stand', ['상영 시간표', { sub: '마지막 항구 · 14:20 16:50 19:30', bg: '#1a1a1a', fg: '#ffb040' }], 6, 0, 1.4],
+            ['xBanner', ['마지막 항구', { sub: '절찬 상영중', accent: '#d86a1a', bg: '#0a0c10', fg: '#ffffff' }], 2, 0, 1.6],
+            ['hologram', ['4DX', { color: '#ffb040' }], -3, 0, 1.6]] },
 ];
 
 // ------------------------------------------------------------------ street furniture (each placed by hand below)
@@ -309,4 +372,5 @@ export function buildHandStreets(ctx) {
   for (const z of [-121, -103, -85, -67, -37, -19, -1, 17]) { B.box(m.steel, 1.4, 0.02, 1.4, X.road1 + 1.6, y + 0.02, z); tree(B, m, X.road1 + 1.6, z, y, 0.95); w.addBoxCentered(V(X.road1 + 1.6, y + 1, z), V(0.4, 2, 0.4), { surface: 'wood', walkable: false }); }
   // bollards closing the plaza to cars at both ends
   for (const z of [Z.z0 - 1, Z.z1 + 1]) for (let x = X.plaza0 + 1; x < X.plaza1 - 0.5; x += 2.2) { B.add(new THREE.CylinderGeometry(0.12, 0.12, 0.9, 10).translate(x, y + 0.45, z), m.steel); w.addBoxCentered(V(x, y + 0.45, z), V(0.24, 0.9, 0.24), { surface: 'metal', walkable: false }); }
+  buildInteriors(ctx);
 }

@@ -19,6 +19,7 @@ import { signTexture } from '../CityProps.js';
 import { buildCar } from '../korea/Cars.js';
 import { wreck } from '../../render/Destruction.js';
 import { Crowd } from '../city/Crowd.js';
+import * as SK from '../city/SignKit.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 let seedN = 17; const rnd = () => ((seedN = (seedN * 16807) % 2147483647) / 2147483647);
@@ -443,7 +444,14 @@ export class NewYorkTower {
       const names = ['DELI', 'PHARMACY', 'BAGELS', 'DRY CLEANING', 'WINE & SPIRITS', 'NAIL SALON', 'PIZZA', 'BANK', 'SHOES', 'HARDWARE', 'FLORIST', 'OPTICAL'];
       const sg = new THREE.Mesh(new THREE.PlaneGeometry(len * 0.8, 0.7), new THREE.MeshBasicMaterial({ map: signTexture(names[Math.floor(rnd() * names.length)], '', ['#1a1a1a', '#6a1a1a', '#1a2a4a', '#2a3a2a'][i % 4], '#f0f0e8'), toneMapped: false }));
       sg.position.set(face + nx * 0.06, 4.1, zc); sg.rotation.y = win.rotation.y; scene.add(sg);
-      if (rnd() < 0.5) { const aw = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, len), new THREE.MeshStandardMaterial({ color: [0x6a1a1a, 0x1a3a2a, 0x1a1a2a][i % 3], roughness: 0.8 })); aw.position.set(face + nx * 0.6, 3.6, zc); aw.rotation.z = nx * 0.25; scene.add(aw); }
+      const rot = win.rotation.y, at = (o, y, dz = 0) => (g) => { g.position.set(face + nx * o, y, zc + dz); g.rotation.y = rot; scene.add(g); return g; };
+      // printed fabric awning (half the shops), and the small things a New York front has: an OPEN neon in the
+      // window, a projecting blade or point sign (own random stream so the rest of the street is unchanged)
+      if (rnd() < 0.5) at(0.02, 3.75)(SK.awning(['DELI', 'BAGELS', 'PIZZA', 'FLORIST', 'WINE & SPIRITS'][i % 5], { w: Math.min(len, 6), depth: 1.3, drop: 0.45, color: ['#6a1a1a', '#1a3a2a', '#1a1a2a'][i % 3], ink: '#f0e8d8', font: 'serif', sub: 'EST. 1987 · OPEN 7 DAYS' }));
+      const sr = this.signRnd ??= ((q) => () => ((q = (q * 16807) % 2147483647) / 2147483647))(4242);
+      if (sr() < 0.4) at(0.05, 2.6, len * 0.3)(SK.neon('OPEN', { color: ['#ff3a3a', '#40c8ff', '#ffb040'][Math.floor(sr() * 3)], h: 0.45 }));
+      if (sr() < 0.3) at(0, 6.5, -len / 2 + 0.3)(SK.blade(['HOTEL', 'TAILOR', 'PAWN', 'DINER'][Math.floor(sr() * 4)], { bg: '#141414', fg: ['#ff5a3a', '#ffd040', '#7ad8ff'][Math.floor(sr() * 3)], w: 0.7 }));
+      else if (sr() < 0.3) at(0, 4.6, len / 2 - 0.3)(SK.point(['ATM', 'Rx', 'NAILS', '24H'][Math.floor(sr() * 4)], { shape: sr() < 0.5 ? 'round' : 'square', bg: '#f0f0e8', fg: '#1a1a1a', size: 0.6 }));
     }
   }
   cafeFront() {
@@ -458,7 +466,14 @@ export class NewYorkTower {
     const bar = new THREE.Mesh(new THREE.BoxGeometry(1, 1.05, 8), M.wood); bar.position.set(C.x0 + 1.2, 0.55, (C.z0 + C.z1) / 2); scene.add(bar);
     for (const z of [C.z0 + 1, C.z1 - 1]) { const m = new THREE.Mesh(new THREE.BoxGeometry(0.2, 5, 0.3), M.mullion); m.position.set(C.x1, 2.5, z); scene.add(m); }
     const gl = new THREE.Mesh(new THREE.PlaneGeometry(C.z1 - C.z0 - 2, 3.4), M.glass); gl.position.set(C.x1, 1.9, (C.z0 + C.z1) / 2); gl.rotation.y = Math.PI / 2; scene.add(gl);
-    const aw = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.1, C.z1 - C.z0), new THREE.MeshStandardMaterial({ color: 0x1e3a2a, roughness: 0.8 })); aw.position.set(C.x1 + 1.0, 3.9, (C.z0 + C.z1) / 2); aw.rotation.z = 0.22; scene.add(aw);
+    // the café: printed awning, a chalk A-frame by the door, pendants over the bar, a neon line on the back wall
+    const zc = (C.z0 + C.z1) / 2, put = (g, x, y, z, r = Math.PI / 2) => { g.position.set(x, y, z); g.rotation.y = r; scene.add(g); return g; };
+    put(SK.awning('MERIDIAN', { w: C.z1 - C.z0 - 1, depth: 1.8, drop: 0.6, color: '#1e3a2a', ink: '#f0e6c8', font: 'serif', sub: 'ESPRESSO · BAKERY · SINCE 1994' }), C.x1 + 0.05, 4.05, zc);
+    put(SK.aFrame('TODAY', { sub: 'pumpkin latte · rye loaf', bg: '#1a1a1a', fg: '#f0e6c8', chalk: true }), C.x1 + 1.6, 0, C.z0 + 2.2);
+    put(SK.neon('fresh bread daily', { color: '#ffb070', h: 0.5 }), C.x0 + 0.32, 3.1, zc);
+    for (let k = -1; k <= 1; k++) { const p = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.24, 16, 1, true), new THREE.MeshStandardMaterial({ color: 0xb8904a, metalness: 0.9, roughness: 0.3, side: THREE.DoubleSide })); p.position.set(C.x0 + 1.2, 2.9, zc + k * 2.4); scene.add(p);
+      const b = new THREE.Mesh(new THREE.CircleGeometry(0.13, 12), new THREE.MeshBasicMaterial({ color: 0xffe0b0, toneMapped: false })); b.rotation.x = Math.PI / 2; b.position.set(C.x0 + 1.2, 2.79, zc + k * 2.4); scene.add(b);
+      const cbl = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 2.0, 4), M.mullion); cbl.position.set(C.x0 + 1.2, 3.9, zc + k * 2.4); scene.add(cbl); }
     const sg = new THREE.Mesh(new THREE.PlaneGeometry(6, 0.8), new THREE.MeshBasicMaterial({ map: signTexture('MERIDIAN CAFÉ', 'ESPRESSO · BAKERY', '#1e3a2a', '#f0e6c8'), toneMapped: false })); sg.position.set(C.x1 + 0.05, 4.5, (C.z0 + C.z1) / 2); sg.rotation.y = Math.PI / 2; scene.add(sg);
     this.anchors.push({ pos: V(C.x0 + 5, 4.2, (C.z0 + C.z1) / 2), color: 0xffd0a0, power: 30, dist: 14, area: 'street' });
   }
