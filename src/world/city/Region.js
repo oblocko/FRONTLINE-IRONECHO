@@ -18,6 +18,7 @@ import { Batch } from './CityPlan.js';
 import { wallMat, flatMat, groundMat } from './CityMaterials.js';
 import { curtainMat, gridMat, outline, shell, cap } from './Modern.js';
 import { CURB } from './Streets.js';
+import { HAND } from './HandStreets.js';
 
 const EXT = { x0: -1500, x1: 1900, z0: -1400, z1: 1400 };
 const CORE = { x0: -206, x1: 726, z0: -306, z1: 306 };
@@ -71,6 +72,8 @@ const roofGreen = () => mat('roofg', () => flatMat(0x4c6e58, { roughness: 0.8, k
 
 // ------------------------------------------------------------------ helpers
 const inCore = (x0, z0, x1, z1) => x1 > CORE.x0 && x0 < CORE.x1 && z1 > CORE.z0 && z0 < CORE.z1;
+// the hand-made quarter (HandStreets.js) replaces the generated blocks, their streets and trees
+const inHand = (x0, z0, x1, z1) => x1 > HAND.x0 - 6 && x0 < HAND.x1 + 6 && z1 > HAND.z0 - 6 && z0 < HAND.z1 + 6;
 const inRiver = (z0, z1) => z1 > RIVER.z0 - 40 && z0 < RIVER.z1 + 40;
 function boxGeo(w, h, d, x, y, z) { return new THREE.BoxGeometry(w, h, d).translate(x, y + h / 2, z); }
 
@@ -136,17 +139,19 @@ export class Region {
     for (let a2 = 0; a2 < nx; a2++) for (let b2 = 0; b2 < nz; b2++) {
       const x0 = ax0 + a2 * bw + st / 2, x1 = ax0 + (a2 + 1) * bw - st / 2, z0 = az0 + b2 * bd + st / 2, z1 = az0 + (b2 + 1) * bd - st / 2;
       if (x1 - x0 < 24 || z1 - z0 < 24 || inCore(x0 - 30, z0 - 30, x1 + 30, z1 + 30) || inRiver(z0, z1)) continue;
-      if (a2 < nx - 1) B.add(boxGeo(st, 0.04, z1 - z0 + st, x1 + st / 2, CURB - 0.02, (z0 + z1) / 2), asph, { cast: false });
-      if (b2 < nz - 1) B.add(boxGeo(x1 - x0 + st, 0.04, st, (x0 + x1) / 2, CURB - 0.02, z1 + st / 2), asph, { cast: false });
+      if (a2 < nx - 1 && !inHand(x1, z0, x1 + st, z1 + st)) B.add(boxGeo(st, 0.04, z1 - z0 + st, x1 + st / 2, CURB - 0.02, (z0 + z1) / 2), asph, { cast: false });
+      if (b2 < nz - 1 && !inHand(x0, z1, x1 + st, z1 + st)) B.add(boxGeo(x1 - x0 + st, 0.04, st, (x0 + x1) / 2, CURB - 0.02, z1 + st / 2), asph, { cast: false });
       const edge = { n: b2 === 0, s: b2 === nz - 1, w: a2 === 0, e: a2 === nx - 1 };   // block faces an arterial
-      fillBlock(spec, { x0, z0, x1, z1 }, D, T, { edge, hotter, rnd, pick, occl });
+      // a block touching the hand-made quarter keeps everything that stays clear of it
+      const sp = inHand(x0, z0, x1, z1) ? (x, z, q) => { const [a, b, c, d] = q.box; if (!inHand(a, b, c, d)) spec(x, z, q); } : spec;
+      fillBlock(sp, { x0, z0, x1, z1 }, D, T, { edge, hotter, rnd, pick, occl: sp === spec ? occl : (a, b, c, d, h) => { if (!inHand(a, b, c, d)) occl(a, b, c, d, h); } });
     }
     // street trees along the arterials of this cell (both sides, every ~12 m)
     for (let x = ax0; x < ax1; x += 12) for (const z of [az0 - 3, az1 + 3]) treeSpots.push([x, z]);
     for (let z = az0; z < az1; z += 12) for (const x of [ax0 - 3, ax1 + 3]) treeSpots.push([x, z]);
   }
   // trees stream with their chunk (merged low-poly crowns)
-  for (const [x, z] of treeSpots) { if (inCore(x - 10, z - 10, x + 10, z + 10) || inRiver(z, z)) continue; const s2 = 0.8 + rnd() * 0.5; spec(x, z, { geo: () => treeGeo(x, z, s2), mat: () => treeMat(), box: [x - 1, z - 1, x + 1, z + 1, 6 * s2], color: 0x4a6a3a, tree: true }); }
+  for (const [x, z] of treeSpots) { if (inCore(x - 10, z - 10, x + 10, z + 10) || inHand(x - 3, z - 3, x + 3, z + 3) || inRiver(z, z)) continue; const s2 = 0.8 + rnd() * 0.5; spec(x, z, { geo: () => treeGeo(x, z, s2), mat: () => treeMat(), box: [x - 1, z - 1, x + 1, z + 1, 6 * s2], color: 0x4a6a3a, tree: true }); }
   // terrain beyond the city: foothills rising into mountain ranges, the river valley carried on through them
   if (!DBG.includes('nohills')) scene.add(terrain(rnd));
 

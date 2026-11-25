@@ -8,7 +8,7 @@ export const TEXTURES = ['concrete', 'asphalt', 'metal', 'paintedMetal', 'corrug
 export const EPILOGUE = '';
 export async function build(game) {
   // free roam over both districts (old centre + new district)
-  const lv = new SeoulMetro(game, { bounds: { minX: -200, maxX: 718, minZ: -298, maxZ: 298 } }); game.level = lv; await lv.build();
+  const lv = new SeoulMetro(game, { bounds: { minX: -450, maxX: 718, minZ: -298, maxZ: 298 } }); game.level = lv; await lv.build();
   game.squad = {}; game.squadList = [];
 }
 export const SEGMENTS = [{
