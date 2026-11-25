@@ -10,6 +10,7 @@ import { settings } from '../../core/Settings.js';
 import { buildYeonseo, LAYOUT } from '../city/Yeonseo.js';
 import { Rect } from '../city/CityPlan.js';
 import { Traffic } from '../city/Traffic.js';
+import { Crowd } from '../city/Crowd.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 export const METRO = { bounds: { minX: -60, maxX: 60, minZ: -225, maxZ: 222 }, layout: LAYOUT };
@@ -29,6 +30,22 @@ export class YeonseoMetro {
     this.lod.update(0, true);
     // moving traffic (dev roam and peaceful scenes; a mission can pass { traffic: false })
     if (this.opts.traffic !== false && city.ctx.trafficPlan) { this.traffic = new Traffic(g, { y: 0 }); city.ctx.trafficPlan(this.traffic); this.traffic.build(); }
+    // pedestrians (a mission can pass { crowd: false } or a density): sidewalks ~1 per 7 m, plazas ~1 per 140 m²,
+    // some heading for the doors of the station / big buildings on their plaza
+    if (this.opts.crowd !== false) {
+      const k = this.opts.crowd ?? 1, doors = this.plan.items.filter((it) => it.entrances?.length && it.kind === 'building' && it.h > 20).flatMap((it) => it.entrances.map((e) => [e.x + e.nx * 2, e.z + e.nz * 2]));
+      const areas = [];
+      for (const w of this.plan.walks) {
+        const r = w.rect, len = Math.max(r.w, r.d), area = r.w * r.d;
+        if (w.kind === 'sidewalk' && Math.min(r.w, r.d) >= 2.4 && len > 20) areas.push({ rect: r, kind: 'strip', n: Math.round(len / 7 * k) });
+        else if (w.kind === 'plaza' && area > 200) areas.push({ rect: r.inset(1), kind: 'plaza', n: Math.round(area / 140 * k), doors: doors.filter(([x, z]) => r.has(x, z, 3)) });
+      }
+      // plazas first, then sidewalks nearest the station quarter, so the cap trims the quiet edges, not the centre
+      const hub = [330, -130], dist = (A) => Math.hypot((A.rect.x0 + A.rect.x1) / 2 - hub[0], (A.rect.z0 + A.rect.z1) / 2 - hub[1]);
+      areas.sort((a, b) => (a.kind === 'plaza' ? 0 : 1) - (b.kind === 'plaza' ? 0 : 1) || dist(a) - dist(b));
+      for (const A of areas) if (A.kind === 'plaza' && dist(A) < 120) A.n = Math.round(A.n * 2.2);   // the station plaza is busy
+      this.crowd = new Crowd(g, areas, { y: 0.15, max: 1800 });
+    }
   }
   atmosphere() {
     const g = this.game, scene = g.renderer.scene;
@@ -67,5 +84,5 @@ export class YeonseoMetro {
       plan.add({ kind: 'structure', id: `pier${x}`, rect, y0, h: 6.05 - y0, obj: p, colliders: [p.userData.collider], tags: ['support'] });
     }
   }
-  update(dt) { this.sky?.update(dt, this.game.renderer.camera); this.lod.update(dt); this.region?.update(dt); this.traffic?.update(dt); }
+  update(dt) { this.sky?.update(dt, this.game.renderer.camera); this.lod.update(dt); this.region?.update(dt); this.traffic?.update(dt); this.crowd?.update(dt); }
 }
