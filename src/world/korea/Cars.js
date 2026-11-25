@@ -171,7 +171,7 @@ export function buildCar(type = 'sedan', opts = {}) {
 // instance), fixed parts (tyres, trim, lights, plates: vertex colours) and glass (tinted per instance:
 // dark, or black when broken) — so a whole street of cars costs three draw calls per type per cell.
 const mergedCache = new Map();
-function mergedType(type) {
+export function mergedType(type) {
   if (mergedCache.has(type)) return mergedCache.get(type);
   const m = mats(), G = typeGeo(type), fixed = [], paintG = [], glassG = [];
   const fixedCol = { black: m.black.color, trim: m.trim.color, head: m.head.color, tail: m.tail.color, amber: m.amber.color, plate: new THREE.Color(0xe8e8e2), tyre: m.tyre.color, rim: m.rim.color, bed: m.bed.color, taxi: new THREE.Color(0xf0eee6) };

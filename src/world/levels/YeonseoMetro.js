@@ -9,6 +9,7 @@ import { Sky } from '../../render/Sky.js';
 import { settings } from '../../core/Settings.js';
 import { buildYeonseo, LAYOUT } from '../city/Yeonseo.js';
 import { Rect } from '../city/CityPlan.js';
+import { Traffic } from '../city/Traffic.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 export const METRO = { bounds: { minX: -60, maxX: 60, minZ: -225, maxZ: 222 }, layout: LAYOUT };
@@ -26,6 +27,8 @@ export class YeonseoMetro {
     g.renderer.camera.far = 6000; g.renderer.camera.updateProjectionMatrix();   // the region + mountains reach ~4 km
     g.renderer.setDistanceBlur({ start: 220, end: 1400, radius: 2.2 });
     this.lod.update(0, true);
+    // moving traffic (dev roam and peaceful scenes; a mission can pass { traffic: false })
+    if (this.opts.traffic !== false && city.ctx.trafficPlan) { this.traffic = new Traffic(g, { y: 0 }); city.ctx.trafficPlan(this.traffic); this.traffic.build(); }
   }
   atmosphere() {
     const g = this.game, scene = g.renderer.scene;
@@ -64,5 +67,5 @@ export class YeonseoMetro {
       plan.add({ kind: 'structure', id: `pier${x}`, rect, y0, h: 6.05 - y0, obj: p, colliders: [p.userData.collider], tags: ['support'] });
     }
   }
-  update(dt) { this.sky?.update(dt, this.game.renderer.camera); this.lod.update(dt); this.region?.update(dt); }
+  update(dt) { this.sky?.update(dt, this.game.renderer.camera); this.lod.update(dt); this.region?.update(dt); this.traffic?.update(dt); }
 }

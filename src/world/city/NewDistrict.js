@@ -168,8 +168,16 @@ export function buildNewDistrict(ctx) {
   for (const lx of [-8, -4, 4, 8]) for (let zz = -296; zz < 296; zz += 10) if (!L.roadsX.some((r) => zz + 5 > r[0] - 4 && zz < r[1] + 4)) batch.box(white, 0.15, 0.005, 5, 420 + lx, 0.012, zz + 2.5, 0, { cast: false });
   for (const [z0, z1, x0, x1] of L.roadsX) { const zc = (z0 + z1) / 2; for (let xx = x0 + 4; xx < x1 - 3; xx += 8) if (xx + 4 < bx0 - 2 || xx > bx1 + 2) batch.box(yellow, 4, 0.005, 0.15, xx + 2, 0.012, zc, 0, { cast: false });
     for (const s2 of [z0 - 2.2, z1 + 2.2]) for (let xx = bx0 + 0.8; xx < bx1 - 0.6; xx += 1) batch.box(white, 0.5, 0.005, 3.5, xx + 0.25, 0.012, s2, 0, { cast: false }); }
-  for (let k = 0; k < 18; k++) { const zz = -280 + rnd() * 560; if (L.roadsX.some((r) => zz > r[0] - 10 && zz < r[1] + 10)) continue; const lx = [410.2, 414, 426, 429.8][Math.floor(rnd() * 4)];
-    placeCar(ctx, carType(rnd), lx, zz, (lx > 420 ? Math.PI : 0) + (rnd() - 0.5) * 0.2, { state: 'dusty' }); }
+  // moving traffic on the district's roads (right-hand traffic), signalised junctions on the boulevard and the
+  // N-S streets; the lanes are kept free of parked cars (those stand at the curbs)
+  ctx.trafficPlan = (T) => {
+    const bc = (bx0 + bx1) / 2;
+    for (const [dx, dir] of [[-2.2, 1], [-5.6, 1], [2.2, -1], [5.6, -1]]) T.lane(dir > 0 ? [bc + dx, -300] : [bc + dx, 300], dir > 0 ? [bc + dx, 300] : [bc + dx, -300], { speed: 13, count: 16 });
+    for (const [z0, z1, x0, x1] of L.roadsX) { const zc = (z0 + z1) / 2, wide = z1 - z0 > 15;
+      for (const [dz, dir] of wide ? [[2.2, 1], [5.6, 1], [-2.2, -1], [-5.2, -1]] : [[2, 1], [-2, -1]]) T.lane(dir > 0 ? [x0, zc + dz] : [x1, zc + dz], dir > 0 ? [x1, zc + dz] : [x0, zc + dz], { speed: wide ? 12 : 9, count: wide ? 12 : 6 });
+      for (const [jx0, jx1] of [[bx0, bx1], [612, 624], [270, 282]]) if (jx1 > x0 && jx0 < x1) T.junction(jx0, z0, jx1, z1); }
+    for (const [x0, x1, z0, z1] of L.roadsZ) { const xc = (x0 + x1) / 2; T.lane([xc - 2, z0], [xc - 2, z1], { speed: 9, count: 5 }); T.lane([xc + 2, z1], [xc + 2, z0], { speed: 9, count: 5 }); }
+  };
 }
 
 // rounded department store with a curved roof and horizontal white bands (podium of the landmark)
