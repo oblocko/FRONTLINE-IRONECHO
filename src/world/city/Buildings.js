@@ -93,7 +93,7 @@ function pickShop(ctx, cats) {
 // Ground-floor shopfronts along one face. Units are split from the face; one narrow bay can be the
 // building lobby (stairs to the upper floors). Every shop gets glass with its interior type, an aluminium
 // frame, a door (registered as an entrance) and a sign in the building's sign style.
-function shopfronts(ctx, item, rect, nx, nz, { y0, gfH = 4.2, cats, lobby = true, signStyle = 'box', vacant = 0.12, lit = 0.35, wall, from = 0, to = 1 }) {
+function shopfronts(ctx, item, rect, nx, nz, { y0, gfH = 4.2, cats, lobby = true, signStyle = 'box', vacant = 0.12, lit = 0.35, wall, from = 0, to = 1, kinds = null }) {
   const m = mats(), B = ctx.batch, r = ctx.rnd, e = edge(rect, nx, nz), rot = Math.atan2(nx, nz);
   const a0 = -e.len / 2 + e.len * from + 0.6, a1 = -e.len / 2 + e.len * to - 0.6; const L = a1 - a0; if (L < 3) return;
   // split into units 4.5..8 m (+ lobby bay 2.4)
@@ -142,7 +142,7 @@ function shopfronts(ctx, item, rect, nx, nz, { y0, gfH = 4.2, cats, lobby = true
     if (closed && r() < 0.6) { const b = banner('임대 문의', '010-0000-0000 · 상가 임대', Math.min(4, sw), 0.8); const [bx, bz] = P(c, 0.02); b.position.set(bx, sy, bz); b.rotation.y = rot; ctx.scene.add(b); ctx.own(b); continue; }
     // sign: the kind follows the trade (rules), the details vary per shop (SignKit.js)
     const fg = cols[0] === '#ffffff' || cols[0] === '#f2ede2' || cols[0] === '#f5ecd8' ? cols[1] : cols[0];
-    const kind = signKind(cat, signStyle, r);
+    const kind = kinds ? kinds[Math.floor(r() * kinds.length)] : signKind(cat, signStyle, r);
     let s;
     if (kind === 'box') s = boxSign(name, sub, cols, sw, 0.95, { style: ['plain', 'split', 'logo', 'border'][Math.floor(r() * 4)], lit: lit > 0.5 });
     else if (kind === 'channel') { s = r() < 0.6 ? channelSign(name, fg, 0.62, { outline: '#ffffff', raceway: '#2a2a2a' }) : SK.channel(name, { color: fg, h: 0.6, light: r() < 0.5 ? 'halo' : 'front', returns: '#2a2a2a' }); }
@@ -195,14 +195,14 @@ export function commercial(ctx, parcel, o = {}) {
   const wall = wallMat(W.kind, W.color);
   const it = reg(ctx, { id: id(o.use ?? 'shops'), use: o.use ?? 'shops', zone: parcel.zone, rect, y0, h, entrances: [] });
   ctx.ownBegin(it);
-  it.colliders.push(mass(ctx, rect, y0, h, wall));
+  it.colliders.push(mass(ctx, rect, y0, h, wall, o.roof ? { roof: o.roof } : undefined));
   const cats = o.cats ?? ['store', 'cafe', 'restaurant', 'pharmacy', 'office', 'phone', 'optician', 'salon', 'clinic'];
   for (const [nx, nz] of SIDES) {
     const st = parcel.streets[key(nx, nz)], front = nx === parcel.front[0] && nz === parcel.front[1];
     // a side against a neighbouring building (within 2 m) is a blank party wall
     const e = edge(rect, nx, nz), strip = nx ? new Rect(e.cx, e.cz - e.len / 2 + 0.5, e.cx + nx * 2, e.cz + e.len / 2 - 0.5) : new Rect(e.cx - e.len / 2 + 0.5, e.cz, e.cx + e.len / 2 - 0.5, e.cz + nz * 2);
     if (!st && ctx.plan.items.some((q) => q !== it && q.kind === 'building' && q.rect.hits(strip))) continue;
-    if (st && ['sidewalk', 'plaza', 'alley', 'local', 'arterial', 'path'].includes(st)) shopfronts(ctx, it, rect, nx, nz, { y0, gfH, cats, lobby: front && floors > 2, signStyle: o.signStyle ?? 'mixed', wall, vacant: o.vacant ?? 0.12, lit: o.lit ?? 0.35 });
+    if (st && ['sidewalk', 'plaza', 'alley', 'local', 'arterial', 'path'].includes(st)) shopfronts(ctx, it, rect, nx, nz, { y0, gfH, cats, lobby: front && floors > 2, signStyle: o.signStyle ?? 'mixed', wall, vacant: o.vacant ?? 0.12, lit: o.lit ?? 0.35, kinds: o.signKinds ?? null });
     windows(ctx, o.upper ?? 'commercial', rect, nx, nz, { y0: y0 + gfH - (o.upper === 'villa' ? FACADE.villa.floorH : upH), floors, startFloor: 1, wall: W.color, frame: [0x8e9498, 0x3a3e42, 0x6a5a48][Math.floor(r() * 3)], tenants: front && o.upper !== 'villa' ? 0.45 : 0, guard: o.upper === 'villa' ? 0.4 : 0.05 });
   }
   // a vertical projecting sign at the front corner for the upper tenants

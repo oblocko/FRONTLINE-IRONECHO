@@ -21,6 +21,7 @@ import { curtainMat, gridMat, balustradeMat } from './Modern.js';
 import { boxSign, channelSign } from '../korea/Signs.js';
 import * as SK from './SignKit.js';
 import { shopInterior, interiorBatch, buildInteriors } from './ShopInterior.js';
+const THEME_TYPE = { cafe: 1, salad: 2, pharmacy: 3, bank: 4, glasses: 5, books: 5, music: 6, cosmetics: 0, fashion: 0, sports: 0, cinema: 0, store: 0 };
 const THEME_OF = { 0: 'store', 1: 'cafe', 2: 'salad', 3: 'pharmacy', 4: 'bank', 5: 'glasses', 6: 'music' };
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -114,14 +115,14 @@ function ledScreen(ctx, kind, w, h, x, y, z, rotY) {
 //      tower: { floors, setback (m back from the front), skin: 'curtain' | 'grid' | 'fins', glass, frame, fins },
 //      brand: { text, color, h } on the podium fascia, crown: [text, colour] letters on the roof, led: { kind, w, h, y } on the front }
 const GF = 5.5, FH = 3.8;
-function modernBuilding(ctx, b) {
+export function modernBuilding(ctx, b) {
   const m = mats(), B = ctx.batch, w = ctx.world, y0 = CURB, [nx] = b.front, rot = Math.atan2(nx, 0);
   const rect = new Rect(b.x0, b.z0, b.x1, b.z1), T = b.tower, pH = b.podium, tH = T.floors * FH, H = pH + tH;
   const it = ctx.plan.add({ kind: 'building', id: b.name, use: 'shops', zone: 'commercial', rect, y0, h: H, entrances: [] }); ctx.ownBegin(it);
   const e = edge(rect, nx, 0), at = (a, o = 0) => onFace(e, nx, 0, a, o);
   // podium: ground floor is D deep of walk-in shops behind real glass; behind them and above the ground
   // floor the podium is solid (sides / back in light stone)
-  const body = wallMat('panel', b.body ?? 0xd8d6d0), D = 11, CH = 4.0, len = e.len;
+  const body = wallMat(b.bodyKind ?? 'panel', b.body ?? 0xd8d6d0), D = b.interiors === false ? 0.8 : Math.min(11, rect.w - 3), CH = 4.0, len = e.len;
   const back = nx > 0 ? new Rect(rect.x0, rect.z0, rect.x1 - D, rect.z1) : new Rect(rect.x0 + D, rect.z0, rect.x1, rect.z1);
   B.box(body, back.w, pH, back.d, back.cx, y0 + pH / 2, back.cz);
   it.colliders.push(w.addBox(V(back.x0, y0, back.z0), V(back.x1, y0 + pH, back.z1), { surface: 'concrete', cover: true, walkable: false }));
@@ -146,7 +147,8 @@ function modernBuilding(ctx, b) {
       for (const sgn of [-1, 1]) { const [qx, qz] = at(du + sgn * 1.0, -0.04); B.box(m.mullion, 0.08, 2.4, 0.06, qx, y0 + 1.2, qz); } }
     const theme = sh.in ?? THEME_OF[sh.type] ?? 'store';
     const [ix, iz] = at(c, 0); const nm = sh.sign ? sh.sign[1] : sh.ch?.[0] ?? b.name;
-    shopInterior(ctx, IB, { fx: ix - nx * 0.06, zc: iz, nx, w: sw - 0.4, D: D - 0.1, y0, h: CH - 0.4, theme, name: sh.inName ?? nm.replace(/\n/g, ' '), color: sh.color ?? (sh.sign?.[2]?.color) ?? '#ffffff', metal: sh.metal ?? (theme === 'pharmacy' || theme === 'bank' ? 'silver' : theme === 'cafe' || theme === 'books' ? 'brass' : 'black'), seed: 11 + si * 31 + Math.round(Math.abs(b.z0) * 7), doorU: du - c });
+    if (b.interiors === false) ctx.fac.get('commercial').shop(ix - nx * 0.05, y0 + 2.1, iz, rot, sw - 0.6, 3.9, { type: THEME_TYPE[theme] ?? 0, lit: 0.6 });
+    else shopInterior(ctx, IB, { fx: ix - nx * 0.06, zc: iz, nx, w: sw - 0.4, D: D - 0.1, y0, h: CH - 0.4, theme, name: sh.inName ?? nm.replace(/\n/g, ' '), color: sh.color ?? (sh.sign?.[2]?.color) ?? '#ffffff', metal: sh.metal ?? (theme === 'pharmacy' || theme === 'bank' ? 'silver' : theme === 'cafe' || theme === 'books' ? 'brass' : 'black'), seed: 11 + si * 31 + Math.round(Math.abs(b.z0) * 7), doorU: du - c });
     const [fx, fz] = at(c, 0.1); B.box(m.black, 0.2, 1.1, sw - 0.3, fx, y0 + GF - 0.55, fz);
     if (sh.sign) { const [kind, ...args] = sh.sign; const sg = SK[kind](...args); const [gx, gz] = at(c, 0.12); sg.position.set(gx, y0 + GF - 0.55, gz); sg.rotation.y = rot; SK.bake(ctx, sg); }
     else if (sh.ch) { const cs = channelSign(sh.ch[0], sh.ch[1], 0.75, { raceway: null, lit: true }); const [gx, gz] = at(c, 0.22); cs.position.set(gx, y0 + GF - 0.55, gz); cs.rotation.y = rot; ctx.scene.add(cs); ctx.own(cs); }
@@ -194,7 +196,14 @@ function modernBuilding(ctx, b) {
     if (sg.userData.spin) (ctx.spinners ??= []).push(sg.userData.spin);
     if (out > 0.5 && yy < 0.5) w.addBoxCentered(V(sx, y0 + 0.6, sz), V(0.7, 1.2, 0.7), { surface: 'metal', walkable: false });
   }
-  rooftop(ctx, new Rect(tr.x0 + 2, tr.z0 + 2, tr.x1 - 2, tr.z1 - 2), y0 + H, [-nx, 0], { units: 3, tank: false });
+  // a rooftop terrace (bar / café on the roof): timber deck, glass balustrade, umbrellas, a string of lights
+  if (b.roofDeck) { const rr = new Rect(tr.x0 + 1, tr.z0 + 1, tr.x1 - 1, tr.z1 - 1), top = y0 + H;
+    B.box(m.wood, rr.w, 0.1, rr.d, rr.cx, top + 0.05, rr.cz, 0, { cast: false });
+    for (const [sx, sz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const te = edge(rr, sx, sz); B.box(m.rail, sx ? 0.04 : te.len, 1.0, sx ? te.len : 0.04, te.cx, top + 0.6, te.cz); }
+    const umb = flatMat(b.roofDeck === true ? 0xe8e0d0 : b.roofDeck, { roughness: 0.9, key: `hsumb${b.roofDeck}` });
+    for (let u = rr.z0 + 3; u < rr.z1 - 2; u += 5) for (const xx of [rr.x0 + rr.w * 0.3, rr.x0 + rr.w * 0.7]) { B.add(new THREE.ConeGeometry(1.3, 0.45, 8, 1, true).translate(xx, top + 2.4, u), umb); B.box(m.steel, 0.04, 2.2, 0.04, xx, top + 1.2, u); B.add(new THREE.CylinderGeometry(0.4, 0.4, 0.04, 14).translate(xx, top + 0.85, u), m.white); }
+    const bulb = new THREE.MeshBasicMaterial({ color: 0xffe0a0, toneMapped: false }); for (let u = rr.z0 + 0.5; u < rr.z1; u += 0.8) B.add(new THREE.SphereGeometry(0.06, 6, 4).translate(rr.x0 + 0.2, top + 2.6 - 0.3 * Math.sin(((u - rr.z0) / rr.d) * Math.PI * 3), u), bulb, { cast: false }); }
+  else rooftop(ctx, new Rect(tr.x0 + 2, tr.z0 + 2, tr.x1 - 2, tr.z1 - 2), y0 + H, [-nx, 0], { units: 3, tank: false });
   // the back (service lane): plain service doors
   { const be = edge(rect, -nx, 0); for (let u = -be.len / 2 + 4; u < be.len / 2 - 2; u += 9) { const [dx, dz] = onFace(be, -nx, 0, u, 0.03); B.box(m.steel, 0.06, 2.2, 1.2, dx, y0 + 1.1, dz); } }
   ctx.ownEnd(); return it;

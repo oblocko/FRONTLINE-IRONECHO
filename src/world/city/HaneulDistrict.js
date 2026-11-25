@@ -22,7 +22,7 @@ import { groundMat, paintMat, flatMat, wallMat } from './CityMaterials.js';
 import { CURB, furnishSidewalk, signal, parkAlong } from './Streets.js';
 import * as B from './Buildings.js';
 import * as SK from './SignKit.js';
-import { buildHandStreets, HAND, ledTex, lightPave } from './HandStreets.js';
+import { buildHandStreets, HAND, ledTex, lightPave, modernBuilding } from './HandStreets.js';
 import { curtainMat } from './Modern.js';
 
 export const DISTRICT = { x0: -945, x1: -232, z0: -430, z1: 430 };
@@ -50,6 +50,7 @@ export function buildHaneulDistrict(ctx) {
   // ================================================================ 1. roads (hand-drawn network)
   road(DISTRICT.x0, -430, DISTRICT.x1, -416, 'local', 'x'); road(DISTRICT.x0, 416, DISTRICT.x1, 430, 'local', 'x');
   road(ART.x0, -416, ART.x1, 416, 'arterial', 'z');
+  road(-975, -416, DISTRICT.x0, 416, 'arterial', 'z');   // the region's arterial on the west edge (drawn by Region): the edge rows face it
   for (const [a, b] of [[DISTRICT.x0, ART.x0], [ART.x1, DISTRICT.x1]]) { road(a, HR.z0, b, HR.z1, 'local', 'x'); road(a, WR.z0, b, WR.z1, 'local', 'x'); }
   for (const [z0, z1] of ZS) {
     road(-290, z0, -278, z1, 'local', 'z');                                   // 동교로
@@ -83,13 +84,18 @@ export function buildHaneulDistrict(ctx) {
 
   // ---- a) villa quarter (x -945..-706): double-loaded along the N-S alleys
   const villaCols = [[DISTRICT.x0, -888], [-882, -833], [-827, -778], [-772, -706]];
+  const COL_THEME = [['culture', 'culture'], ['food', 'culture'], ['food', 'food'], ['culture', 'food']];   // [west row, east row] per column
   for (const [z0, z1] of ZS) for (const [cz0, cz1] of cuts(z0, z1, EW.villa)) for (const [x0, xx1] of villaCols) {
     const x1 = xx1 === -706 && cz0 >= SQ.z0 && cz1 <= SQ.z1 ? SQ.x0 : xx1;
     const inner = block(x0, cz0, x1, cz1, { name: '하늘길 주거' });
     // the last column's east part is the west cafe row (along the park): it faces the cafe alley
     const cafeEdge = x1 === -706; const vx1 = cafeEdge ? -722 : inner.x1;
-    if (cafeEdge && !(cz1 > SQ.z0 && cz0 < SQ.z1)) cafeRow(ctx, parcel, new Rect(-722, inner.z0, -706, inner.z1), [1, 0]);
+    if (cafeEdge && !(cz1 > SQ.z0 && cz0 < SQ.z1)) modernRow(ctx, new Rect(-722, inner.z0, -706, inner.z1), 1, 'cafe', { min: 10, max: 16 });
     const mid = (inner.x0 + vx1) / 2;
+    // the middle band (between 와우로 and 하늘로) is the quarter's culture / food alleys, not housing
+    if (z0 === -216) { const th = COL_THEME[villaCols.findIndex((c) => c[0] === x0)] ?? ['food', 'culture'];
+      if (cafeEdge || x1 === SQ.x0) { modernRow(ctx, new Rect(inner.x0, inner.z0, vx1 - 0.5, inner.z1), -1, th[0], { min: 12, max: 20 }); continue; }   // backs onto the cafe row
+      modernRow(ctx, new Rect(inner.x0, inner.z0, mid - 0.5, inner.z1), -1, th[0], { min: 12, max: 20 }); modernRow(ctx, new Rect(mid + 0.5, inner.z0, vx1, inner.z1), 1, th[1], { min: 12, max: 20 }); continue; }
     for (const [rx0, rx1, fx] of [[inner.x0, mid, -1], [mid, vx1, 1]]) {
       if (rx1 - rx0 < 10) continue;
       let z = inner.z0 + 0.5, k = 0;
@@ -115,14 +121,14 @@ export function buildHaneulDistrict(ctx) {
     const inSq = cz1 > SQ.z0 && cz0 < SQ.z1;
     // east cafe row + mixed block (x -664..-575)
     const inA = block(inSq ? SQ.x1 : -664, cz0, -575, cz1, { name: '하늘길 카페거리' });
-    if (!inSq) cafeRow(ctx, parcel, new Rect(-664, inA.z0, -646, inA.z1), [-1, 0]);
-    commRow(ctx, parcel, new Rect(-618, inA.z0, inA.x1, inA.z1), [1, 0], { floors: [4, 7] });
+    if (!inSq) modernRow(ctx, new Rect(-664, inA.z0, -646, inA.z1), -1, 'cafe', { min: 10, max: 16 });
+    modernRow(ctx, new Rect(-618, inA.z0, inA.x1, inA.z1), 1, 'food');
     backLot(ctx, new Rect(-646, inA.z0, -618, inA.z1));
     // block along the arterial (x -565..-495): a row on the mid road, taller row on the arterial
     const inB = block(-565, cz0, ART.x0, cz1);
     const midX = (inB.x0 + inB.x1) / 2 - 4;
-    commRow(ctx, parcel, new Rect(inB.x0, inB.z0, midX, inB.z1), [-1, 0], { floors: [4, 6] });
-    commRow(ctx, parcel, new Rect(midX + 2, inB.z0, inB.x1, inB.z1), [1, 0], { floors: [8, 13], wide: true });
+    modernRow(ctx, new Rect(inB.x0, inB.z0, midX, inB.z1), -1, 'culture');
+    modernRow(ctx, new Rect(midX + 2, inB.z0, inB.x1, inB.z1), 1, 'office', { min: 18, max: 30 });
   }
   // the 보행로 through the commercial blocks (z -53..-45): paved, lit, benches and planters, crossings
   connector(ctx);
@@ -157,6 +163,70 @@ export function buildHaneulDistrict(ctx) {
   // cars parked along the locals
   for (const [z0, z1] of ZS) { parkAlong(ctx, { axis: 'z', line: -566.1, from: z0 + 10, to: z1 - 10, dir: 1, fill: 0.4, avoid: [-49, 160, 300, -323] }); parkAlong(ctx, { axis: 'z', line: -279.1, from: z0 + 10, to: z1 - 10, dir: 1, fill: 0.35 }); }
   parkAlong(ctx, { axis: 'x', line: 78.9, from: -940, to: -500, dir: 1, fill: 0.3, avoid: [-703, -667, -885, -830, -775] });
+}
+
+
+// ------------------------------------------------------------------ the quarter's buildings, in the 하늘길 style
+// Each street has a theme; each building gets its own name, façade, height and signs from the theme's lists
+// (picked in order with a per-street offset, so neighbours always differ). Same builder as 하늘길 itself:
+// glass ground floor (walk-in shops near the centre), modern tower skin, signs from SignKit.
+const NAMES = {
+  cafe: ['카페 소요', '모노 로스터스', '느린 오후', '하늘 베이커리', '오브제 커피', '브루 랩', '라운드 테이블', '숲의 부엌', '그린 브레드', '카페 결', '도토리 다방', '밀크 앤 허니', '오늘의 빵', '써니 사이드', '모카 하우스', '포레스트 티'],
+  food: ['명가 국밥', '불꽃 닭갈비', '서울 떡볶이', '하늘 칼국수', '스시 하루', '오사카 라멘', '타코 플레이스', '버거 스탠드', '청춘 포차', '할매 순대', '피자 공방', '마라 키친', '돈까스 연구소', '쌀국수 하노이', '해물 포차', '우동 한그릇'],
+  fashion: ['ROOM 29', '베이직 하우스', '무드 스튜디오', 'STREET LAB', '하늘 슈즈', '데님 팩토리', 'NOVA', '블루 라벨', '어반 핏', '라인 앤 폼', 'VELVET', '코튼 클럽', '스니커 랩', 'TONE', '모던 가먼트', '셀렉트 31'],
+  culture: ['라이브홀 웨이브', '갤러리 하늘', '레코드 숍 33', '인디 스테이지', '공방 나무', '포토 스튜디오 빛', '아트 스페이스 결', '재즈 클럽 블루', '독립 서점 섬', '클럽 에코', '판화 공방', '뮤직 라운지 B1', '전시관 여백', '보드게임 카페', '타투 스튜디오', '코믹 서점'],
+  office: ['하늘 타워', '서교 프라자', '와우 빌딩', '동교 센터', '하늘 메디컬', '연남 오피스', '서울 아카데미', 'HJ 빌딩', '미래 프라자', '그린 타워'],
+};
+const COLORS = { warm: ['#3a2a1a', '#f0e6d0', '#d8b080'], green: ['#1e3a2e', '#f0ecd8', '#a0c070'], red: ['#a01a10', '#fff2c8', '#ffd040'], navy: ['#1a2a4a', '#ffffff', '#7ac8ff'], black: ['#141414', '#ffffff', '#d8b060'], pink: ['#f4d8e0', '#8a2a4a', '#e8708a'], white: ['#ffffff', '#1a1a1a', '#2a6a8a'], yellow: ['#f4d040', '#1a1a1a', '#c8261c'] };
+const pickN = (a, i) => a[((i % a.length) + a.length) % a.length];
+function themedSpec(theme, i, len, depth) {
+  const name = pickN(NAMES[theme], i * 5 + Math.floor(i / 3)), c = pickN(Object.values(COLORS), i * 3 + theme.length);
+  const neon = pickN(['#ff4ad8', '#7ad8ff', '#ffb040', '#8aff6a', '#ff5a3a', '#c060ff'], i);
+  const two = len > 17;
+  const sub = pickN(NAMES[theme], i * 5 + 7);
+  const signOf = (kindList, txt, k) => { const kind = pickN(kindList, k);
+    if (kind === 'channel') return ['channel', txt, { color: c[0] === '#ffffff' ? c[1] : c[2], h: 0.65, light: pickN(['front', 'halo', 'side'], k), returns: '#2a2a2a', font: k % 2 ? 'serif' : 'sans' }];
+    if (kind === 'flex') return ['flex', txt, { sub: pickN(['since 2009', 'OPEN 11:00', '본점', 'DAILY', ''], k), bg: c[0], fg: c[1], accent: c[2], w: Math.min(7, (two ? len / 2 : len) - 1.2), h: 0.95, bulbs: theme === 'food' && k % 3 === 0 }];
+    if (kind === 'neon') return ['neon', txt, { color: neon, h: 0.75 }];
+    if (kind === 'wood') return ['wood', txt, { tone: pickN(['#6a4a2e', '#8a6440', '#3a2a1e', '#a07a50'], k), ink: '#f4ecd8', h: 0.6, font: 'serif' }];
+    if (kind === 'scashi') return ['scashi', txt, { color: '#2a2a2a', panel: pickN(['#f4f2ee', null, '#e8e4dc'], k), h: 0.55, font: k % 2 ? 'serif' : 'sans', lamps: 3, w: Math.min(6, (two ? len / 2 : len) - 1.5) }];
+    return ['metal', txt, { kind: pickN(['brass', 'corten', 'black', 'steel'], k), h: 0.75, font: 'serif' }]; };
+  const T = {
+    cafe:    { kinds: ['wood', 'scashi', 'neon', 'channel'], podium: 5.5, floors: [1, 3], skins: [['fins', 'wood'], ['grid', null], ['curtain', null]], body: [0xf0ede6, 0xe6e0d8, 0xd8d0c4, 0x2a2c30], int: ['cafe', 'cafe', 'books'], extra: ['awning', 'aFrame', 'point'] },
+    food:    { kinds: ['flex', 'flex', 'wood', 'neon'], podium: 5.5, floors: [2, 4], skins: [['grid', null], ['curtain', null], ['fins', 'alu']], body: [0xece6d8, 0xd8d0c0, 0x3a3440, 0xc8c0b4], int: ['salad', 'cafe'], extra: ['awning', 'stand', 'point', 'blade'] },
+    fashion: { kinds: ['channel', 'metal', 'channel', 'scashi'], podium: 10, floors: [3, 7], skins: [['curtain', null], ['grid', null], ['fins', 'alu']], body: [0x2a2c30, 0xd0d4d8, 0xeeece8, 0x18181a], int: ['fashion', 'cosmetics', 'sports'], extra: ['xBanner', 'blade', 'point'] },
+    culture: { kinds: ['neon', 'scashi', 'metal', 'neon'], podium: 6, floors: [1, 4], skins: [['grid', null], ['fins', 'wood'], ['curtain', null]], body: [0x2a2828, 0x6a6460, 0xb8b4ae, 0x18181a], int: ['music', 'books', 'cafe'], extra: ['xBanner', 'blade', 'aFrame'] },
+    office:  { kinds: ['channel', 'channel', 'flex'], podium: 8, floors: [7, 13], skins: [['curtain', null], ['grid', null]], body: [0xb8c0c4, 0xd8d6d0, 0x2a2c30], int: ['bank', 'pharmacy', 'glasses', 'cafe'], extra: ['point', 'blade'] },
+  }[theme];
+  const [skin, finMat] = pickN(T.skins, i * 7 + 1), floors = T.floors[0] + ((i * 5 + 3) % (T.floors[1] - T.floors[0] + 1));
+  const glass = pickN([0x3e5a6a, 0x2a3640, 0x4a6474, 0x46564a, 0x3a3a4e], i), frame = pickN([0xd8dce0, 0x3a3e42, 0xe8e4dc, 0x8a7a50], i * 3);
+  const shops = two ? [{ w: Math.round(len * 0.55), in: pickN(T.int, i), sign: signOf(T.kinds, name, i) }, { in: pickN(T.int, i + 1), sign: signOf(T.kinds, sub, i + 2) }] : [{ in: pickN(T.int, i), sign: signOf(T.kinds, name, i) }];
+  const extra = []; const ex = pickN(T.extra, i), ex2 = pickN(T.extra, i + 2), half = len / 2 - 0.8;
+  for (const [e, k] of [[ex, 0], [ex2, 1]]) {
+    if (k === 1 && i % 3 === 0) continue;
+    const a = k ? half - 1.5 : -half + 1.5;
+    if (e === 'awning') extra.push(['awning', [name, { w: Math.min(5.5, len * 0.45), depth: 1.4, drop: 0.5, color: c[0] === '#ffffff' ? c[2] : c[0], ink: c[1], stripes: i % 4 === 0 ? ['#f4f0e6', c[0]] : null, shape: i % 3 === 0 ? 'dome' : 'slope', sub: sub }], -len * 0.2, 4.1]);
+    else if (e === 'aFrame') extra.push(['aFrame', [pickN(['오늘의 메뉴', 'TODAY', 'OPEN', '전시 중', '이번 주 공연'], i), { sub: sub, bg: c[0], fg: c[1], chalk: theme === 'cafe' }], a, 0, 1.6]);
+    else if (e === 'stand') extra.push(['stand', [name, { sub: pickN(['점심 특선 9,000원', '포장 가능', '2층 단체석', '24시간'], i), bg: c[0], fg: c[1] }], a, 0, 1.5]);
+    else if (e === 'xBanner') extra.push(['xBanner', [pickN(['NEW SEASON', '전시 오픈', 'LIVE 8PM', 'SALE 30%', '원데이 클래스'], i), { sub: name, accent: neon, bg: '#ffffff', fg: '#1a1a1a' }], a, 0, 1.6]);
+    else if (e === 'point') extra.push(['point', [[...name.replace(/ /g, '')].slice(0, 2).join(''), { shape: pickN(['round', 'square', 'cube'], i), bg: c[0], fg: c[1], size: 0.65 }], a, 3.6]);
+    else if (e === 'blade' && T.podium + floors * 3.8 > 9) extra.push(['blade', [pickN(['필라테스', '영어학원', '치과', '네일', '스튜디오', '연습실'], i) + ' ' + (i % 9 + 1) + 'F', { bg: pickN(['#1d3f8a', '#141414', '#f4f2ee', '#7a2a6a'], i), fg: pickN(['#ffffff', '#ffd040', '#1a1a1a'], i), w: 0.7 }], k ? half : -half, T.podium + 1.6]);
+  }
+  return { name: `${name}-${i}`, podium: T.podium, body: pickN(T.body, i * 3 + 1), interiors: theme !== 'office',
+    shops, tower: { floors, setback: theme === 'fashion' || theme === 'office' ? (i % 3) * 1.5 : 0, skin, finMat, fins: skin === 'fins', finStep: pickN([1.0, 1.2, 1.5, 1.8], i), glass, frame, spandrel: frame, bays: 3 + (i % 3) },
+    brand: theme === 'fashion' && i % 2 ? { text: name, color: c[0] === '#141414' ? c[2] : '#ffffff', h: 1.8 } : null,
+    led: theme === 'fashion' && i % 4 === 1 ? { kind: pickN(['shoes', 'serum', 'tea', 'tour'], i), w: Math.min(8, len - 4), h: 5, y: T.podium + 2 } : theme === 'culture' && i % 5 === 2 ? { kind: 'music', w: Math.min(7, len - 4), h: 4.5, y: T.podium + 1.5 } : null,
+    roofDeck: (theme === 'cafe' || theme === 'food' || theme === 'culture') && i % 3 === 1 ? pickN([true, 0x2a4a3a, 0xc8261c, 0x1a2a4a], i) : null,
+    extra };
+}
+let SPEC_I = 0;
+// a row of themed buildings along z, fronts facing [fx, 0]
+function modernRow(ctx, r, fx, theme, { min = 12, max = 24 } = {}) {
+  if (r.x1 - r.x0 < 9) return;
+  let z = r.z0 + 0.3;
+  while (r.z1 - z > min - 1) { const i = SPEC_I++; let wdt = min + ((i * 7) % (max - min + 1)); if (r.z1 - (z + wdt) < min) wdt = r.z1 - z - 0.3;
+    modernBuilding(ctx, { ...themedSpec(theme, i, wdt - 0.6, r.x1 - r.x0), x0: r.x0, x1: r.x1, z0: z, z1: z + wdt - 0.6, front: [fx, 0] });
+    z += wdt; }
 }
 
 // ------------------------------------------------------------------ zone builders
@@ -250,11 +320,11 @@ function hanulNorth(ctx, parcel, block, z0, z1) {
   for (let z = z0 + 10; z < z1 - 8; z += 24) { tree(ctx, -371, z, 1); bench(ctx, -373.6, z + 6); bench(ctx, -368.4, z + 6); }
   for (let z = z0 + 22; z < z1 - 10; z += 48) terrace(ctx, -378, z, 5, 10);
   const west = block(ART.x1, z0, -384, z1); const mid = (west.x0 + west.x1) / 2;
-  commRow(ctx, parcel, new Rect(west.x0, west.z0, mid - 1, west.z1), [-1, 0], { floors: [6, 10], wide: true });
-  commRow(ctx, parcel, new Rect(mid + 1, west.z0, west.x1, west.z1), [1, 0], { floors: [4, 7] });
+  modernRow(ctx, new Rect(west.x0, west.z0, mid - 1, west.z1), -1, 'office', { min: 18, max: 28 });
+  modernRow(ctx, new Rect(mid + 1, west.z0, west.x1, west.z1), 1, 'fashion', { min: 14, max: 24 });
   const east = block(-349, z0, -290, z1); const m2 = (east.x0 + east.x1) / 2;
-  commRow(ctx, parcel, new Rect(east.x0, east.z0, m2 - 1, east.z1), [-1, 0], { floors: [4, 7] });
-  commRow(ctx, parcel, new Rect(m2 + 1, east.z0, east.x1, east.z1), [1, 0], { floors: [5, 9] });
+  modernRow(ctx, new Rect(east.x0, east.z0, m2 - 1, east.z1), -1, 'fashion', { min: 14, max: 24 });
+  modernRow(ctx, new Rect(m2 + 1, east.z0, east.x1, east.z1), 1, 'office', { min: 18, max: 28 });
 }
 // 하늘 광장: the main square across 하늘로 from 하늘길: stepped amphitheatre around a stage, a water mirror,
 // tree groves with seating, a media column, café terraces along the tower fronts
