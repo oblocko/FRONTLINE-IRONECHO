@@ -3,7 +3,7 @@
 //   boulevard (N-S)      x 408..432 — runs between the two lakes
 //   올림픽로 (E-W)        z -104..-84, the big crossing with the boulevard; rail viaduct just north (z -160..-144)
 //   잠실로 (E-W, east)    z -16..-4, between the landmark block and the east lake
-//   streets              N-S x 270..282 and 612..624, E-W z -236..-224 and 150..162
+//   streets              N-S x 270..282 and 612..624, E-W z -276..-264 and 150..162
 //   east lake (동호)      east of the boulevard, south of 잠실로; the landmark tower + mall on the block north of it
 //   west lake (서호)      west of the boulevard, further south-west; lake park north of it
 //   서울중앙역            north-west of the big crossing (hall over the viaduct, plaza on 올림픽로)
@@ -20,11 +20,11 @@ import { buildCentralStation, footbridge, stationQuarter } from './Station.js';
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 export const ND = {
   x0: 216, x1: 720, boulevard: [408, 432], walk: 6, sw: 4, connector: [200, 216],
-  roadsX: [[-104, -84, 216, 720], [-236, -224, 216, 720], [150, 162, 216, 720], [-16, -4, 432, 720]],     // E-W [z0, z1, x0, x1]
-  roadsZ: [[270, 282, -300, -224], [270, 282, -104, 300], [612, 624, -300, 300]],                      // N-S [x0, x1, z0, z1] (the west one stops at the station block)
-  rail: { z0: -206, z1: -166, y: 9 },
+  roadsX: [[-104, -84, 216, 720], [-276, -264, 216, 720], [150, 162, 216, 720], [-16, -4, 432, 720]],     // E-W [z0, z1, x0, x1]
+  roadsZ: [[270, 282, -300, -264], [270, 282, -104, 300], [612, 624, -300, 300]],                      // N-S [x0, x1, z0, z1] (the west one stops at the station block)
+  rail: { z0: -246, z1: -206, y: 9 },   // 40 m further north than first built: more room between the station and the landmark
   lakes: [{ cx: 522, cz: 70, rx: 72, rz: 44 }, { cx: 345, cz: 95, rx: 52, rz: 44 }],
-  tower: V(522, 0, -50),   // moved east from 488 so the station and the landmark stand further apart
+  tower: V(488, 0, -50),
 };
 // lakes are below the land: water at -0.9 inside the ellipse (heightFn uses this)
 export function inLake(x, z, grow = 0) { return ND.lakes.some((l) => ((x - l.cx) / (l.rx + grow)) ** 2 + ((z - l.cz) / (l.rz + grow)) ** 2 < 1); }
@@ -39,12 +39,12 @@ export function buildNewDistrict(ctx) {
   plan.reserve(new Rect(L.connector[1], L.rail.z0, L.x1, L.rail.z1), 'overpass', 'rail viaduct');
   // blocks = the cells between roads (per side), sidewalks along every edge that meets a road
   const xCuts = { W: [[216, 270], [282, bx0]], E: [[bx1, 612], [624, L.x1]] };
-  const zCuts = { W: [[-300, -236], [-224, -104], [-84, 150], [162, 300]], E: [[-300, -236], [-224, -104], [-84, -16], [-4, 150], [162, 300]] };
+  const zCuts = { W: [[-300, -276], [-264, -104], [-84, 150], [162, 300]], E: [[-300, -276], [-264, -104], [-84, -16], [-4, 150], [162, 300]] };
   const cells = [];
   for (const side of ['W', 'E']) for (const [x0, x1] of xCuts[side]) for (const [z0, z1] of zCuts[side]) {
     // the station block west of the boulevard is one large block (no street through it)
-    if (side === 'W' && z0 === -224 && x0 === 282) continue;
-    const r = new Rect(side === 'W' && z0 === -224 && x0 === 216 ? 216 : x0, z0, side === 'W' && z0 === -224 && x0 === 216 ? bx0 : x1, z1); cells.push(r);
+    if (side === 'W' && z0 === -264 && x0 === 282) continue;
+    const r = new Rect(side === 'W' && z0 === -264 && x0 === 216 ? 216 : x0, z0, side === 'W' && z0 === -264 && x0 === 216 ? bx0 : x1, z1); cells.push(r);
     plan.block(r, side === 'E' ? 'business' : 'residential', `N${side}${x0},${z0}`);
     const onRoad = (x, z) => plan.carriageways.some((q) => q.rect.has(x, z));
     const bw = (nx) => (nx && (x0 === bx1 || x1 === bx0) ? L.walk : L.sw);
@@ -89,20 +89,20 @@ export function buildNewDistrict(ctx) {
   for (const tz of [R.z0 + 2, R.z0 + 6.5, R.z1 - 6.5, R.z1 - 2]) for (const s of [-0.72, 0.72]) batch.box(rail2, deck.w, 0.16, 0.08, deck.cx, R.y + 0.1, tz + s, 0, { cast: false });
   // 서울중앙역 (world/city/Station.js): train shed + concourse vault + arched glass front, twin towers, plaza with
   // a sunken metro plaza, bus terminal and taxi rank; a footbridge to the landmark
-  const stBlock = new Rect(216 + 4, -224 + 4, bx0 - L.walk, -104 - L.sw);
+  const stBlock = new Rect(216 + 4, -264 + 4, bx0 - L.walk, -104 - L.sw);
   const station = buildCentralStation(ctx, { block: stBlock, rail: R });
   footbridge(ctx, { x0: stBlock.x1 - 30, z0: -116, x1: bx1 + L.walk + 10, z1: -84 + L.sw + 8 });   // lands on the landmark forecourt
   // the east side: mixed-use development across the boulevard (department store podium + hotel tower), its forecourt
   // where the footbridge lands
-  plan.walk(new Rect(bx1 + L.walk, -166, bx1 + L.walk + 14, -104 - L.sw), 'plaza');
+  plan.walk(new Rect(bx1 + L.walk, R.z1, bx1 + L.walk + 14, -104 - L.sw), 'plaza');
   plan.walk(new Rect(bx1 + L.walk, -112.5, 612 - 2, -104 - L.sw), 'plaza');   // the department store / hotel forecourt on 올림픽로
   modernTower(ctx, { x: 492, z: -137, y0: CURB, podium: { kind: 'round', w: 82, d: 50, h: 26, r: 10 }, sections: [{ kind: 'round', w: 34, d: 26, r: 8, h: 118, floorH: 4, rims: 2 }],
     crown: 'fin', zone: 'business', use: 'shops', front: [0, 1], palette: { glass: 0x5a7486, spandrel: 0xc8ccd0, mullion: 0xe0e4e6, key: 'hotel' } });
-  stationQuarter(ctx, { st: station, block: stBlock, rail: R, east: [new Rect(bx1 + L.walk + 2, -206, 612 - L.sw - 2, -166), new Rect(624 + L.sw + 2, -206, L.x1 - 2, -166)] });
+  stationQuarter(ctx, { st: station, block: stBlock, rail: R, east: [new Rect(bx1 + L.walk + 2, R.z0, 612 - L.sw - 2, R.z1), new Rect(624 + L.sw + 2, R.z0, L.x1 - 2, R.z1)] });
   // ---------------------------------------------------------------- the landmark + podium mall (east of the boulevard, facing the lakes)
   const T = L.tower; landmarkTower(ctx, { x: T.x, z: T.z, y0: CURB, H: 520, base: 58, name: '서울 하늘타워' });
   // podium mall north / east of the tower: a long retail block and a rounded "dome" department store
-  modernTower(ctx, { x: 584, z: -50, y0: CURB, sections: [{ kind: 'round', w: 46, d: 56, r: 12, h: 36, mat: 'grid', floorH: 6, rims: 1 }], crown: 'plant', zone: 'business', use: 'shops', front: [-1, 0], palette: { frame: 0xeeeae0, glass: 0x5a6a74, key: 'mall' } });
+  modernTower(ctx, { x: 566, z: -50, y0: CURB, sections: [{ kind: 'round', w: 80, d: 56, r: 14, h: 36, mat: 'grid', floorH: 6, rims: 1 }], crown: 'plant', zone: 'business', use: 'shops', front: [-1, 0], palette: { frame: 0xeeeae0, glass: 0x5a6a74, key: 'mall' } });
   domeStore(ctx, { x: 560, z: -128, w: 50, d: 30, h: 26 });
   // forecourt between the tower and the boulevard
   { const fc = new Rect(bx1 + L.walk, -80, T.x - 30, -20); plan.walk(fc, 'plaza'); batch.add(cap(outline('rect', fc.w, fc.d), CURB + 0.015, { cx: fc.cx, cz: fc.cz }), groundMat('plaza', { color: 0xc8c4bc }), { cast: false }); }

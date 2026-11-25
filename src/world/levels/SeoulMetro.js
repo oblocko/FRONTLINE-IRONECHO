@@ -41,7 +41,7 @@ export class SeoulMetro {
         else if (w.kind === 'plaza' && area > 200) areas.push({ rect: r.inset(1), kind: 'plaza', n: Math.round(area / 140 * k), doors: doors.filter(([x, z]) => r.has(x, z, 3)) });
       }
       // plazas first, then sidewalks nearest the station quarter, so the cap trims the quiet edges, not the centre
-      const hub = [330, -130], dist = (A) => Math.hypot((A.rect.x0 + A.rect.x1) / 2 - hub[0], (A.rect.z0 + A.rect.z1) / 2 - hub[1]);
+      const hub = [330, -160], dist = (A) => Math.hypot((A.rect.x0 + A.rect.x1) / 2 - hub[0], (A.rect.z0 + A.rect.z1) / 2 - hub[1]);
       areas.sort((a, b) => (a.kind === 'plaza' ? 0 : 1) - (b.kind === 'plaza' ? 0 : 1) || dist(a) - dist(b));
       for (const A of areas) if (A.kind === 'plaza' && dist(A) < 120) A.n = Math.round(A.n * 2.2);   // the station plaza is busy
       this.crowd = new Crowd(g, areas, { y: 0.15, max: 1800 });
