@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { events } from '../core/Events.js';
 import { settings, QUALITY_PRESETS, DEFAULT_BINDINGS } from '../core/Settings.js';
 import { saves } from '../core/SaveSystem.js';
+import { VERSION, BUILD } from '../version.js';
 import { MISSIONS, ACTS, missionById } from '../missions/index.js';
 import { CHARACTERS, speakerLabel } from '../story/Characters.js';
 import { keyName } from '../player/Player.js';
@@ -54,7 +55,7 @@ export class UI {
           <button class="btn" data-a="credits"><span class="idx">05</span>CREDITS<span class="sub">제작진</span></button>
           <button class="btn" data-a="exit" data-snd="back"><span class="idx">06</span>EXIT<span class="sub">종료</span></button>
         </nav>
-        <div class="foot">BUILD 0.1.0 · VERTICAL SLICE<br/>MISSION 01 PLAYABLE · 02–16 IN PRODUCTION<br/>ALL CHARACTERS AND EVENTS ARE FICTIONAL</div>
+        <div class="foot">VERSION ${VERSION} · BUILD ${BUILD}<br/>MISSIONS 01–07 PLAYABLE<br/>ALL CHARACTERS AND EVENTS ARE FICTIONAL</div>
       </div>
       <div class="center"><div class="reticle-deco"></div></div>
       <div class="right">

@@ -48,7 +48,7 @@ const paveTex = () => tex('hs_pave2', 512, 512, (g, W, H) => {
   for (let i = 0; i < 3000; i++) { g.fillStyle = `rgba(0,0,0,${Math.random() * 0.05})`; g.fillRect(Math.random() * W, Math.random() * H, 2, 2); }
 });
 // a full-colour LED screen ad (products only, no people)
-function ledTex(kind) {
+export function ledTex(kind) {
   return tex(`hs_led${kind}`, 512, 384, (g, W, H) => {
     const ads = {
       serum: () => { const gr = g.createLinearGradient(0, 0, W, H); gr.addColorStop(0, '#f6d8e0'); gr.addColorStop(1, '#c87890'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
