@@ -238,7 +238,7 @@ export function bake(ctx, g, B = ctx.batch) {
     if (!o.isMesh) return;
     if (o === g.userData.spin) { live.push(o); return; }
     const src = o.geometry, mats = Array.isArray(o.material) ? o.material : [o.material];
-    const parts = Array.isArray(o.material) && src.groups.length ? src.groups.map((gr) => { const ge = new THREE.BufferGeometry(); for (const k of ['position', 'normal', 'uv']) if (src.attributes[k]) ge.setAttribute(k, src.attributes[k]); ge.setIndex(src.index.array.slice(gr.start, gr.start + gr.count)); return [ge, mats[gr.materialIndex]]; }) : [[src.clone(), mats[0]]];
+    const parts = Array.isArray(o.material) && src.groups.length ? src.groups.map((gr) => { const ge = new THREE.BufferGeometry(); for (const k of ['position', 'normal', 'uv']) if (src.attributes[k]) ge.setAttribute(k, src.attributes[k]); ge.setIndex(new THREE.BufferAttribute(src.index.array.slice(gr.start, gr.start + gr.count), 1)); return [ge, mats[gr.materialIndex]]; }) : [[src.clone(), mats[0]]];
     for (const [ge, m] of parts) { if (!m) continue; const w = ge.clone().applyMatrix4(o.matrixWorld); if (!w.attributes.uv) continue; w.userData.keepUV = true; B.add(w, m, { cast: false }); }
   });
   if (live.length) { for (const o of live) { o.getWorldPosition(o.position); o.rotation.set(0, 0, 0); o.scale.set(1, 1, 1); ctx.scene.add(o); } }

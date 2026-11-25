@@ -712,9 +712,12 @@ export class NewYorkTower {
     box(401.7, 410.4, 0, 2.8, 1.3, 1.6, M.wall); box(401.7, 413.3, 0, 2.8, -1.6, -1.3, M.wall); box(413, 413.3, 0, 2.8, -1.3, 8, M.wall); box(410.1, 410.4, 0, 2.8, 1.6, 8, M.wall);
     box(401.7, 413.3, 2.8, 3.0, -1.6, 8, M.concDark, true, { cover: false });
     for (const [x, z] of [[405, 0], [411.7, 4]]) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.12), M.workGlow); b.position.set(x, 2.78, z); scene.add(b); this.anchors.push({ pos: V(x, 2.5, z), color: 0xfff0d0, power: 10, dist: 7, area: 'under' }); }
-    const door = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.3), new THREE.MeshBasicMaterial({ map: signTexture('TRACK ACCESS', 'AUTHORIZED ONLY', '#c8a020', '#141414'), toneMapped: false })); door.position.set(411.7, 2.5, 7.95); door.rotation.y = Math.PI; scene.add(door);
+    const door = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.3), new THREE.MeshBasicMaterial({ map: signTexture('TRACK ACCESS', 'AUTHORIZED ONLY', '#c8a020', '#141414'), toneMapped: false })); door.position.set(411.7, 2.58, 7.55); door.rotation.y = Math.PI; scene.add(door);
     // tunnel shell: north wall behind the platforms, south wall, ceiling; track bed, ties, rails, third rail cover
-    box(P.x0 - 1, T.x1, -1.2, 4.6, P.z0 - 0.4, P.z0, M.soot);
+    // north wall, with the TRACK ACCESS doorway where the service corridor comes out (x 410.4..413)
+    box(P.x0 - 1, 410.4, -1.2, 4.6, P.z0 - 0.4, P.z0, M.soot); box(413, T.x1, -1.2, 4.6, P.z0 - 0.4, P.z0, M.soot);
+    box(410.4, 413, 2.8, 4.6, P.z0 - 0.4, P.z0, M.soot, true, { cover: false });
+    for (const x of [410.3, 413.1]) box(x - 0.1, x + 0.1, 0, 2.8, P.z0 - 0.45, P.z0 + 0.05, M.black, false);   // door frame
     box(T.x0, T.x1, -1.2, 4.6, T.z1, T.z1 + 0.4, M.soot);
     box(T.x0, T.x1, 4.4, 4.8, P.z0, T.z1, M.soot, true, { cover: false });
     box(T.x0 - 0.4, T.x0, -1.2, 4.6, P.z0, T.z1, M.soot); box(T.x1, T.x1 + 0.4, -1.2, 4.6, P.z0, T.z1, M.soot);
