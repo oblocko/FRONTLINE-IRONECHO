@@ -50,7 +50,7 @@ function mats() {
 
 // ------------------------------------------------------------------ building pieces
 // a solid mass with roof slab, parapet and collider
-function mass(ctx, rect, y0, h, wall, { roof = mats().roofGreen, parapet = 1.0, collide = true, surface = 'concrete' } = {}) {
+export function mass(ctx, rect, y0, h, wall, { roof = mats().roofGreen, parapet = 1.0, collide = true, surface = 'concrete' } = {}) {
   const B = ctx.batch;
   B.box(wall, rect.w, h, rect.d, rect.cx, y0 + h / 2, rect.cz);
   B.box(roof, rect.w - 0.5, 0.06, rect.d - 0.5, rect.cx, y0 + h + 0.03, rect.cz);
@@ -58,7 +58,7 @@ function mass(ctx, rect, y0, h, wall, { roof = mats().roofGreen, parapet = 1.0, 
   return collide ? ctx.world.addBox(V(rect.x0, y0, rect.z0), V(rect.x1, y0 + h, rect.z1), { surface, cover: true, walkable: false }) : null;
 }
 // rooftop clutter on a flat roof: stair head (door facing `front`), tank, AC units, mast
-function rooftop(ctx, rect, top, front, { tank = true, units = 3 } = {}) {
+export function rooftop(ctx, rect, top, front, { tank = true, units = 3 } = {}) {
   const B = ctx.batch, m = mats(), r = ctx.rnd; const [fx, fz] = front;
   const hw = Math.min(4, rect.w * 0.3), hd = Math.min(3.6, rect.d * 0.3);
   const hx = rect.cx + (r() - 0.5) * (rect.w - hw - 2), hz = rect.cz + (r() - 0.5) * (rect.d - hd - 2);
@@ -69,7 +69,7 @@ function rooftop(ctx, rect, top, front, { tank = true, units = 3 } = {}) {
   if (r() < 0.4) B.add(new THREE.CylinderGeometry(0.04, 0.06, 5, 6).translate(hx + hw / 3, top + 5.3, hz), m.steel);
 }
 // one facade face with windows (and optional tenant lettering)
-function windows(ctx, style, rect, nx, nz, { y0, floors, startFloor = 1, wall, frame = 0x8e9498, lit = 0.03, guard = 0.1, ac = 0.12, minY = -1, tenants = 0 }) {
+export function windows(ctx, style, rect, nx, nz, { y0, floors, startFloor = 1, wall, frame = 0x8e9498, lit = 0.03, guard = 0.1, ac = 0.12, minY = -1, tenants = 0 }) {
   const e = edge(rect, nx, nz);
   const p = { cx: e.cx, cz: e.cz, nx, nz, len: e.len, floors, y0, startFloor, minY };
   ctx.fac.get(style).face({ ...p, wall, frame, lit, guard, ac });

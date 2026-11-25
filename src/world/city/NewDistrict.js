@@ -24,7 +24,7 @@ export const ND = {
   roadsZ: [[270, 282, -300, -224], [270, 282, -104, 300], [612, 624, -300, 300]],                      // N-S [x0, x1, z0, z1] (the west one stops at the station block)
   rail: { z0: -206, z1: -166, y: 9 },
   lakes: [{ cx: 522, cz: 70, rx: 72, rz: 44 }, { cx: 345, cz: 95, rx: 52, rz: 44 }],
-  tower: V(488, 0, -50),
+  tower: V(522, 0, -50),   // moved east from 488 so the station and the landmark stand further apart
 };
 // lakes are below the land: water at -0.9 inside the ellipse (heightFn uses this)
 export function inLake(x, z, grow = 0) { return ND.lakes.some((l) => ((x - l.cx) / (l.rx + grow)) ** 2 + ((z - l.cz) / (l.rz + grow)) ** 2 < 1); }
@@ -102,7 +102,7 @@ export function buildNewDistrict(ctx) {
   // ---------------------------------------------------------------- the landmark + podium mall (east of the boulevard, facing the lakes)
   const T = L.tower; landmarkTower(ctx, { x: T.x, z: T.z, y0: CURB, H: 520, base: 58, name: '서울 하늘타워' });
   // podium mall north / east of the tower: a long retail block and a rounded "dome" department store
-  modernTower(ctx, { x: 566, z: -50, y0: CURB, sections: [{ kind: 'round', w: 80, d: 56, r: 14, h: 36, mat: 'grid', floorH: 6, rims: 1 }], crown: 'plant', zone: 'business', use: 'shops', front: [-1, 0], palette: { frame: 0xeeeae0, glass: 0x5a6a74, key: 'mall' } });
+  modernTower(ctx, { x: 584, z: -50, y0: CURB, sections: [{ kind: 'round', w: 46, d: 56, r: 12, h: 36, mat: 'grid', floorH: 6, rims: 1 }], crown: 'plant', zone: 'business', use: 'shops', front: [-1, 0], palette: { frame: 0xeeeae0, glass: 0x5a6a74, key: 'mall' } });
   domeStore(ctx, { x: 560, z: -128, w: 50, d: 30, h: 26 });
   // forecourt between the tower and the boulevard
   { const fc = new Rect(bx1 + L.walk, -80, T.x - 30, -20); plan.walk(fc, 'plaza'); batch.add(cap(outline('rect', fc.w, fc.d), CURB + 0.015, { cx: fc.cx, cz: fc.cz }), groundMat('plaza', { color: 0xc8c4bc }), { cast: false }); }

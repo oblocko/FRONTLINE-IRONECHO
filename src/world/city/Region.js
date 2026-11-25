@@ -23,7 +23,7 @@ const EXT = { x0: -1500, x1: 1900, z0: -1400, z1: 1400 };
 const CORE = { x0: -206, x1: 726, z0: -306, z1: 306 };
 const RIVER = { z0: -1150, z1: -800 };
 const ARTX = [-1440, -960, -480, 0, 420, 900, 1380, 1860], ARTZ = [-1330, -660, 660, 1020, 1380];
-const LANDMARK = { x: 488, z: -50 };
+const LANDMARK = { x: 522, z: -50 };
 
 // ------------------------------------------------------------------ façade textures (painted, tile = uM x vM metres)
 const texCache = new Map();
