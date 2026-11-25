@@ -21,7 +21,9 @@ export class Combat {
       if (v.dead) continue; const h = v.rayTest(origin, dir, agentT);
       if (h && h.dist < agentT) { agentT = h.dist; vehHit = { v, ...h }; agentHit = null; }
     }
-    const wh = this.world.raycast(origin, dir, agentT, { ignore: (c) => c.passBullets || c.owner?.isVehicle });
+    let wh = this.world.raycast(origin, dir, agentT, { ignore: (c) => c.passBullets || c.owner?.isVehicle });
+    // glass (seeThrough colliders) breaks and the round carries on
+    if (wh?.collider?.seeThrough) { wh.collider.onHit?.(wh); wh = this.world.raycast(origin, dir, agentT, { ignore: (c) => c.passBullets || c.seeThrough || c.owner?.isVehicle }); }
     if (vehHit && !wh) {
       this.effects.tracer(muzzle, vehHit.point, 500);
       this.effects.impact(vehHit.point, dir.clone().negate(), 'metal'); this.audio.bulletImpact(vehHit.point, 'metal');

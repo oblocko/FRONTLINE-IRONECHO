@@ -157,7 +157,17 @@ export class Crowd {
     this.far = new Tier(scene, figureFar(), mat, n, false);
     this.t = 0; this.frame = 0; this._m = new THREE.Matrix4(); this._q = new THREE.Quaternion(); this._up = new THREE.Vector3(0, 1, 0); this._p = new THREE.Vector3(); this._s = new THREE.Vector3(1, 1, 1);
   }
+  // panic: everyone within `radius` of `from` runs away along their strip / out of the plaza and keeps going
+  flee(from, radius = 80) {
+    for (const p of this.people) {
+      const dx = p.x - from.x, dz = p.z - from.z, d = Math.hypot(dx, dz); if (d > radius) continue;
+      const r = p.A.rect; p.wait = 0; p.speed = 3.0 + Math.random() * 1.2; p.fled = true;
+      if (p.A.kind === 'strip') { if (p.along) p.tx = dx > 0 ? r.x1 - 1 : r.x0 + 1; else p.tz = dz > 0 ? r.z1 - 1 : r.z0 + 1; }
+      else { p.tx = Math.max(r.x0 + 1, Math.min(r.x1 - 1, p.x + dx / (d || 1) * 60)); p.tz = Math.max(r.z0 + 1, Math.min(r.z1 - 1, p.z + dz / (d || 1) * 60)); }
+    }
+  }
   pick(p, rnd = this.rnd) {
+    if (p.fled) { p.wait = 1e9; return; }   // ran to the end: stays there (out of the way)
     const r = p.A.rect;
     if (p.A.kind === 'strip') {   // walk to the far end of the strip on your own side, then back
       const w = p.along ? r.z1 - r.z0 : r.x1 - r.x0, c = (p.along ? r.z0 + r.z1 : r.x0 + r.x1) / 2, side = c + p.lane * w * 0.22 + p.off;

@@ -174,7 +174,7 @@ export class WeaponSystem {
     this.time = time;
     const inp = this.input; const p = this.player; const d = this.current; const s = this.state;
     // hidden = binoculars / jammer / mounted gun in use: the rifle must not fire, reload or throw
-    const ctl = this.enabled && p.controlsEnabled && p.alive && !p.seat && !this.lowered && !this.hidden;
+    const ctl = this.enabled && p.controlsEnabled && p.alive && !(p.seat && !p.seat.armed) && !this.lowered && !this.hidden;
     // a click that was meant for the binoculars / jammer / mounted gun must not carry over to the rifle once it
     // comes back: the trigger stays locked until the button has been released
     if (!ctl) this._trigLock = true; else if (this._trigLock && !inp.fire()) this._trigLock = false;
@@ -194,7 +194,7 @@ export class WeaponSystem {
     this._wallT = (this._wallT || 0) - dt;
     if (this._wallT <= 0) {
       this._wallT = 0.05; const eye = p.eyePos(new THREE.Vector3()); const f = p.forward(new THREE.Vector3());
-      const reach = this.currentId === 'pistol' ? 0.55 : 0.9; const hit = d && !p.seat ? this.combat.world.raycast(eye, f, reach, { ignore: (c) => c.passBullets }) : null;
+      const reach = this.currentId === 'pistol' ? 0.55 : 0.9; const hit = d && !(p.seat && !p.seat.armed) ? this.combat.world.raycast(eye, f, reach, { ignore: (c) => c.passBullets }) : null;
       this._wallTarget = hit && !hit.terrain && Math.abs(hit.normal?.y ?? 0) < 0.7 ? Math.min(1, Math.max(0, (reach - hit.dist) / (reach * 0.65))) : 0;
     }
     this.wallTuck = damp(this.wallTuck || 0, this._wallTarget || 0, 10, dt);
@@ -269,7 +269,7 @@ export class WeaponSystem {
     const look = this.input.lookDelta();
     this.sway.x = damp(this.sway.x, -look.dx * 1.6, 10, dt); this.sway.y = damp(this.sway.y, -look.dy * 1.6, 10, dt);
     this.kick = damp(this.kick, 0, 18, dt); this.kickRot = damp(this.kickRot, 0, 12, dt);
-    this.lowerAmt = damp(this.lowerAmt, this.lowered || p.seat ? 1 : 0, 6, dt);
+    this.lowerAmt = damp(this.lowerAmt, this.lowered || (p.seat && !p.seat.armed) ? 1 : 0, 6, dt);
     const ads = this.adsAmount; const sprint = damp(this._sprint || 0, p.sprinting ? 1 : 0, 8, dt); this._sprint = sprint;
     // positions in camera space
     // ADS: put the sight's reticle on the camera axis, `eyeRelief` metres in front of the eye

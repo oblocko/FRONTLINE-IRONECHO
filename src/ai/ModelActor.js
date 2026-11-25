@@ -7,7 +7,7 @@
 //            pointing / halt gestures, head look-at.
 // Same public interface as the procedural Actor (target / anim / rayTest / die …).
 import * as THREE from 'three';
-import { characterLib, skinTone, cloneBody, bodyMaterial, garmentMaterial, maskMaterial, gearFor, lookKey, lookFor, LOOKS, buildNpcWeapon, weaponTypeFor, vhash } from './CharacterLib.js';
+import { characterLib, skinTone, cloneBody, bodyMaterial, garmentMaterial, maskMaterial, gearFor, lookKey, lookFor, isFemale, LOOKS, buildNpcWeapon, weaponTypeFor, vhash } from './CharacterLib.js';
 import { buildNpcRifle } from './HumanModel.js';
 
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -54,7 +54,7 @@ export class ModelActor {
     this.faction = faction; this.name = name; this.variant = variant; this.isModel = true;
     const civ = faction === 'civ';
     const look = lookOverride || lookKey(faction, variant, weapon, hat); this.look = look;
-    const sex = sexOverride && lib.f ? sexOverride : lib.f && ((civ && variant % 3 === 1) || (look === 'us' && variant % 4 === 3)) ? 'f' : 'm'; this.sex = sex;
+    const sex = sexOverride && lib.f ? sexOverride : lib.f && isFemale(civ, look, variant) ? 'f' : 'm'; this.sex = sex;
     if (look === 'kpa_officer') hat = 'officer';
     this.root = new THREE.Group(); this.root.scale.setScalar(scale); this.root.userData.dynamic = true; scene.add(this.root);
     this.model = cloneBody(sex); this.root.add(this.model);

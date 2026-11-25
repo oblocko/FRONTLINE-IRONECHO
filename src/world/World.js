@@ -154,7 +154,7 @@ export class World {
   lineOfSight(a, b) {
     const d = _v.copy(b).sub(a); const len = d.length(); if (len < 0.01) return true;
     const dir = d.clone().divideScalar(len);
-    const hit = this.raycast(a, dir, len - 0.05, { ignore: (c) => c.passBullets });
+    const hit = this.raycast(a, dir, len - 0.05, { ignore: (c) => c.passBullets || c.seeThrough });   // seeThrough: glass
     return !hit;
   }
 

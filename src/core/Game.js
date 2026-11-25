@@ -18,7 +18,7 @@ import { AIDirector } from '../ai/AI.js';
 import { Dialogue } from '../story/Dialogue.js';
 import { Objectives } from '../story/Objectives.js';
 import { MissionRunner, Cinematics } from '../story/MissionRunner.js';
-import { loadCharacters } from '../ai/CharacterLib.js';
+import { loadCharacters, setFemaleMix } from '../ai/CharacterLib.js';
 import { loadGear } from '../gear/GearLib.js';
 import { missionById, nextMission } from '../missions/index.js';
 import { UI } from '../ui/UI.js';
@@ -121,7 +121,7 @@ export class Game {
     this.ui.hideAll();
     events.emit('ui:fade', { to: 1, dur: 0 });
     await nextFrame();
-    this.missionMeta = p.meta; this.missionMod = p.mod; this.missionId = id; if (!checkpointId) this.choiceLog = [];
+    this.missionMeta = p.meta; this.missionMod = p.mod; this.missionId = id; if (!checkpointId) this.choiceLog = []; setFemaleMix(id === 'm06' ? 'classic' : 'few');
     this.renderer.clearScene(); this.menuScene = null;
     audio.stopAllLoops(); audio.setMusic('silent'); audio.recover(); this.failReason = null;
     // fresh systems

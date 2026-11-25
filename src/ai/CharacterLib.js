@@ -173,6 +173,8 @@ export const LOOKS = {
   pmc: { cloth: 'fabric', top: 0x2a2d31, pants: 0x3b3a36, boot: 0x2a2620, glove: 0x1a1a1a, rep: 10 },
   // M06: Nadia Rahman (olive field jacket, dark trousers) and the harbour gang's hired guns (street clothes, light vests)
   nadia: { cloth: 'fabric', top: 0x343a2a, pants: 0x1c1c1f, boot: 0x1d1a16, glove: 0x1c1c1c, rep: 10 },
+  // M07: Maya Chen (burgundy wool coat, dark jeans)
+  maya: { cloth: 'fabric', top: 0x5a2630, pants: 0x23252b, boot: 0x2a2220, glove: -1, rep: 10 },
   merc: { cloth: 'fabric', top: 0x4a4d55, pants: 0x2a2e36, boot: 0x2a2620, glove: -1, rep: 10 },
   police: { cloth: 'fabric', top: 0x1f2a44, pants: 0x1c2232, boot: 0x141414, glove: -1, rep: 10 },
 };
@@ -181,6 +183,14 @@ const CIV_PANTS = [0x24262c, 0x3a4458, 0x4a4036, 0x2e3a52, 0x5a5650];
 const SHOES = [0xd8d8d4, 0x2a2a2a, 0x5a4636, 0x8a2a2a];
 // enemy unit mix for the current mission (weights): regular army, SF (blue / brown), officers
 let ENEMY_MIX = { kpa: 1 };
+// how often generated people (civilians, US marines) use the female body: 'classic' is the original mix
+// (kept for M06), 'few' is the default everywhere else. Named characters pass `sex` explicitly.
+let FEMALE_MIX = 'few';
+export function setFemaleMix(mode) { FEMALE_MIX = mode || 'few'; }
+export function isFemale(civ, look, variant) {
+  if (FEMALE_MIX === 'classic') return (civ && variant % 3 === 1) || (look === 'us' && variant % 4 === 3);
+  return civ && hash(variant * 13 + 5) < 0.12;
+}
 export function setEnemyMix(mix) { ENEMY_MIX = mix || { kpa: 1 }; }
 const hash = (n) => { let h = (n + 1) * 2654435761; h ^= h >>> 15; h = Math.imul(h, 2246822519); h ^= h >>> 13; return (h >>> 0) / 4294967296; };
 export const vhash = hash;

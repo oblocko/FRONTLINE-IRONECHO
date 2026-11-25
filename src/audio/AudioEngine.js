@@ -231,6 +231,22 @@ export class AudioEngine {
       const og = c.createGain(); this.env(og, t, 0.002, 0.06, 0.35); o.connect(og); this.route(og, pos, { ref: 3 }); o.start(t); o.stop(t + 0.4);
     }
   }
+  // a glass pane breaking: a sharp crack, then a shower of tinkling fragments (high band-passed noise bursts
+  // and short pings), scaled by the pane size
+  glassBreak(pos, size = 1) {
+    if (!this.canPlay(1)) return; const c = this.ctx, t = c.currentTime;
+    const n = this.noiseSrc(); const f = c.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 1800;
+    const g = c.createGain(); this.env(g, t, 0.002, 0.5 * Math.min(1.4, size), 0.25); n.connect(f).connect(g); this.route(g, pos, { ref: 4 });
+    n.start(t, Math.random()); n.stop(t + 0.35); this.track(n, 0.35);
+    const k = Math.round(6 + 8 * Math.min(1.5, size));
+    for (let i = 0; i < k; i++) {
+      const w = 0.05 + Math.random() * (0.5 + 0.4 * size), o = c.createOscillator(); o.type = 'sine'; o.frequency.value = 2600 + Math.random() * 4200;
+      const og = c.createGain(); this.env(og, t + w, 0.001, 0.025 + Math.random() * 0.03, 0.05 + Math.random() * 0.12); o.connect(og); this.route(og, pos, { ref: 3, echo: false }); o.start(t + w); o.stop(t + w + 0.2);
+    }
+    const s = this.noiseSrc(); const sf = c.createBiquadFilter(); sf.type = 'bandpass'; sf.frequency.value = 5200; sf.Q.value = 2;
+    const sg = c.createGain(); sg.gain.setValueAtTime(0.0001, t + 0.08); sg.gain.exponentialRampToValueAtTime(0.12 * size, t + 0.15); sg.gain.exponentialRampToValueAtTime(0.0001, t + 0.9 + 0.3 * size);
+    s.connect(sf).connect(sg); this.route(sg, pos, { ref: 3 }); s.start(t + 0.08, Math.random()); s.stop(t + 1.4);
+  }
   whiz(pos) { // near-miss crack
     if (!this.canPlay(1)) return; const c = this.ctx, t = c.currentTime;
     const n = this.noiseSrc(); const f = c.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 2500;

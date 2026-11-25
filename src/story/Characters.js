@@ -11,6 +11,8 @@ export const CHARACTERS = {
   nadia: { name: '나디아 라만', en: 'Nadia Rahman', rank: '', rankEn: '', unit: '前 민간보안책임자', color: '#ffb38a', pitch: 1.3, role: 'Uneasy ally', lang: 'en' },
   morrow: { name: '빅터 모로', en: 'Victor Morrow', rank: '', rankEn: '', unit: 'Halvard Meridian 대표', color: '#e0e0e0', pitch: 0.8, role: 'Defense-tech broker', lang: 'en' },
   cole: { name: '콜 브레넌', en: 'Cole Brennan', rank: '', rankEn: '', unit: 'Halvard Meridian 보안 책임자 · 前 TU-LANTERN', color: '#ff9a7a', pitch: 0.78, role: 'Former teammate', lang: 'en' },
+  graves: { name: '그레이브스', en: 'Graves', rank: '', rankEn: '', unit: 'Halvard Meridian 현장 팀장', color: '#ff9a7a', pitch: 0.84, role: 'Kidnap team lead', lang: 'en' },
+  contractor: { name: '계약 요원', en: 'Contractor', rank: '', rankEn: '', unit: 'Kestrel Risk Advisory', color: '#ff7a6a', pitch: 0.95, role: '', lang: 'en' },
   tail: { name: '미행자', en: 'Tail', rank: '', rankEn: '', unit: '추적팀', color: '#ff7a6a', pitch: 0.95, role: '', lang: 'en' },
   tracker: { name: '추적팀', en: 'Tracker team', rank: '', rankEn: '', unit: '', color: '#ff7a6a', pitch: 0.9, role: 'Radio', lang: 'en' },
   guard: { name: '경비', en: 'Guard', rank: '', rankEn: '', unit: '', color: '#ff7a6a', pitch: 1.0, role: '', lang: 'en' },

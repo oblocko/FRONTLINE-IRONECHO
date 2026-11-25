@@ -466,7 +466,7 @@ export class AIDirector {
   }
   get diff() { return DIFFICULTY[settings.data.gameplay.difficulty] || DIFFICULTY.regular; }
   spawn(opts) { const a = new AIAgent(this, opts); this.agents.push(a); return a; }
-  remove(agent) { agent.actor.dispose(this.scene); agent.releaseToken(); if (agent.cover) agent.cover.occupant = null; this.agents = this.agents.filter((a) => a !== agent); }
+  remove(agent) { agent.removed = true; agent.actor.dispose(this.scene); agent.releaseToken(); if (agent.cover) agent.cover.occupant = null; this.agents = this.agents.filter((a) => a !== agent); }
   enemies() { return this.agents.filter((a) => a.team === 'enemy' && !a.dead); }
   friendlies() { return this.agents.filter((a) => a.team === 'friendly' && !a.dead); }
   friendlyTargets() { const f = this.friendlies(); if (this.player && this.player.alive) f.push(this.player); return f; }
@@ -607,7 +607,8 @@ export class AIDirector {
       const spread = 0.025 + Math.min(0.06, dist * 0.0012);
       dir.x += (Math.random() - 0.5) * spread * 2; dir.y += (Math.random() - 0.3) * spread * 2; dir.z += (Math.random() - 0.5) * spread * 2; dir.normalize();
     }
-    const wh = this.world.raycast(muzzle, dir, Math.min(dist + 30, 250), { ignore: (c) => c.passBullets });
+    let wh = this.world.raycast(muzzle, dir, Math.min(dist + 30, 250), { ignore: (c) => c.passBullets });
+    if (wh?.collider?.seeThrough) { wh.collider.onHit?.(wh); wh = this.world.raycast(muzzle, dir, Math.min(dist + 30, 250), { ignore: (c) => c.passBullets || c.seeThrough }); }
     const endDist = hit ? dist : (wh ? wh.dist : dist + 30);
     if (hit && wh && wh.dist < dist - 0.5) { // blocked by cover
       this.effects.impact(wh.point, wh.normal, wh.surface); if (this.listenerDist(wh.point) < 30) this.audio.bulletImpact(wh.point, wh.surface);

@@ -72,8 +72,9 @@ export class Player {
 
   // ----- seats / vehicles -----
   // yawFrom: object whose world yaw is the look origin (defaults to the seat object itself)
-  enterSeat(object3d, { offset = new THREE.Vector3(), yawRange = Math.PI * 0.75, pitchRange = [-0.6, 0.5], yawBase = 0, yawFrom = null } = {}) {
-    this.seat = { object3d, offset: offset.clone(), yawRange, pitchRange, yawBase, yawFrom };
+  enterSeat(object3d, { offset = new THREE.Vector3(), yawRange = Math.PI * 0.75, pitchRange = [-0.6, 0.5], yawBase = 0, yawFrom = null, armed = false } = {}) {
+    // armed: the player keeps using his own weapons from the seat (e.g. riding a rail car)
+    this.seat = { object3d, offset: offset.clone(), yawRange, pitchRange, yawBase, yawFrom, armed };
     this.lookYawLocal = 0; this.pitch = 0;
     events.emit('player:seat', { seated: true });
   }
