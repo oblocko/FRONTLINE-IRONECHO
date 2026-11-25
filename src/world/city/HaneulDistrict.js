@@ -22,7 +22,7 @@ import { groundMat, paintMat, flatMat, wallMat } from './CityMaterials.js';
 import { CURB, furnishSidewalk, signal, parkAlong } from './Streets.js';
 import * as B from './Buildings.js';
 import * as SK from './SignKit.js';
-import { buildHandStreets, HAND, ledTex } from './HandStreets.js';
+import { buildHandStreets, HAND, ledTex, lightPave } from './HandStreets.js';
 import { curtainMat } from './Modern.js';
 
 export const DISTRICT = { x0: -945, x1: -232, z0: -430, z1: 430 };
@@ -97,7 +97,13 @@ export function buildHaneulDistrict(ctx) {
         // corners (first / last parcel on a road) are shop-houses, the rest villas (two hand-picked heights)
         const corner = k === 0 || inner.z1 - (z + wdt) < 11;
         if (corner) B.commercial(ctx, parcel(rx0, a, rx1, b2, 'residential', [fx, 0]), { use: 'mixedShops', floors: 4, upper: 'villa', cats: ['cafe', 'restaurant', 'store', 'salon', 'cafe'], wall: { kind: rnd() < 0.6 ? 'brick' : 'tile', color: rnd() < 0.5 ? 0x8a5444 : 0xd0c8b8 }, vacant: 0.08 });
-        else B.villa(ctx, parcel(rx0, a, rx1, b2, 'residential', [fx, 0]), { floors: k % 3 === 1 ? 3 : 4 });
+        // the row repeats a hand-made sequence of plot types: villas of 3-5 floors, a narrow shop-house, a
+        // resident parking lot, a pocket garden — shifted per row so neighbouring rows don't line up
+        else { const T = ROW_PATTERN[(k + Math.round(rx0 / 7)) % ROW_PATTERN.length];
+          if (T === 'park') B.parkingLot(ctx, parcel(rx0, a, rx1, b2, 'residential', [fx, 0]), { fill: 0.5 });
+          else if (T === 'garden') pocketGarden(ctx, new Rect(rx0, a, rx1, b2));
+          else if (T === 'shop') B.commercial(ctx, parcel(rx0, a, rx1, b2, 'residential', [fx, 0]), { use: 'mixedShops', floors: 3, upper: 'villa', cats: ['store', 'salon', 'restaurant', 'cafe'], wall: { kind: 'render', color: [0xece6d8, 0xd8e0e4, 0xe8d8c8][k % 3] }, vacant: 0.1 });
+          else B.villa(ctx, parcel(rx0, a, rx1, b2, 'residential', [fx, 0]), { floors: T }); }
         z += wdt; k++; }
     }
   }
@@ -122,10 +128,10 @@ export function buildHaneulDistrict(ctx) {
   connector(ctx);
   // ---- d) 하늘길: the hand-made street, its west strip on the arterial, the extensions north
   buildHandStreets(ctx);
-  { const r = new Rect(ART.x1, HAND.z0, HAND.x0, HAND.z1); land(r.x0, r.z0, r.x1, r.z1); plan.walk(r, 'plaza'); paved(r, groundMat('plaza', { color: 0xb8b4ac }));
+  { const r = new Rect(ART.x1, HAND.z0, HAND.x0, HAND.z1); land(r.x0, r.z0, r.x1, r.z1); plan.walk(r, 'plaza'); paved(r, lightPave());
     for (let z = r.z0 + 8; z < r.z1 - 4; z += 12) if (Math.abs(z - (CONN.z0 + CONN.z1) / 2) > 8) tree(ctx, r.cx, z); }
   for (const [z0, z1] of [[-416, -230], [-216, HAND.z0]]) hanulNorth(ctx, parcel, block, z0, z1);
-  { const r = new Rect(ART.x1, HAND.z1, -290, HR.z0); land(r.x0, r.z0, r.x1, r.z1); plan.walk(r, 'plaza'); paved(r, groundMat('plaza', { color: 0xb8b4ac })); sidewalks.push([r, 'x', HR.z0, 1]); }
+  { const r = new Rect(ART.x1, HAND.z1, -290, HR.z0); land(r.x0, r.z0, r.x1, r.z1); plan.walk(r, 'plaza'); paved(r, lightPave()); sidewalks.push([r, 'x', HR.z0, 1]); }
   // ---- e) 하늘 광장 and the plaza towers, villas behind
   mainPlaza(ctx);
   plazaTowers(ctx, parcel);
@@ -154,6 +160,9 @@ export function buildHaneulDistrict(ctx) {
 }
 
 // ------------------------------------------------------------------ zone builders
+const ROW_PATTERN = [4, 3, 5, 4, 'shop', 4, 3, 'park', 5, 4, 3, 'garden', 4, 5];
+// a pocket garden between the villas: lawn, a tree, a bench
+function pocketGarden(ctx, r) { ctx.plan.walk(r, 'path'); ctx.batch.box(groundMat('lawn'), r.w, 0.02, r.d, r.cx, CURB + 0.01, r.cz, 0, { cast: false }); tree(ctx, r.cx, r.cz - 2, 1.05); bench(ctx, r.cx + 2.5, r.cz + 2); }
 // cafe row along the park: narrow shop-houses, cafés downstairs, a terrace deck in front of some
 function cafeRow(ctx, parcel, r, front) {
   const rnd = ctx.rnd; let z = r.z0 + 0.4, k = 0;
@@ -196,7 +205,7 @@ function parkStrip(ctx, z0, z1) {
 // 작은 광장: the park opens into a paved square with a fountain, stepped seating, kiosks and terraces
 function smallSquare(ctx) {
   const { plan, batch } = ctx, w = ctx.world, r = new Rect(SQ.x0, SQ.z0, SQ.x1, SQ.z1);
-  plan.block(r, 'public', '하늘숲 광장'); plan.walk(r, 'plaza'); batch.box(groundMat('plaza', { color: 0xc8c0b0 }), r.w, 0.03, r.d, r.cx, CURB + 0.015, r.cz, 0, { cast: false });
+  plan.block(r, 'public', '하늘숲 광장'); plan.walk(r, 'plaza'); batch.box(lightPave(), r.w, 0.03, r.d, r.cx, CURB + 0.015, r.cz, 0, { cast: false });
   const stone = wallMat('stone', 0xb8b0a4), water = new THREE.MeshStandardMaterial({ color: 0x5a7a88, roughness: 0.05, metalness: 0.3 });
   // fountain: a round basin with a jet column
   ctx.batch.add(new THREE.CylinderGeometry(6, 6.2, 0.6, 32).translate(-685, CURB + 0.3, -50), stone); ctx.batch.add(new THREE.CylinderGeometry(5.6, 5.6, 0.05, 32).translate(-685, CURB + 0.55, -50), water);
@@ -224,7 +233,7 @@ function terrace(ctx, cx, cz, wdt, dep) {
 // 보행로: paving, planters with seats, catenary lights over it, crosswalk paint on the roads it crosses
 function connector(ctx) {
   const { plan, batch } = ctx, z0 = CONN.z0, z1 = CONN.z1, zc = (z0 + z1) / 2;
-  for (const [x0, x1] of [[SQ.x1, -575], [-565, ART.x0]]) { const r = new Rect(x0, z0, x1, z1); plan.block(r, 'commercial', '하늘 보행로'); plan.walk(r, 'plaza'); batch.box(groundMat('pavers', { color: 0xd0c4b0 }), r.w, 0.03, r.d, r.cx, CURB + 0.015, r.cz, 0, { cast: false });
+  for (const [x0, x1] of [[SQ.x1, -575], [-565, ART.x0]]) { const r = new Rect(x0, z0, x1, z1); plan.block(r, 'commercial', '하늘 보행로'); plan.walk(r, 'plaza'); batch.box(lightPave(), r.w, 0.03, r.d, r.cx, CURB + 0.015, r.cz, 0, { cast: false });
     for (let x = x0 + 8; x < x1 - 6; x += 14) { batch.box(wallMat('stone', 0xb0a898), 3, 0.5, 1.4, x, CURB + 0.25, z0 + 1.2); bench(ctx, x + 4, z0 + 1.2, false); tree(ctx, x, z0 + 1.2, 0.8); } }
   const bulb = new THREE.MeshBasicMaterial({ color: 0xffe0a0, toneMapped: false }), wire = flatMat(0x1a1a1a, { key: 'hd_wire' });
   for (let x = SQ.x1 + 4; x < ART.x0 - 2; x += 6) { if (x > -577 && x < -563) continue; batch.add(new THREE.CylinderGeometry(0.01, 0.01, z1 - z0, 4).rotateX(Math.PI / 2).translate(x, CURB + 6, zc), wire); for (let z = z0 + 0.5; z < z1; z += 1.2) batch.add(new THREE.SphereGeometry(0.07, 6, 4).translate(x, CURB + 6 - 0.5 * Math.sin(((z - z0) / (z1 - z0)) * Math.PI), z), bulb, { cast: false }); }
@@ -237,7 +246,7 @@ function connector(ctx) {
 // commercial rows on both sides, outdoor seating down the middle
 function hanulNorth(ctx, parcel, block, z0, z1) {
   const { plan, batch } = ctx;
-  const ped = new Rect(-384, z0, -358, z1); plan.block(ped, 'commercial', '하늘길'); plan.walk(ped, 'plaza'); batch.box(groundMat('pavers', { color: 0xc8c4bc }), ped.w, 0.03, ped.d, ped.cx, CURB + 0.015, ped.cz, 0, { cast: false });
+  const ped = new Rect(-384, z0, -358, z1); plan.block(ped, 'commercial', '하늘길'); plan.walk(ped, 'plaza'); batch.box(lightPave(), ped.w, 0.03, ped.d, ped.cx, CURB + 0.015, ped.cz, 0, { cast: false });
   for (let z = z0 + 10; z < z1 - 8; z += 24) { tree(ctx, -371, z, 1); bench(ctx, -373.6, z + 6); bench(ctx, -368.4, z + 6); }
   for (let z = z0 + 22; z < z1 - 10; z += 48) terrace(ctx, -378, z, 5, 10);
   const west = block(ART.x1, z0, -384, z1); const mid = (west.x0 + west.x1) / 2;
@@ -252,7 +261,7 @@ function hanulNorth(ctx, parcel, block, z0, z1) {
 function mainPlaza(ctx) {
   const { plan, batch } = ctx, w = ctx.world, P = PLAZA, r = new Rect(P.x0, P.z0, P.x1, P.z1);
   plan.block(new Rect(P.x0, P.z0, P.x1, 266), 'commercial', '하늘 광장'); plan.walk(r, 'plaza');
-  batch.box(groundMat('plaza', { color: 0xd0ccc4 }), r.w, 0.03, r.d, r.cx, CURB + 0.015, r.cz, 0, { cast: false });
+  batch.box(lightPave(), r.w, 0.03, r.d, r.cx, CURB + 0.015, r.cz, 0, { cast: false });
   const stone = wallMat('stone', 0xc0b8ac), water = new THREE.MeshStandardMaterial({ color: 0x3a5260, roughness: 0.02, metalness: 0.5 });
   // water mirror (shallow, edge flush) in the centre
   batch.box(stone, 40, 0.2, 22, -378, CURB + 0.1, 130); batch.box(water, 39, 0.02, 21, -378, CURB + 0.205, 130, 0, { cast: false });

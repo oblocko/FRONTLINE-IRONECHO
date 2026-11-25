@@ -4,9 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>FRONTLINE — IRON ECHO</title>
-  <meta name="description" content="FRONTLINE — IRON ECHO: 2029년 한반도 전쟁을 배경으로 한 1인칭 싱글플레이 현대전 FPS 캠페인. 브라우저(WebGL 2)에서 바로 플레이. Mission 01–05 플레이 가능." />
+  <meta name="description" content="FRONTLINE — IRON ECHO: 2029년 한반도 전쟁을 배경으로 한 1인칭 싱글플레이 현대전 FPS 캠페인. 브라우저(WebGL 2)에서 바로 플레이. Mission 01–07 플레이 가능." />
   <meta property="og:title" content="FRONTLINE — IRON ECHO" />
-  <meta property="og:description" content="Single-player modern military FPS campaign set in a fictional 2029 Korean war. Runs in the browser (three.js / WebGL 2). Missions 01–05 playable." />
+  <meta property="og:description" content="Single-player modern military FPS campaign set in a fictional 2029 Korean war. Runs in the browser (three.js / WebGL 2). Missions 01–07 playable." />
   <meta property="og:type" content="website" />
   <meta property="og:image" content="https://oblocko.github.io/FRONTLINE-IRONECHO/docs/screenshots/06_m02_avenue.jpg" />
   <link rel="stylesheet" href="./styles/main.css" />
@@ -37,9 +37,10 @@
     <section>
       <h2>현재 상태 (빌드 0.3.0)</h2>
       <ul>
-        <li><strong>플레이 가능 (16개 중 5개):</strong> Mission 01 ROUTINE PATROL, Mission 02 BLACKOUT, Mission 03 FALLING FRONT, Mission 04 THE CROSSING (ACT 1 전체), Mission 05 OFF THE GRID (ACT 2 첫 미션, 다니엘 보스 시점) — 각각 처음부터 끝까지 진행 가능, 미션 완료 후 메뉴를 거치지 않고 다음 작전으로 이어짐</li>
+        <li><strong>플레이 가능 (16개 중 7개):</strong> Mission 01 ROUTINE PATROL, Mission 02 BLACKOUT, Mission 03 FALLING FRONT, Mission 04 THE CROSSING (ACT 1 전체), Mission 05 OFF THE GRID (파리), Mission 06 NIGHT MARKET (뭄바이), Mission 07 CLOSE QUARTERS (뉴욕) (ACT 2, 다니엘 보스 시점) — 각각 처음부터 끝까지 진행 가능, 미션 완료 후 메뉴를 거치지 않고 다음 작전으로 이어짐</li>
         <li><strong>분기 선택:</strong> M05부터 플레이어의 선택이 진행 방식과 다음에 주어지는 선택지를 바꾸고, 이후 미션으로 이어지는 기록(storyFlags)으로 저장됨</li>
-        <li><strong>설계 완료·제작 예정:</strong> Mission 06–16 (시나리오와 미션별 이벤트 계획 문서화)</li>
+        <li><strong>설계 완료·제작 예정:</strong> Mission 08–16 (시나리오와 미션별 이벤트 계획 문서화)</li>
+        <li><strong>개발 중:</strong> 미션과 별개로 자유롭게 돌아다니는 서울 대도시 — 옛 도심, 중앙역과 랜드마크 타워가 있는 신도심, 약 0.6㎢의 하늘길 지구(상업 거리·하늘 광장·하늘숲길과 작은 광장·보행로·빌라 골목), 걸어 들어갈 수 있는 가게 내부, 한국식 간판</li>
         <li>메인 메뉴 · 임무 선택 · 영화식 브리핑 · 그래픽/오디오/조작 설정(키 변경, 게임패드) · 체크포인트 저장/이어하기 · 일시정지 · 결과 화면 · 크레딧</li>
       </ul>
     </section>
@@ -94,6 +95,18 @@
     </section>
 
     <section>
+      <h3>MISSION 06 — NIGHT MARKET (야시장)</h3>
+      <p>03월 19일 23:40, 습한 밤의 뭄바이 항구 야시장. 다니엘은 파리에서 찾은 비행 기록을 따라와 부두 창고의 비밀 경매를 지켜본다. 그곳에서 나디아 라만과 처음 마주친다.</p>
+      <p><em>이벤트:</em> 노점과 네온 사이 시장 통과 · 부두가 보이는 옥상 확보 · 경매 관찰(마지막에 손을 드는 낙찰자 찾기) · 경매장 습격과 운반책 추적 · 전원이 끊긴 서쪽 창고 교전 · 나디아와의 대치(파리에서의 선택에 따라 선택지가 달라짐)</p>
+    </section>
+
+    <section>
+      <h3>MISSION 07 — CLOSE QUARTERS (근접전)</h3>
+      <p>03월 21일 18:05, 진눈깨비 내리는 뉴욕. 마야가 애비뉴의 카페에서 납치되고, 그녀의 전화는 애셔 타워 32층에서 응답한다.</p>
+      <p><em>이벤트:</em> 로비 돌파 · 32층 층별 제압과 서버실(복사 또는 삭제) · 창밖 헬기 공격으로 무너지는 유리 커튼월 · 화물 엘리베이터 지붕을 타고 샤프트 하강 · 지하철 터널 작업차 추격(운전하며 사격) · 폐역 홀리스 스트리트 인질 대치</p>
+    </section>
+
+    <section>
       <h2>게임 시스템</h2>
       <ul>
         <li><strong>1인칭:</strong> 걷기·달리기·앉기·점프·장애물 넘기, 조준(홀로 사이트), 재장전 애니메이션, 무기 교체, 수류탄, 손전등, 쌍안경, 차량 좌석·포탑·거치 화기</li>
@@ -117,7 +130,7 @@
 
     <section lang="en">
       <h2>English summary</h2>
-      <p>FRONTLINE — IRON ECHO is a single-player first-person modern military shooter that runs in the browser (three.js / WebGL 2). Set in a fictional 2029 war on the Korean peninsula, it follows conscript Han Min-jae on the Korean front and ex-operative Daniel Voss abroad across a 16-mission campaign. Missions 01 and 02 are fully playable and chain into each other; missions 03–16 are designed. Gameplay mixes infantry combat with mounted machine guns, an IFV turret section, binocular-directed mortar strikes, recon and kamikaze drones, a stealth beat, a timed bomb defusal in a dark subway station, civilian escort, a bus escort and scripted collapses. To play, open this page with JavaScript and WebGL 2 enabled in a desktop browser.</p>
+      <p>FRONTLINE — IRON ECHO is a single-player first-person modern military shooter that runs in the browser (three.js / WebGL 2). Set in a fictional 2029 war on the Korean peninsula, it follows conscript Han Min-jae on the Korean front and ex-operative Daniel Voss abroad across a 16-mission campaign. Missions 01–07 are playable and chain into each other (Korean front, then Paris, Mumbai and New York); missions 08–16 are designed. A free-roam Seoul city map is in development. Gameplay mixes infantry combat with mounted machine guns, an IFV turret section, binocular-directed mortar strikes, recon and kamikaze drones, a stealth beat, a timed bomb defusal in a dark subway station, civilian escort, a bus escort and scripted collapses. To play, open this page with JavaScript and WebGL 2 enabled in a desktop browser.</p>
     </section>
   </article>
 

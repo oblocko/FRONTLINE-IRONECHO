@@ -75,6 +75,8 @@ export function ledTex(kind) {
   });
 }
 const M = {};
+// the street's light granite paving, shared with the rest of the quarter (plazas, pedestrian streets)
+export function lightPave() { return mats().pave; }
 function mats() {
   if (M.pave) return M;
   M.pave = new THREE.MeshStandardMaterial({ map: paveTex(), roughness: 0.7 }); M.pave.userData.uM = 4.8; M.pave.userData.vM = 4.8;

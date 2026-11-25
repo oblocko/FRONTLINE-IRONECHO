@@ -193,4 +193,4 @@ const THEMES = {
 export const INTERIOR_THEMES = Object.keys(THEMES);
 // interiors get their own batch: they sit under the podium (no sun), so they are not shadowed by it
 export function interiorBatch(ctx) { if (!ctx.interiorBatch) { ctx.interiorBatch = new Batch(ctx.scene); ctx.interiorBatch.owner = null; } return ctx.interiorBatch; }
-export function buildInteriors(ctx) { const B = ctx.interiorBatch; if (!B) return; for (const m of B.build()) { m.receiveShadow = false; m.castShadow = false; m.userData.lodAlways = false; } }
+export function buildInteriors(ctx) { const B = ctx.interiorBatch; if (!B) return; for (const m of B.build()) { m.receiveShadow = false; m.castShadow = false; m.userData.lodAlways = false; m.userData.lodNear = true; } }

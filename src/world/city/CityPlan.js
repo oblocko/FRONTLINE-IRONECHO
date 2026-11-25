@@ -169,9 +169,9 @@ export class CityPlan {
 // material. UVs are world-planar (texMeters per material) so textures keep their scale on every face.
 export class Batch {
   constructor(scene) { this.scene = scene; this.buckets = new Map(); }
-  add(geo, mat, { texMeters, cast = true } = {}) {
+  add(geo, mat, { texMeters, cast = true, near = false } = {}) {
     if (this.owner) geo.userData.owner = this.owner;
-    let b = this.buckets.get(mat); if (!b) { b = { geos: [], texMeters: texMeters ?? mat.userData.texMeters ?? 2, cast }; this.buckets.set(mat, b); }
+    let b = this.buckets.get(mat); if (!b) { b = { geos: [], texMeters: texMeters ?? mat.userData.texMeters ?? 2, cast, near }; this.buckets.set(mat, b); }
     b.geos.push(geo); return geo;
   }
   shift(owner, dy) { for (const b of this.buckets.values()) for (const g of b.geos) if (g.userData.owner === owner) g.translate(0, dy, 0); }
@@ -195,7 +195,7 @@ export class Batch {
       const chunks = new Map();
       for (const g of geos) { g.computeBoundingBox(); const c = g.boundingBox.getCenter(new THREE.Vector3()); const key = `${Math.floor(c.x / 120)},${Math.floor(c.z / 120)}`; if (!chunks.has(key)) chunks.set(key, []); chunks.get(key).push(g); }
       for (const [key, list] of chunks) {
-        const merged = mergeAll(list); const m = new THREE.Mesh(merged, mat); m.castShadow = b.cast; m.receiveShadow = true; m.userData.cell = key; m.userData.cellSize = 120; if (this.lodAlways || !b.cast) m.userData.lodAlways = true; this.scene.add(m); out.push(m);   // ground / road surfaces (no shadow) always draw
+        const merged = mergeAll(list); const m = new THREE.Mesh(merged, mat); m.castShadow = b.cast; m.receiveShadow = true; m.userData.cell = key; m.userData.cellSize = 120; if (b.near) m.userData.lodNear = true; else if (this.lodAlways || !b.cast) m.userData.lodAlways = true; this.scene.add(m); out.push(m);   // ground / road surfaces (no shadow) always draw
       }
     }
     this.buckets.clear(); return out;
