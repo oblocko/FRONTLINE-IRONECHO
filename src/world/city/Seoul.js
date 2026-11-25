@@ -1,8 +1,8 @@
-// Yeonseo (fictional Korean city), central district — the planned large-city layout prepared for the later
-// Yeonseo missions (M10 HOMECOMING / M15 RECLAIM). M02 keeps its own avenue level (levels/YeonseoCity.js).
+// Seoul, downtown (fictional streets) — the large-city layout for later Seoul missions. Separate from the
+// fictional Yeonseo City of M02, which keeps its own avenue level (levels/YeonseoCity.js).
 //
 // ROAD NETWORK
-//   연서대로 (arterial, N-S): carriageway x -12..12 (3 lanes each way + median), sidewalks to x ±16
+//   중앙대로 (arterial, N-S): carriageway x -12..12 (3 lanes each way + median), sidewalks to x ±16
 //   cross streets (local, E-W) at z -120, -40, 40, 120: carriageway z ±4.5, sidewalks to ±7
 //   back streets (alleys, N-S) x ±40..48 behind the frontage, except where a superblock sits (B west: the
 //   apartment complex, B east: the school, E west north: the hospital); villa alley x 62..66 in E east
@@ -10,7 +10,7 @@
 // ZONES (north → south; the convoy enters from the north)
 //   A  z -260..-127  industrial both sides (logistics, warehouses, factories, a gas station on the corner)
 //   B  z -113..-47   residential (west: 한빛마을 apartment complex + its shops) · public (east: elementary school)
-//   C  z -33..33     commercial core around 연서역 (shops 5-10 floors, station plaza with exit 3, rear food alley)
+//   C  z -33..33     commercial core around 중앙로역 (shops 5-10 floors, station plaza with exit 3, rear food alley)
 //   D  z 47..113     business (office towers set back behind plazas, bank, offices, parking)
 //   E  z 127..260    public (west: hospital, park) · residential (east: shop-houses on the avenue, villas behind)
 import * as THREE from 'three';
@@ -33,7 +33,7 @@ export const LAYOUT = {
   corridors: [{ rect: new Rect(-4.7, -230, -0.3, -117), why: 'convoy route' }, { rect: new Rect(-9.2, 0, -2.3, 203), why: 'escort / bus route' }, { rect: new Rect(8, 114.5, 62, 125.5), why: 'technical route' }],
 };
 
-export function buildYeonseo(game, { station = null, early = null, corridors = [], jam = false, district = true, region: regionOn = true } = {}) {
+export function buildSeoul(game, { station = null, early = null, corridors = [], jam = false, district = true, region: regionOn = true } = {}) {
   const scene = game.renderer.scene, world = game.world, L = LAYOUT;
   let seed = 20260320; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   const plan = new CityPlan({});
@@ -54,7 +54,7 @@ export function buildYeonseo(game, { station = null, early = null, corridors = [
   ctx.ownBegin = (it) => { ctx.cur = it; batch.owner = it; fac.owner = it; };
   ctx.ownEnd = () => { ctx.cur = null; batch.owner = null; fac.owner = null; };
   ctx.own = (o) => { if (ctx.cur) (ctx.cur.objs ||= []).push(o); };
-  let addrN = 100; ctx.addr = () => `연서대로 ${addrN += 2 + Math.floor(rnd() * 6)}`;
+  let addrN = 100; ctx.addr = () => `중앙대로 ${addrN += 2 + Math.floor(rnd() * 6)}`;
   ctx.treeBatch = new TreeBatch(ctx);
   ctx.carBatch = new CarBatch(scene);
   ctx.trees = (pts, { kind = 'leaf', mix = 0 } = {}) => pts.forEach(([x, z]) => ctx.treeBatch.add(x, z, { kind: rnd() < mix ? 'pine' : kind }));
@@ -116,7 +116,7 @@ export function buildYeonseo(game, { station = null, early = null, corridors = [
   build.push(() => B.apartmentComplex(ctx, { rect: new Rect(-92, pz0('B'), -F, -66), zone: 'residential', streets: streets(new Rect(-92, pz0('B'), -F, -66)) }, { name: '한빛마을 3단지', floors: 18, accent: 0x3a6a9a, firstDong: 301 }));
   build.push(() => B.commercial(ctx, parcel(-42, -64, -F, pz1('B'), 'residential', [1, 0]), { use: 'apartmentShops', floors: 3, cats: ['store', 'pharmacy', 'cafe', 'restaurant', 'salon', 'office', 'clinic'], signStyle: 'box' }));
   build.push(() => B.parkingLot(ctx, parcel(-92, -64, -44, pz1('B'), 'residential', [0, 1])));
-  build.push(() => B.school(ctx, { rect: new Rect(F, pz0('B'), 92, pz1('B')), zone: 'public', streets: streets(new Rect(F, pz0('B'), 92, pz1('B'))) }, { name: '연서초등학교' }));
+  build.push(() => B.school(ctx, { rect: new Rect(F, pz0('B'), 92, pz1('B')), zone: 'public', streets: streets(new Rect(F, pz0('B'), 92, pz1('B'))) }, { name: '한빛초등학교' }));
   // C — commercial core
   const coreE = [[pz0('C'), -19, 7], [-19, -6, 9], [-6, 8, 10]], coreW = [[pz0('C'), -20, 6], [-20, -4, 8], [-4, 12, 7], [12, pz1('C'), 9]];
   for (const [z0, z1, fl] of coreE) build.push(() => B.commercial(ctx, parcel(F, z0, bs0, z1, 'commercial', [-1, 0]), { use: fl >= 9 ? 'shopsTall' : 'shops', floors: fl }));
@@ -143,7 +143,7 @@ export function buildYeonseo(game, { station = null, early = null, corridors = [
     build.push(() => B.parkingLot(ctx, parcel(r0, pz0('D'), r1, 80, 'business', fr)));
     build.push(() => B.commercial(ctx, parcel(...(s > 0 ? [bs1, 80, bs1 + 20, pz1('D')] : [-bs1 - 20, 80, -bs1, pz1('D')]), 'business', fr), { use: 'office', floors: 6, cats: ['office', 'cafe', 'restaurant'], vacant: 0.1 })); }
   // E west — hospital (north of the overpass), park (south); E east — shop-houses on the avenue, villas behind
-  build.push(() => B.hospital(ctx, parcel(-92, pz0('E'), -F, L.overpass[0] - 1, 'public', [1, 0]), { name: '연서중앙병원' }));
+  build.push(() => B.hospital(ctx, parcel(-92, pz0('E'), -F, L.overpass[0] - 1, 'public', [1, 0]), { name: '서울중앙병원' }));
   build.push(() => B.park(ctx, { rect: new Rect(-bs0, L.overpass[1] + 1, -F, 232), zone: 'public', streets: streets(new Rect(-bs0, L.overpass[1] + 1, -F, 232)) }));
   build.push(() => B.park(ctx, { rect: new Rect(-92, L.overpass[1] + 1, -bs1, 232), zone: 'public', streets: streets(new Rect(-92, L.overpass[1] + 1, -bs1, 232)) }));
   for (const [z0, z1] of [[pz0('E'), L.overpass[0] - 1], [L.overpass[1] + 1, 260]]) {
@@ -158,7 +158,7 @@ export function buildYeonseo(game, { station = null, early = null, corridors = [
 
   // station exit 3 on the plaza (registered first so nothing is built over its approach)
   const kit = new CityKit(game); ctx.kit = kit;
-  const ex = L.stationExit; const exit = kit.subwayEntrance(ex.x, ex.z, 0, '연서역 3번 출구'); exit.position.y = CURB;
+  const ex = L.stationExit; const exit = kit.subwayEntrance(ex.x, ex.z, 0, '중앙로역 3번 출구'); exit.position.y = CURB;
   plan.add({ kind: 'structure', id: 'subway-exit-3', use: 'plaza', zone: 'commercial', rect: Rect.c(ex.x, ex.z, 3.5, 6.2), y0: CURB, h: 3.1, obj: exit, entrances: [{ x: ex.x, z: ex.z + 3.1, nx: 0, nz: 1 }] });
   early?.(ctx);
   for (const f of build) f();

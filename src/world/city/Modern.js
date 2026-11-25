@@ -183,11 +183,11 @@ export function modernTower(ctx, { x, z, y0, sections, podium = null, crown = 'p
   ctx.ownEnd(); return it;
 }
 
-// ------------------------------------------------------------------ the landmark: 연서 하늘타워 (original design)
+// ------------------------------------------------------------------ the landmark: 서울 하늘타워 (original design)
 // Rounded-square plan with four deep re-entrant corner notches, so the shaft reads as four "petal" wings;
 // a convex taper; the notches deepen with height until, near the top, the four wings separate into four
 // blades of staggered height around a glass lantern and a spire. Bright sky-lobby bands mark the shaft.
-export function landmarkTower(ctx, { x, z, y0, H = 520, base = 60, name = '연서 하늘타워' }) {
+export function landmarkTower(ctx, { x, z, y0, H = 520, base = 60, name = '서울 하늘타워' }) {
   const B = ctx.landmarkBatch || ctx.batch, N = 96;
   const finTex = tex('hanul-fins', 512, 512, (g, W, Hh, rnd) => {
     g.fillStyle = '#93a6b2'; g.fillRect(0, 0, W, Hh);

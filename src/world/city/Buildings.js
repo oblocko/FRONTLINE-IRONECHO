@@ -423,7 +423,7 @@ export function school(ctx, site, o = {}) {
   ctx.fac.get('commercial').shop(ex, y0 + 1.5, ez, 0, 3.6, 2.7, { type: 4, lit: 0.1 }); ctx.batch.box(m.conc, 6, 0.3, 3, ex, y0 + 3.3, ez + 1.5);
   for (const s of [-1, 1]) ctx.batch.box(m.conc, 0.4, 3.2, 0.4, ex + s * 2.8, y0 + 1.6, ez + 2.8);
   it.entrances.push({ x: ex, z: ez, nx: 0, nz: 1 });
-  const nm = channelSign(o.name ?? '연서초등학교', '#f2f2ea', 1.1, { raceway: null }); nm.position.set(ex, y0 + H - 1.4, ez + 0.02); ctx.scene.add(nm); ctx.own(nm);
+  const nm = channelSign(o.name ?? '한빛초등학교', '#f2f2ea', 1.1, { raceway: null }); nm.position.set(ex, y0 + H - 1.4, ez + 0.02); ctx.scene.add(nm); ctx.own(nm);
   const clock = new THREE.Mesh(new THREE.CircleGeometry(0.9, 24), new THREE.MeshStandardMaterial({ color: 0xf0f0e8, roughness: 0.5 })); clock.position.set(ex, y0 + H - 3.4, ez + 0.03); ctx.scene.add(clock); ctx.own(clock);
   ctx.ownEnd();
   // field + track south of the building, flagpoles, trees along the wall
@@ -459,7 +459,7 @@ export function hospital(ctx, parcel, o = {}) {
   const [cx, cz] = onFace(e, fx, fz, 0, 3); ctx.batch.box(m.white, fx ? 6 : 16, 0.5, fx ? 16 : 6, cx, y0 + 4.4, cz);
   for (const s of [-1, 1]) { const [px, pz] = onFace(e, fx, fz, s * 7, 5.6); ctx.batch.box(m.white, 0.5, 4.2, 0.5, px, y0 + 2.1, pz); ctx.plan.add({ kind: 'prop', id: id('column'), rect: Rect.c(px, pz, 0.5, 0.5), y0, h: 4.2, colliders: [ctx.world.addBox(V(px - 0.25, y0, pz - 0.25), V(px + 0.25, y0 + 4.2, pz + 0.25), { surface: 'concrete' })] }); }
   it.entrances.push({ x: ex, z: ez, nx: fx, nz: fz });
-  const nm = channelSign(o.name ?? '연서중앙병원', '#1d4f8a', 2.0, { raceway: null }); const [nx2, nz2] = onFace(e, fx, fz, 0, 0.03); nm.position.set(nx2, y0 + H - 1.8, nz2); nm.rotation.y = rot; ctx.scene.add(nm); ctx.own(nm);
+  const nm = channelSign(o.name ?? '서울중앙병원', '#1d4f8a', 2.0, { raceway: null }); const [nx2, nz2] = onFace(e, fx, fz, 0, 0.03); nm.position.set(nx2, y0 + H - 1.8, nz2); nm.rotation.y = rot; ctx.scene.add(nm); ctx.own(nm);
   // emergency entrance on a side that faces a street
   const side = SIDES.find(([nx, nz]) => (nx !== fx || nz !== fz) && parcel.streets[key(nx, nz)]);
   if (side) { const se = edge(rect, ...side); const [sx, sz] = onFace(se, ...side, 0, 0); ctx.fac.get('commercial').shop(sx, y0 + 1.6, sz, Math.atan2(...side), 4, 2.8, { type: 3, lit: 0.9 });
@@ -536,7 +536,7 @@ export function gasStation(ctx, parcel, o = {}) {
   k.colliders.push(mass(ctx, kr, y0, 3.6, wallMat('panel', 0xe8e6e0), { parapet: 0.4 }));
   const ke = edge(kr, fx, fz); const [kx, kz] = onFace(ke, fx, fz, 0, 0); ctx.fac.get('commercial').shop(kx, y0 + 1.5, kz, Math.atan2(fx, fz), ke.len - 2, 2.6, { type: 0, lit: 0.7 });
   k.entrances.push({ x: kx, z: kz, nx: fx, nz: fz });
-  const ks = boxSign('연서주유소', '셀프 · 세차', ['#d8261c', '#ffffff', '#f2b705'], Math.min(6, ke.len - 1), 0.8, { style: 'logo', lit: true }); const [sx, sz] = onFace(ke, fx, fz, 0, 0.05); ks.position.set(sx, y0 + 3.2, sz); ks.rotation.y = Math.atan2(fx, fz); ctx.scene.add(ks); ctx.own(ks);
+  const ks = boxSign('한빛주유소', '셀프 · 세차', ['#d8261c', '#ffffff', '#f2b705'], Math.min(6, ke.len - 1), 0.8, { style: 'logo', lit: true }); const [sx, sz] = onFace(ke, fx, fz, 0, 0.05); ks.position.set(sx, y0 + 3.2, sz); ks.rotation.y = Math.atan2(fx, fz); ctx.scene.add(ks); ctx.own(ks);
   ctx.ownEnd();
   // price pole at the street corner
   const pe = edge(R, fx, fz); const [qx, qz] = onFace(pe, fx, fz, pe.len / 2 - 1.2, -1.0);
@@ -561,7 +561,7 @@ export function industrial(ctx, parcel, o = {}) {
   const nDoors = use === 'logistics' ? Math.max(2, Math.floor(len / 6)) : 2;
   const doors = []; for (let i = 0; i < nDoors; i++) doors.push({ side, at: -len / 2 + (i + 0.5) * len / nDoors, width: use === 'logistics' ? 3.2 : 5, height: use === 'logistics' ? 3.6 : 5, kind: 'shutter', open: r() * 0.6 });
   doors.push({ side, at: len / 2 - 1.2, width: 1.0, kind: 'person' });
-  const owners = ['연서물류', '한결정밀', '대성산업', '우진로지스', '태광금속', '서해냉동'];
+  const owners = ['한강물류', '한결정밀', '대성산업', '우진로지스', '태광금속', '서해냉동'];
   const grp = warehouse(ctx.game, { x: rect.cx, z: rect.cz, y: y0, w: rect.w, d: rect.d, h, rotQ: 0, doors, sign: `${1 + Math.floor(r() * 9)}`, owner: owners[Math.floor(r() * owners.length)] });
   const it = reg(ctx, { id: id(use), use, zone: parcel.zone, rect, y0, h: h + Math.min(rect.w, rect.d) * 0.08, obj: grp, colliders: [grp.userData.collider], entrances: [] });
   const e = edge(rect, fx, fz); const [dx, dz] = onFace(e, fx, fz, len / 2 - 1.2, 0); it.entrances.push({ x: dx, z: dz, nx: fx, nz: fz });

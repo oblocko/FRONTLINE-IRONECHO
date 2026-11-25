@@ -3,7 +3,7 @@
 // Beyond the playable streets: no colliders, low-poly masses with textured façades, merged per 240 m
 // chunk (frustum culled), big buildings registered as occluders with the LOD system.
 //
-// PLAN (north = -z): an arterial grid (x 0 = 연서대로, x 420 = the boulevard) splits the land into cells; each
+// PLAN (north = -z): an arterial grid (x 0 = 중앙대로, x 420 = the boulevard) splits the land into cells; each
 // cell belongs to the nearest district seed (SEEDS) and is subdivided by that district's own street grid.
 //   cbd / business  towers on podiums, tiered, heights falling away from the district centre
 //   downtown        perimeter commercial blocks, continuous frontage, parking courts

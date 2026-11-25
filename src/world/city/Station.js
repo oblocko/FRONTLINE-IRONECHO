@@ -1,4 +1,4 @@
-// 연서중앙역 — the central station of the new district (original design, after the user's references:
+// 서울중앙역 — the central station of the new district (original design, after the user's references:
 // a glass train shed crossed by a concourse, a great arched portal, a lattice canopy over the plaza).
 //
 //   tracks        8 tracks on the E-W viaduct (deck y 9), island platforms, three trains standing
@@ -124,8 +124,8 @@ export function buildCentralStation(ctx, { block, rail }) {
   plan.add({ kind: 'building', id: 'central-station', use: 'civic', zone: 'public', rect: new Rect(conc.x0, conc.z0, conc.x1, front), y0: CURB, h: cvTop, tags: ['support'], entrances: [{ x: conc.x0 + fw / 2, z: front, nx: 0, nz: 1 }],
     colliders: [world.addBox(V(conc.x0, CURB, conc.z0), V(conc.x1, CURB + cvSpring, front), { surface: 'concrete', cover: true, walkable: false })] });
   // name on the arch
-  const sn = channelSign('연서중앙역', '#f4f6f8', 4.2, { raceway: null }); sn.position.set(conc.x0 + fw / 2, CURB + cvTop - 9, front + 2.2); scene.add(sn);
-  const se = channelSign('YEONSEO CENTRAL', '#f4f6f8', 1.8, { raceway: null }); se.position.set(conc.x0 + fw / 2, CURB + cvTop - 13.2, front + 2.2); scene.add(se);
+  const sn = channelSign('서울중앙역', '#f4f6f8', 4.2, { raceway: null }); sn.position.set(conc.x0 + fw / 2, CURB + cvTop - 9, front + 2.2); scene.add(sn);
+  const se = channelSign('SEOUL CENTRAL', '#f4f6f8', 1.8, { raceway: null }); se.position.set(conc.x0 + fw / 2, CURB + cvTop - 13.2, front + 2.2); scene.add(se);
 
   // ---------------------------------------------------------------- twin towers either side of the concourse
   const tw = conc.x0 - block.x0 - 10;
@@ -201,7 +201,7 @@ export function stationQuarter(ctx, { st, block, rail, east, streetsZ }) {
   for (let k = 0; k < 4; k++) { const x = ax + (k < 2 ? -1 : 1) * (12 + (k % 2) * 7), z = front + 30;
     prop(`kiosk${k}`, Rect.c(x, z, 3, 2.4), 2.6, () => { batch.box(flatMat(0xe8e6e0, { key: 'kiosk' }), 3, 2.3, 2.4, x, CURB + 1.15, z); batch.box(flatMat(kioskCols[k], { key: 'kioskroof' + k }), 3.6, 0.2, 3.0, x, CURB + 2.5, z); batch.box(dark, 2.2, 0.9, 0.05, x, CURB + 1.4, z + 1.22); }); }
   { const x = conc.x1 + 10, z = front + 26; prop('media-pylon', Rect.c(x, z, 2, 1), 12, () => { batch.box(dark, 1.4, 12, 0.8, x, CURB + 6, z);
-      const scr = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 7.6), new THREE.MeshBasicMaterial({ map: (() => { const c = document.createElement('canvas'); c.width = 256; c.height = 440; const g = c.getContext('2d'); const gr = g.createLinearGradient(0, 0, 0, 440); gr.addColorStop(0, '#1d3f8a'); gr.addColorStop(1, '#0a1a3a'); g.fillStyle = gr; g.fillRect(0, 0, 256, 440); g.fillStyle = '#fff'; g.font = 'bold 34px "WenQuanYi Zen Hei", sans-serif'; g.textAlign = 'center'; g.fillText('연서중앙역', 128, 120); g.font = '22px sans-serif'; g.fillText('YEONSEO CENTRAL', 128, 160); g.fillStyle = '#ffcc33'; g.font = 'bold 26px "WenQuanYi Zen Hei", sans-serif'; g.fillText('KTX · ITX · 지하철 3·7호선', 128, 260); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })(), toneMapped: false }));
+      const scr = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 7.6), new THREE.MeshBasicMaterial({ map: (() => { const c = document.createElement('canvas'); c.width = 256; c.height = 440; const g = c.getContext('2d'); const gr = g.createLinearGradient(0, 0, 0, 440); gr.addColorStop(0, '#1d3f8a'); gr.addColorStop(1, '#0a1a3a'); g.fillStyle = gr; g.fillRect(0, 0, 256, 440); g.fillStyle = '#fff'; g.font = 'bold 34px "WenQuanYi Zen Hei", sans-serif'; g.textAlign = 'center'; g.fillText('서울중앙역', 128, 120); g.font = '22px sans-serif'; g.fillText('SEOUL CENTRAL', 128, 160); g.fillStyle = '#ffcc33'; g.font = 'bold 26px "WenQuanYi Zen Hei", sans-serif'; g.fillText('KTX · ITX · 지하철 3·7호선', 128, 260); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })(), toneMapped: false }));
       scr.position.set(x, CURB + 7.6, z + 0.42); scene.add(scr); }); }
   for (let x = plaza.x0 + 4; x < plaza.x1 - 4; x += 2.4) if (Math.abs(x - ax) > 20) batch.box(steel, 0.25, 0.9, 0.25, x, CURB + 0.45, plaza.z1 - 1.2);   // bollards on the curb
 
@@ -210,7 +210,7 @@ export function stationQuarter(ctx, { st, block, rail, east, streetsZ }) {
   batch.add(new THREE.BoxGeometry(nw, 0.6, 10).translate(ax, CURB + 7, nz - 5), steel);
   for (const s of [-1, 1]) batch.box(steel, 0.6, 7, 0.6, ax + s * (nw / 2 - 1), CURB + 3.5, nz - 9.5);
   batch.box(flatMat(0x7e98a8, { roughness: 0.06, metalness: 0.4, key: 'ndoor' }), nw - 8, 5.5, 0.2, ax, CURB + 2.75, nz - 0.1);
-  const nn = channelSign('연서중앙역 북측 출입구', '#1d3f8a', 1.1, { raceway: null }); nn.position.set(ax, CURB + 6, nz - 0.25); nn.rotation.y = Math.PI; scene.add(nn);
+  const nn = channelSign('서울중앙역 북측 출입구', '#1d3f8a', 1.1, { raceway: null }); nn.position.set(ax, CURB + 6, nz - 0.25); nn.rotation.y = Math.PI; scene.add(nn);
   plan.walk(new Rect(block.x0, block.z0, block.x1, nz), 'plaza');
   batch.add(cap(outline('rect', block.x1 - block.x0, nz - block.z0), CURB + 0.015, { cx: (block.x0 + block.x1) / 2, cz: (block.z0 + nz) / 2 }), groundMat('plaza', { color: 0xc8c4bc }), { cast: false });
   { const lane = new Rect(ax - 40, block.z0 + 0.5, ax + 40, block.z0 + 6); plan.park(lane); batch.add(cap(outline('rect', lane.w, lane.d), CURB + 0.02, { cx: lane.cx, cz: lane.cz }), groundMat('asphalt'), { cast: false });

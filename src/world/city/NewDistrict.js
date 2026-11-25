@@ -1,4 +1,4 @@
-// 연서 신도심 — the new district east of the old centre (x 216..720). Contemporary, not futuristic.
+// 서울 신도심 — the new district east of the old centre (x 216..720). Contemporary, not futuristic.
 // Laid out like a lakeside landmark district (north = -z):
 //   boulevard (N-S)      x 408..432 — runs between the two lakes
 //   올림픽로 (E-W)        z -104..-84, the big crossing with the boulevard; rail viaduct just north (z -160..-144)
@@ -6,7 +6,7 @@
 //   streets              N-S x 270..282 and 612..624, E-W z -236..-224 and 150..162
 //   east lake (동호)      east of the boulevard, south of 잠실로; the landmark tower + mall on the block north of it
 //   west lake (서호)      west of the boulevard, further south-west; lake park north of it
-//   연서중앙역            north-west of the big crossing (hall over the viaduct, plaza on 올림픽로)
+//   서울중앙역            north-west of the big crossing (hall over the viaduct, plaza on 올림픽로)
 //   all other blocks      contemporary offices (east) and residential towers (west / south)
 import * as THREE from 'three';
 import { Rect } from './CityPlan.js';
@@ -76,7 +76,7 @@ export function buildNewDistrict(ctx) {
     ctx.trees(trees, { mix: 0.3 });
   }
 
-  // ---------------------------------------------------------------- rail viaduct + 연서중앙역
+  // ---------------------------------------------------------------- rail viaduct + 서울중앙역
   const R = L.rail, S = L.station, conc = wallMat('concrete', 0xb0aea6);
   const deck = new Rect(L.connector[1], R.z0, L.x1, R.z1);
   batch.box(conc, deck.w, 1.6, deck.d, deck.cx, R.y - 0.8, deck.cz);
@@ -87,7 +87,7 @@ export function buildNewDistrict(ctx) {
   // tracks
   const rail2 = flatMat(0x6a6460, { roughness: 0.5, metalness: 0.7, key: 'rail' });
   for (const tz of [R.z0 + 2, R.z0 + 6.5, R.z1 - 6.5, R.z1 - 2]) for (const s of [-0.72, 0.72]) batch.box(rail2, deck.w, 0.16, 0.08, deck.cx, R.y + 0.1, tz + s, 0, { cast: false });
-  // 연서중앙역 (world/city/Station.js): train shed + concourse vault + arched glass front, twin towers, plaza with
+  // 서울중앙역 (world/city/Station.js): train shed + concourse vault + arched glass front, twin towers, plaza with
   // a sunken metro plaza, bus terminal and taxi rank; a footbridge to the landmark
   const stBlock = new Rect(216 + 4, -224 + 4, bx0 - L.walk, -104 - L.sw);
   const station = buildCentralStation(ctx, { block: stBlock, rail: R });
@@ -100,7 +100,7 @@ export function buildNewDistrict(ctx) {
     crown: 'fin', zone: 'business', use: 'shops', front: [0, 1], palette: { glass: 0x5a7486, spandrel: 0xc8ccd0, mullion: 0xe0e4e6, key: 'hotel' } });
   stationQuarter(ctx, { st: station, block: stBlock, rail: R, east: [new Rect(bx1 + L.walk + 2, -206, 612 - L.sw - 2, -166), new Rect(624 + L.sw + 2, -206, L.x1 - 2, -166)] });
   // ---------------------------------------------------------------- the landmark + podium mall (east of the boulevard, facing the lakes)
-  const T = L.tower; landmarkTower(ctx, { x: T.x, z: T.z, y0: CURB, H: 520, base: 58, name: '연서 하늘타워' });
+  const T = L.tower; landmarkTower(ctx, { x: T.x, z: T.z, y0: CURB, H: 520, base: 58, name: '서울 하늘타워' });
   // podium mall north / east of the tower: a long retail block and a rounded "dome" department store
   modernTower(ctx, { x: 566, z: -50, y0: CURB, sections: [{ kind: 'round', w: 80, d: 56, r: 14, h: 36, mat: 'grid', floorH: 6, rims: 1 }], crown: 'plant', zone: 'business', use: 'shops', front: [-1, 0], palette: { frame: 0xeeeae0, glass: 0x5a6a74, key: 'mall' } });
   domeStore(ctx, { x: 560, z: -128, w: 50, d: 30, h: 26 });
