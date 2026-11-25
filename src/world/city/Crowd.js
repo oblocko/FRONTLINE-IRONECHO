@@ -204,7 +204,7 @@ export class Crowd {
       const tier = d2 < NEAR2 * (p.tier === 0 ? 1.15 : 0.87) ? 0 : d2 < MID2 * (p.tier === 1 ? 1.1 : 0.9) ? 1 : 2;
       const T = tier === 0 && this.near.k < this.near.mesh.instanceMatrix.count ? this.near : tier <= 1 && this.mid.k < this.mid.mesh.instanceMatrix.count ? this.mid : this.far;
       p.tier = T === this.near ? 0 : T === this.mid ? 1 : 2;
-      this._p.set(p.x, this.y, p.z); this._q.setFromAxisAngle(this._up, p.heading); this._m.compose(this._p, this._q, this._s);
+      this._p.set(p.x, p.A.y ?? this.y, p.z); this._q.setFromAxisAngle(this._up, p.heading); this._m.compose(this._p, this._q, this._s);
       T.put(p, this._m, moving ? p.speed * 5.2 : 0);
     }
     this.near.flush(); this.mid.flush(); this.far.flush();

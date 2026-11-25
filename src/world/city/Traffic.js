@@ -12,9 +12,9 @@ export class Traffic {
   // opts: { y (road surface), maxCars }
   constructor(game, { y = 0, rnd = Math.random } = {}) { this.game = game; this.y = y; this.rnd = rnd; this.lanes = []; this.junctions = []; this.cars = []; this.t = 0; }
   // a straight lane from a to b ([x, z]); axis 'ns' | 'ew' decides which signal phase it obeys
-  lane(a, b, { speed = 11, axis = null, count = 4 } = {}) {
+  lane(a, b, { speed = 11, axis = null, count = 4, y = null } = {}) {
     const dx = b[0] - a[0], dz = b[1] - a[1], len = Math.hypot(dx, dz);
-    const L = { a, b, len, dir: [dx / len, dz / len], speed, axis: axis ?? (Math.abs(dz) > Math.abs(dx) ? 'ns' : 'ew'), cars: [] };
+    const L = { a, b, len, y, dir: [dx / len, dz / len], speed, axis: axis ?? (Math.abs(dz) > Math.abs(dx) ? 'ns' : 'ew'), cars: [] };
     this.lanes.push(L);
     for (let i = 0; i < count; i++) this.addCar(L, (i + this.rnd() * 0.5) * len / count);
     return L;
@@ -63,7 +63,7 @@ export class Traffic {
         if (c.s > L.len) { c.s -= L.len; }   // wraps to the lane start (the lanes end far from the player's streets)
         const cx = L.a[0] + L.dir[0] * c.s, cz = L.a[1] + L.dir[1] * c.s;
         // car geometry faces +z
-        q.setFromAxisAngle(up, Math.atan2(L.dir[0], L.dir[1])); m.compose(V(cx, this.y, cz), q, sc);
+        q.setFromAxisAngle(up, Math.atan2(L.dir[0], L.dir[1])); m.compose(V(cx, L.y ?? this.y, cz), q, sc);
         for (const part of ['paint', 'glass', 'fixed']) this.meshes[c.type][part].setMatrixAt(c.slot, m);
       }
     }
