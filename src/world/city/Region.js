@@ -20,12 +20,11 @@ import { curtainMat, gridMat, outline, shell, cap } from './Modern.js';
 import { CURB } from './Streets.js';
 import { DISTRICT as HAND } from './HaneulDistrict.js';
 import { frontSigns, facility } from './RegionExtras.js';
-import { waterMat, worldUV } from './Water.js';
+import { HAN, hanC, hanNorth, hanSouth, inHan, buildHan } from './HanRiver.js';
 
-const EXT = { x0: -1500, x1: 1900, z0: -1400, z1: 1400 };
+const EXT = { x0: -1500, x1: 1900, z0: -2050, z1: 1400 };   // the Han runs through it (z ≈ -1000): 강북 north of it, 강남 south
 const CORE = { x0: -206, x1: 726, z0: -306, z1: 306 };
-const RIVER = { z0: -1150, z1: -800 };
-const ARTX = [-1440, -960, -480, 0, 420, 900, 1380, 1860], ARTZ = [-1330, -660, 660, 1020, 1380];
+const ARTX = [-1440, -960, -480, 0, 420, 900, 1380, 1860], ARTZ = [-1640, -500, 660, 1020, 1380];
 const LANDMARK = { x: 488, z: -50 };
 // Urban structure (concentric, like a real metropolis): 도심 (the hand-made core) → 중간 지역 (mixed / villas) →
 // 외곽 지역 (apartment complexes; factories west, schools / university north) → 개발제한구역 (greenbelt: forest,
@@ -38,7 +37,15 @@ function zoneOf(x, z) {
   for (const s of SUB) { const d = Math.hypot(x - s.x, z - s.z); if (d < 300) return { type: d < 170 ? 'cbd' : 'business', x: s.x, z: s.z }; }
   if (Math.hypot(x - 1550, z + 600) < 190) return { type: 'stadium', x, z };
   const dx = (x - CEN.x) / 1650, dz = (z - CEN.z) / 1380, r = Math.hypot(dx, dz), ang = Math.atan2(dz, dx), v = (Math.sin(x * 0.011 + 1.3) * Math.cos(z * 0.009) + 1) / 2;
+  // 강북: riverside apartment complexes along the river, the old downtown in the middle, villas / 주상복합 round it,
+  // the greenbelt at the edge
+  if (z < -1050) { const rx = (x - CEN.x) / 1650, dn = hanNorth(x) - z;
+    if (Math.abs(rx) > 0.95 || z < EXT.z0 + 110) return { type: 'greenbelt', x, z };
+    if (dn < 230) return { type: v < 0.6 ? 'highrise' : 'slab', x, z };
+    if (Math.abs(rx) < 0.3) return { type: Math.abs(Math.sin(x * 0.005 + z * 0.003)) < 0.45 ? 'business' : 'downtown', x: CEN.x, z: -1720 };
+    return { type: v < 0.55 ? 'villa' : 'mixed', x, z }; }
   if (r > 0.9) return { type: 'greenbelt', x, z };
+  if (z - hanSouth(x) < 200 && Math.abs(x - CEN.x) > 380) return { type: v < 0.6 ? 'highrise' : 'slab', x, z };   // 강남 riverside apartments
   if (r < 0.52) return { type: Math.abs(Math.sin(ang * 2)) < 0.3 ? 'business' : 'downtown', x: CEN.x, z: CEN.z };
   if (r < 0.72) return { type: v < 0.5 ? 'villa' : 'mixed', x, z };
   if (Math.abs(ang) > 2.55) return { type: 'industrial', x, z };                       // west: 공장
@@ -121,7 +128,7 @@ function mergeGeos(gs) { const pos = [], nor = []; for (const g0 of gs) { const 
 const inCore = (x0, z0, x1, z1) => x1 > CORE.x0 && x0 < CORE.x1 && z1 > CORE.z0 && z0 < CORE.z1;
 // the hand-made quarter (HandStreets.js) replaces the generated blocks, their streets and trees
 const inHand = (x0, z0, x1, z1) => x1 > HAND.x0 - 2 && x0 < HAND.x1 + 2 && z1 > HAND.z0 - 2 && z0 < HAND.z1 + 2;
-const inRiver = (z0, z1) => z1 > RIVER.z0 - 40 && z0 < RIVER.z1 + 40;
+const inRiver = (z0, z1, x0 = -1e4, x1 = 1e4) => inHan(Math.max(x0, EXT.x0 - 160), z0, Math.min(x1, EXT.x1 + 160), z1, 10);
 function boxGeo(w, h, d, x, y, z) { return new THREE.BoxGeometry(w, h, d).translate(x, y + h / 2, z); }
 
 // Streaming: every 240 m chunk keeps its buildings as SPECS (data). At load each chunk gets an HLOD proxy (boxes,
@@ -139,37 +146,25 @@ export class Region {
   const self = this; const DBG = typeof location !== 'undefined' ? (location.search.match(/rg=([a-z,]+)/)?.[1] || '') : '';
   // a building spec goes to its chunk: { geo: () => BufferGeometry, mat: () => Material, box: [x0, z0, x1, z1, h], color }
   let NSPEC = 0; const spec = (x, z, sp) => { if (++NSPEC > 200000) throw new Error('region: runaway spec generation'); this.chunk(x, z).specs.push(sp); };
-  // ground: land + river + banks
-  // ground: two slabs (south / north of the river), the detailed core land cut out of the south one
-  const slab = (x0, z0, x1, z1, holes) => { const sh = new THREE.Shape([[x0, -z0], [x1, -z0], [x1, -z1], [x0, -z1]].map(([a, b]) => new THREE.Vector2(a, b)));
+  // ground: two slabs, 강남 (south of the river, the detailed core land cut out of it) and 강북; their river edges
+  // follow the curve of the Han (the levee tops)
+  const slab = (pts, holes) => { const sh = new THREE.Shape(pts.map(([a, b]) => new THREE.Vector2(a, -b)));
     for (const h of holes) sh.holes.push(new THREE.Path([[h[0], -h[1]], [h[0], -h[3]], [h[2], -h[3]], [h[2], -h[1]]].map(([a, b]) => new THREE.Vector2(a, b))));
     const g = new THREE.ExtrudeGeometry(sh, { depth: 0.3, bevelEnabled: false }); g.rotateX(-Math.PI / 2); g.translate(0, CURB - 0.31, 0); return g; };
-  const gm = groundMat('plaza', { color: 0x8a8882 });
-  if (!DBG.includes('noground')) B.add(slab(EXT.x0 - 160, RIVER.z1, EXT.x1 + 160, EXT.z1 + 160, [[-200, -270, 200, 270], [200, -300, 720, 300], [HAND.x0, HAND.z0, HAND.x1, HAND.z1]]), gm, { cast: false });
-  if (!DBG.includes('noground')) B.add(slab(EXT.x0 - 160, EXT.z0 - 160, EXT.x1 + 160, RIVER.z0, []), gm, { cast: false });
-  const wg = new THREE.PlaneGeometry(9000, RIVER.z1 - RIVER.z0); wg.rotateX(-Math.PI / 2); wg.translate(200, -2.0, (RIVER.z0 + RIVER.z1) / 2);
-  const water = new THREE.Mesh(worldUV(wg), waterMat(0x264a52)); if (!DBG.includes('nowater')) scene.add(water);
-  for (const z of [RIVER.z0, RIVER.z1]) { B.add(boxGeo(9000, 0.1, 60, 200, CURB, z + (z === RIVER.z1 ? 30 : -30)), groundMat('lawn'), { cast: false }); }   // riverside parks
-  // the land must not cover the river: cut it with a dark trough (the ground slab is drawn under it)
-  B.add(boxGeo(9000, 0.4, RIVER.z1 - RIVER.z0, 200, -4.0, (RIVER.z0 + RIVER.z1) / 2), flatMat(0x2a3436, { key: 'riverbed' }), { cast: false });
-  for (const z of [RIVER.z0, RIVER.z1]) B.add(boxGeo(9000, CURB + 4, 1, 200, -4, z), wallMat('stone', 0x9a968c), { cast: false });   // embankments
+  const gm = groundMat('plaza', { color: 0x8a8882 }), LX0 = EXT.x0 - 160, LX1 = EXT.x1 + 160, edgeS = [], edgeN = [];
+  for (let x = LX1; x >= LX0 - 0.1; x -= 20) edgeS.push([x, hanSouth(x)]);
+  for (let x = LX0; x <= LX1 + 0.1; x += 20) edgeN.push([x, hanNorth(x)]);
+  if (!DBG.includes('noground')) B.add(slab([[LX0, EXT.z1 + 160], [LX1, EXT.z1 + 160], ...edgeS], [[-200, -270, 200, 270], [200, -300, 720, 300], [HAND.x0, HAND.z0, HAND.x1, HAND.z1]]), gm, { cast: false });
+  if (!DBG.includes('noground')) B.add(slab([[LX1, EXT.z0 - 160], [LX0, EXT.z0 - 160], ...edgeN], []), gm, { cast: false });
   const asph = groundMat('asphalt', { roughness: 0.85 });
-  // arterials (30 m) and the ring road around the core
-  for (const x of ARTX) for (const [a0, a1] of [[EXT.z0, RIVER.z0], [RIVER.z1, EXT.z1]]) for (const [z0, z1] of (x > HAND.x0 && x < HAND.x1 ? [[a0, Math.min(a1, HAND.z0)], [Math.max(a0, HAND.z1), a1]] : [[a0, a1]])) { if (z1 - z0 < 1) continue; B.add(boxGeo(30, 0.05, z1 - z0, x, CURB - 0.02, (z0 + z1) / 2), asph, { cast: false }); }
+  // arterials (30 m; they stop at the levee, six of them cross the river on a bridge) and the ring road around the core
+  for (const x of ARTX) for (const [a0, a1] of [[EXT.z0, hanNorth(x)], [hanSouth(x), EXT.z1]]) for (const [z0, z1] of (x > HAND.x0 && x < HAND.x1 ? [[a0, Math.min(a1, HAND.z0)], [Math.max(a0, HAND.z1), a1]] : [[a0, a1]])) { if (z1 - z0 < 1) continue; B.add(boxGeo(30, 0.05, z1 - z0, x, CURB - 0.02, (z0 + z1) / 2), asph, { cast: false }); }
   for (const z of ARTZ) B.add(boxGeo(EXT.x1 - EXT.x0, 0.05, 30, (EXT.x0 + EXT.x1) / 2, CURB - 0.02, z), asph, { cast: false });
   for (const z of [CORE.z0 - 14, CORE.z1 + 14]) B.add(boxGeo(CORE.x1 - CORE.x0 + 56, 0.05, 24, (CORE.x0 + CORE.x1) / 2, CURB - 0.02, z), asph, { cast: false });
   for (const x of [CORE.x0 - 14, CORE.x1 + 14]) B.add(boxGeo(24, 0.05, CORE.z1 - CORE.z0 + 56, x, CURB - 0.02, 0), asph, { cast: false });
-  // bridges over the river on each arterial
-  const conc = wallMat('concrete', 0xa8a6a0);
-  // bridges carry the arterials across at road level (deck top = the curb), parapets both sides; the banks have a
-  // railing everywhere else, so the river can be crossed only on a bridge
-  const world = ctx.world, rail = flatMat(0x4a4e50, { metalness: 0.5, roughness: 0.5, key: 'rgrail' }), RL = RIVER.z1 - RIVER.z0, RC = (RIVER.z0 + RIVER.z1) / 2;
-  const BX = ARTX.filter((x) => x > EXT.x0 && x < EXT.x1);
-  for (const x of BX) { B.add(boxGeo(30, 1.8, RL + 4, x, CURB - 1.8, RC), conc); for (let z = RIVER.z0 + 30; z < RIVER.z1; z += 70) B.add(boxGeo(6, CURB - 1.8 + 4.2, 4, x, -4.2, z), conc);
-    B.add(boxGeo(30, 0.05, RL + 4, x, CURB - 0.02, RC), asph, { cast: false });
-    for (const s2 of [-1, 1]) { B.add(boxGeo(0.5, 1.1, RL + 4, x + s2 * 14.75, CURB, RC), conc); world?.addBox(new THREE.Vector3(x + s2 * 14.75 - 0.25, CURB, RIVER.z0 - 2), new THREE.Vector3(x + s2 * 14.75 + 0.25, CURB + 1.1, RIVER.z1 + 2), { surface: 'concrete', walkable: false }); } }
-  for (const z of [RIVER.z0 - 0.4, RIVER.z1 + 0.4]) { let x0 = EXT.x0 - 150;
-    for (const bx of [...BX, EXT.x1 + 150]) { const x1 = Math.min(bx - 15, EXT.x1 + 150); if (x1 - x0 > 1) { B.add(boxGeo(x1 - x0, 0.06, 0.06, (x0 + x1) / 2, CURB + 1.0, z), rail); world?.addBox(new THREE.Vector3(x0, CURB, z - 0.1), new THREE.Vector3(x1, CURB + 1.1, z + 0.1), { surface: 'metal', walkable: false }); } x0 = bx + 15; } }
+  // 한강: 둔치 parks, expressways, six bridges, 누리섬 (HanRiver.js)
+  const world = ctx.world;
+  if (!DBG.includes('nohan')) this.han = buildHan({ B, world, scene, rnd, tree: (x, y, z, s2) => { for (const [g, m] of treeParts(x, z, s2, y)) B.add(g, m, { cast: false }); } });
   // highways out through the greenbelt to the satellite towns (the terrain is levelled along them)
   for (const h of HWY) { const [ax, az] = h.a, [bx, bz] = h.b, L2 = Math.hypot(bx - ax, bz - az), ang = Math.atan2(bz - az, bx - ax);
     const g = new THREE.BoxGeometry(L2, 0.8, 24); g.rotateY(-ang); g.translate((ax + bx) / 2, CURB - 0.38, (az + bz) / 2); B.add(g, asph, { cast: false });
@@ -200,7 +195,7 @@ export class Region {
     const CX = cuts(ax0, ax1, nx), CZ = cuts(az0, az1, nz);
     for (let a2 = 0; a2 < nx; a2++) for (let b2 = 0; b2 < nz; b2++) {
       const x0 = CX[a2] + st / 2, x1 = CX[a2 + 1] - st / 2, z0 = CZ[b2] + st / 2, z1 = CZ[b2 + 1] - st / 2;
-      if (x1 - x0 < 24 || z1 - z0 < 24 || inCore(x0 - 30, z0 - 30, x1 + 30, z1 + 30) || inRiver(z0, z1)) continue;
+      if (x1 - x0 < 24 || z1 - z0 < 24 || inCore(x0 - 30, z0 - 30, x1 + 30, z1 + 30) || inRiver(z0, z1, x0, x1)) continue;
       if (a2 < nx - 1 && !inHand(x1, z0, x1 + st, z1 + st)) B.add(boxGeo(st, 0.04, z1 - z0 + st, x1 + st / 2, CURB - 0.02, (z0 + z1) / 2), asph, { cast: false });
       if (b2 < nz - 1 && !inHand(x0, z1, x1 + st, z1 + st)) B.add(boxGeo(x1 - x0 + st, 0.04, st, (x0 + x1) / 2, CURB - 0.02, z1 + st / 2), asph, { cast: false });
       const edge = { n: b2 === 0, s: b2 === nz - 1, w: a2 === 0, e: a2 === nx - 1 };   // block faces an arterial
@@ -228,7 +223,7 @@ export class Region {
     }
   }
   // trees stream with their chunk (merged low-poly crowns)
-  for (const [x, z] of treeSpots) { if (inCore(x - 10, z - 10, x + 10, z + 10) || inHand(x - 3, z - 3, x + 3, z + 3) || inRiver(z, z)) continue; const s2 = 0.8 + rnd() * 0.5; spec(x, z, { geo: () => treeGeo(x, z, s2), mat: () => treeMat(), box: [x - 1, z - 1, x + 1, z + 1, 6 * s2], color: 0x4a6a3a, tree: true }); }
+  for (const [x, z] of treeSpots) { if (inCore(x - 10, z - 10, x + 10, z + 10) || inHand(x - 3, z - 3, x + 3, z + 3) || inRiver(z - 2, z + 2, x - 2, x + 2)) continue; const s2 = 0.8 + rnd() * 0.5; treeSpec(spec, x, z, s2, 0x4a6a3a); }
   // terrain beyond the city: foothills rising into mountain ranges, the river valley carried on through them
   if (!DBG.includes('nohills')) scene.add(terrain(rnd));
 
@@ -238,10 +233,12 @@ export class Region {
   // HLOD proxies for every chunk now; details stream in later
   const pm = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, map: proxyTex() });
   if (!DBG.includes('noproxy')) for (const c of this.chunks.values()) c.proxy = proxyMesh(c.specs, pm, scene);
+  if (!DBG.includes('nosprawl')) scene.add(sprawl(rnd, pm));
   this.noDetail = DBG.includes('nodetail');
   }
   // stream: build the nearest missing detail chunk (one per call), free far ones, swap proxy / detail
   update(dt) {
+    this.han?.tick(dt);
     if ((this.t -= dt) > 0) return; this.t = 0.15;
     const eye = this.ctx.game.renderer.camera.position; let best = null, bd = Infinity;
     for (const c of this.chunks.values()) {
@@ -278,38 +275,63 @@ function proxyMesh(specs, mat, scene) {
 }
 
 // ------------------------------------------------------------------ terrain
-// A disc of terrain (radius ~9 km round the city) on a polar grid, dense near the city and coarse far out.
-// Height is 0 (under the city ground) inside the city rectangle and rises with distance from it into
-// fractal ridges; the river valley is cut through east and west. Vertex colours: meadow → forest → rock.
+// A disc of terrain (radius ~9.5 km round the city) on a polar grid, dense near the city and coarse far out.
+// Seoul's surroundings here are a broad plain, not a ring of mountains: farmland and woods, low rolling hills
+// (≤ ~45 m) far out, the Han running on east and west through a wide shallow valley. Under the city it sits
+// below every surface (and well below the river corridor so it never shows through the water).
 function noise2(x, z) { const xi = Math.floor(x), zi = Math.floor(z), xf = x - xi, zf = z - zi;
   const h = (a, b) => { const n = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return n - Math.floor(n); };
   const u = xf * xf * (3 - 2 * xf), v = zf * zf * (3 - 2 * zf);
   return (h(xi, zi) * (1 - u) + h(xi + 1, zi) * u) * (1 - v) + (h(xi, zi + 1) * (1 - u) + h(xi + 1, zi + 1) * u) * v; }
-function fbm(x, z) { let a = 0, f = 1, w = 0.5; for (let i = 0; i < 6; i++) { a += w * noise2(x * f, z * f); f *= 2.03; w *= 0.5; } return a; }
+function fbm(x, z, o = 5) { let a = 0, f = 1, w = 0.5; for (let i = 0; i < o; i++) { a += w * noise2(x * f, z * f); f *= 2.03; w *= 0.5; } return a; }
+const smooth = (a, b, t) => { const k = Math.min(1, Math.max(0, (t - a) / (b - a))); return k * k * (3 - 2 * k); };
 export function terrainHeight(x, z) {
   const dx = Math.max(EXT.x0 - 140 - x, 0, x - EXT.x1 - 140), dz = Math.max(EXT.z0 - 140 - z, 0, z - EXT.z1 - 140), d = Math.hypot(dx, dz);
-  if (d <= 0) return -4.6;   // under the city: below every lake / river bed (it used to sit at -0.45 and covered the lakes with meadow)
-  const rise = Math.min(1, d / 1400), ridge = 1 - Math.abs(fbm(x / 1700, z / 1700) * 2 - 1);   // sharp ridges
-  let h = rise * rise * (60 + 520 * Math.pow(ridge, 1.6) + 160 * fbm(x / 500 + 7, z / 500 - 3)) + Math.min(d, 300) * 0.05;
-  const rc = (RIVER.z0 + RIVER.z1) / 2, rw = (RIVER.z1 - RIVER.z0) / 2 + 40 + Math.max(0, Math.abs(x - 200) - 2000) * 0.05;   // the valley widens away from the city
-  const valley = Math.exp(-Math.pow(Math.max(0, Math.abs(z - rc) - rw) / 260, 2)); h = h * (1 - valley) + (Math.abs(z - rc) < rw ? -6 : h * 0.15) * valley;
+  const a = Math.abs(z - hanC(x));
+  if (d <= 0) return a < HAN.half + 100 ? -18 : -4.6;
+  const rise = Math.min(1, d / 1800);
+  let h = rise * (2 + 46 * Math.pow(fbm(x / 2600 + 3, z / 2600 - 1, 4), 2.4) + 4 * fbm(x / 300, z / 300, 3)) + Math.min(d, 200) * 0.006;
+  // the river valley: water half-width + a wide gentle bank
+  const ch = HAN.hw + 10 + Math.max(0, Math.abs(x - 200) - 2400) * 0.03;
+  h = -18 + (h + 18) * smooth(ch, ch + 260, a);
   h += CURB - 0.6;
-  // level ground for the satellite towns and along the highways out to them
-  const sm = (a, b, t) => { const k = Math.min(1, Math.max(0, (t - a) / (b - a))); return k * k * (3 - 2 * k); };
-  for (const t of SAT) { const k = sm(t.R * 1.02, t.R * 1.7, Math.hypot(x - t.x, z - t.z)); h = -2.2 + (h + 2.2) * k; }
-  for (const w of HWY) { const k = sm(14, 110, segDist(x, z, w.a, w.b)); h = -1.2 + (h + 1.2) * k; }
+  // flat ground for the satellite towns and along the highways out to them (the plain is nearly level anyway)
+  for (const t of SAT) { const k = smooth(t.R * 1.0, t.R * 1.6, Math.hypot(x - t.x, z - t.z)); h = (CURB - 0.05) + (h - CURB + 0.05) * k; }
+  for (const w of HWY) { const k = smooth(13, 80, segDist(x, z, w.a, w.b)); h = (CURB - 0.45) + (h - CURB + 0.45) * k; }
   return h;
 }
 function terrain(rnd) {
   const cx = 200, cz = 0, NA = 256, NR = 90, rMax = 9500, pos = [], col = [], idx = [];
-  const c = new THREE.Color(), meadow = new THREE.Color(0x7a8a5a), forest = new THREE.Color(0x3e5236), rock = new THREE.Color(0x7a766c), snow = new THREE.Color(0xc8c8c0);
+  const c = new THREE.Color(), meadow = new THREE.Color(0x7c8a58), field = new THREE.Color(0x9a9a62), forest = new THREE.Color(0x3e5236), bank = new THREE.Color(0x8a8670);
   for (let j = 0; j <= NR; j++) { const r = rMax * Math.pow(j / NR, 1.8);
-    for (let i = 0; i < NA; i++) { const a = (i / NA) * Math.PI * 2, x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r, y = terrainHeight(x, z); pos.push(x, y, z);
-      const t = Math.min(1, Math.max(0, (y - 20) / 420)); c.copy(meadow).lerp(forest, Math.min(1, t * 2.5)); if (t > 0.55) c.lerp(rock, (t - 0.55) / 0.45); if (t > 0.92) c.lerp(snow, (t - 0.92) / 0.08 * 0.5);
-      const k = 0.85 + noise2(x / 60, z / 60) * 0.3; col.push(c.r * k, c.g * k, c.b * k); } }
+    for (let i = 0; i < NA; i++) { const an = (i / NA) * Math.PI * 2, x = cx + Math.cos(an) * r, z = cz + Math.sin(an) * r, y = terrainHeight(x, z); pos.push(x, y, z);
+      // farmland (patchy fields), woods on the hills and in patches, sandy / grey banks by the river
+      const w = fbm(x / 900 + 11, z / 900 + 5, 3), f = noise2(x / 140, z / 140);
+      c.copy(meadow).lerp(field, f > 0.55 ? 0.7 : 0.15); if (w > 0.55 || y > 25) c.lerp(forest, Math.min(1, (w - 0.45) * 3 + Math.max(0, y - 25) / 15));
+      if (y < CURB - 2) c.lerp(bank, Math.min(1, (CURB - 2 - y) / 6));
+      const k = 0.88 + noise2(x / 60, z / 60) * 0.24; col.push(c.r * k, c.g * k, c.b * k); } }
   for (let j = 0; j < NR; j++) for (let i = 0; i < NA; i++) { const a = j * NA + i, b = j * NA + (i + 1) % NA, c2 = (j + 1) * NA + i, d = (j + 1) * NA + (i + 1) % NA; idx.push(a, b, c2, b, d, c2); }   // wound so the normals face up
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals();
   const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 })); m.receiveShadow = false; m.userData.lodAlways = true; m.userData.region = true; return m;
+}
+// 원거리 배경: towns on the plain beyond the greenbelt (apartment clusters, low-rise villages, a few factories),
+// generated, one merged low-poly mesh with the proxy window texture; they read as the metropolitan sprawl in the haze
+function sprawl(rnd, mat) {
+  const pos = [], nor = [], uv = [], col = [], c = new THREE.Color();
+  const add = (x0, z0, x1, z1, y0, h, color) => { const g = boxGeo(x1 - x0, h, z1 - z0, (x0 + x1) / 2, y0, (z0 + z1) / 2).toNonIndexed(), p = g.attributes.position, n = g.attributes.normal; c.set(color);
+    for (let i = 0; i < p.count; i++) { pos.push(p.getX(i), p.getY(i), p.getZ(i)); nor.push(n.getX(i), n.getY(i), n.getZ(i)); const ay = Math.abs(n.getY(i)) > 0.5, ax = Math.abs(n.getX(i)) > 0.5; uv.push(ay ? 0 : (ax ? p.getZ(i) : p.getX(i)) / 8, ay ? 0 : p.getY(i) / 8); const k = ay ? 0.7 : 1; col.push(c.r * k, c.g * k, c.b * k); } };
+  let towns = 0;
+  for (let i = 0; i < 400 && towns < 44; i++) {
+    const an = rnd() * Math.PI * 2, r = 2700 + rnd() * 5600, tx = 200 + Math.cos(an) * r, tz = Math.sin(an) * r * 0.85;
+    if (Math.abs(tz - hanC(tx)) < HAN.hw + 420) continue; if (SAT.some((t) => Math.hypot(tx - t.x, tz - t.z) < t.R + 500)) continue;
+    if (tx > EXT.x0 - 700 && tx < EXT.x1 + 700 && tz > EXT.z0 - 700 && tz < EXT.z1 + 700) continue; if (HWY.some((w) => segDist(tx, tz, w.a, w.b) < 120)) continue;
+    towns++; const kind = rnd(), R = 160 + rnd() * 260, n = 18 + Math.floor(rnd() * 40);
+    for (let k = 0; k < n; k++) { const bx = tx + (rnd() - 0.5) * 2 * R, bz = tz + (rnd() - 0.5) * 2 * R * 0.7, y = terrainHeight(bx, bz) - 0.5;
+      if (kind < 0.55) { const w = 50 + rnd() * 25, h = 35 + rnd() * 50; add(bx - w / 2, bz - 7, bx + w / 2, bz + 7, y, h, [0xe2ded4, 0xd8d4ca, 0xe8e4dc][k % 3]); }                       // apartment slabs
+      else if (kind < 0.85) { const w = 10 + rnd() * 14, d = 9 + rnd() * 10; add(bx - w / 2, bz - d / 2, bx + w / 2, bz + d / 2, y, 6 + rnd() * 9, [0xc8b8a0, 0xb89888, 0xd0c8b8, 0x9aa0a4][k % 4]); }   // villages / low-rise
+      else { const w = 40 + rnd() * 50, d = 30 + rnd() * 30; add(bx - w / 2, bz - d / 2, bx + w / 2, bz + d / 2, y, 8 + rnd() * 6, [0xa8aeb2, 0x8a949a][k % 2]); } } }                     // factories
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.computeBoundingSphere();
+  const m = new THREE.Mesh(g, mat); m.userData.lodAlways = true; m.userData.region = true; m.castShadow = false; return m;
 }
 
 // ------------------------------------------------------------------ districts
@@ -337,8 +359,20 @@ const SEEDS = [
   { type: 'villa', x: -540, z: 620 }, { type: 'villa', x: 230, z: 820 }, { type: 'villa', x: -1300, z: 0 }, { type: 'villa', x: 1700, z: 1150 },
   { type: 'industrial', x: -1300, z: 950 }, { type: 'park', x: 1200, z: 820 }, { type: 'campus', x: -900, z: 900 }, { type: 'stadium', x: 1550, z: -720 },
 ];
-const treeMat = () => mat('regtree', () => flatMat(0x46603a, { roughness: 1, key: 'regtree' }));
-function treeGeo(x, z, s) { const g = new THREE.ConeGeometry(2.2 * s, 5 * s, 6).translate(x, CURB + 3.5 * s, z); return g; }
+// trees: a trunk and a broad leafy crown of two lumpy blobs (not cones), three greens; ~150 triangles
+const LEAF = [0x4a6a3a, 0x3e5e34, 0x5a7442], leafMat = (i) => mat('regleaf' + i, () => flatMat(LEAF[i], { roughness: 1, key: 'regleaf' + i })), barkMat = () => mat('regbark', () => flatMat(0x5a4a3a, { roughness: 1, key: 'regbark' }));
+let blobBase = null;
+function crownGeo(x, y, z, s, k) { if (!blobBase) blobBase = new THREE.IcosahedronGeometry(1, 1);
+  const out = [];
+  for (const [ox, oy, oz, r] of [[0, 0, 0, 2.3], [0.9 * Math.cos(k), 0.9, 0.9 * Math.sin(k), 1.6]]) { const g = blobBase.clone(), p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) { const j = 0.82 + 0.3 * Math.abs(Math.sin(p.getX(i) * 5.1 + p.getY(i) * 3.7 + p.getZ(i) * 4.3 + k)); p.setXYZ(i, p.getX(i) * j, p.getY(i) * j * 0.85, p.getZ(i) * j); }
+    g.computeVertexNormals(); g.scale(r * s, r * s, r * s); g.translate(x + ox * s, y + (3.6 + oy) * s, z + oz * s); out.push(g); }
+  return mergeGeos(out); }
+export function treeParts(x, z, s, y = CURB) { const k = Math.abs(Math.sin(x * 12.9 + z * 78.2)) * 6.28;
+  return [[new THREE.CylinderGeometry(0.14 * s, 0.22 * s, 2.8 * s, 6).translate(x, y + 1.4 * s, z), barkMat()], [crownGeo(x, y, z, s, k), leafMat(Math.floor(k) % 3)]]; }
+function treeSpec(spec, x, z, s, color = 0x4a6a3a) { const k = Math.abs(Math.sin(x * 12.9 + z * 78.2)) * 6.28;
+  spec(x, z, { geo: () => new THREE.CylinderGeometry(0.14 * s, 0.22 * s, 2.8 * s, 6).translate(x, CURB + 1.4 * s, z), mat: barkMat, box: [x - 0.3, z - 0.3, x + 0.3, z + 0.3, 2.8 * s], color: 0x5a4a3a, tree: true });
+  spec(x, z, { geo: () => crownGeo(x, CURB, z, s, k), mat: () => leafMat(Math.floor(k) % 3), box: [x - 2.3 * s, z - 2.3 * s, x + 2.3 * s, z + 2.3 * s, 6 * s], color, tree: true }); }
 
 // fill one block according to its district template. ctx: { edge (faces an arterial), hotter (neighbour intensity
 // above ours → mid-rise transition edge), rnd, pick, occl }
@@ -367,13 +401,13 @@ function fillBlock(spec, r, D, T, { edge, hotter, rnd, pick, occl }) {
   const FAC = { villa: ['church', 'houses', 'playpark', 'market', 'parking', 'houses', 'school'], slab: ['school', 'playpark', 'courts', 'church', 'hospital'], highrise: ['school', 'playpark', 'courts', 'hospital'],
     downtown: ['market', 'parking', 'gas', 'hospital', 'construction', 'church'], mixed: ['construction', 'parking', 'gas', 'playpark'], business: ['construction', 'parking'] }[D.type];
   if (FAC && W >= 44 && Dd >= 38 && hotter < 2 && rnd() < (D.type === 'business' ? 0.12 : 0.3)) {
-    const tree = (x, z, s2) => spec(x, z, { geo: () => treeGeo(x, z, s2), mat: () => treeMat(), box: [x - 1, z - 1, x + 1, z + 1, 6 * s2], color: 0x4a6a3a, tree: true });
+    const tree = (x, z, s2) => treeSpec(spec, x, z, s2, 0x4a6a3a);
     facility(pick(FAC), r, { put, flat, lawn, pave, tree, occl, rnd, pick, spec }); return;
   }
   switch (D.type) {
     case 'greenbelt': {   // 개발제한구역: wooded hills, paddy fields with farm roads, vinyl greenhouse rows, a few farmhouses
       const k = rnd();
-      if (k < 0.45) { lawn(r.x0, r.z0, r.x1, r.z1); for (let n = 0; n < Math.floor(W * Dd / 90); n++) { const x = r.x0 + 3 + rnd() * (W - 6), z = r.z0 + 3 + rnd() * (Dd - 6), s2 = 0.9 + rnd() * 0.9; spec(x, z, { geo: () => treeGeo(x, z, s2), mat: () => treeMat(), box: [x - 1, z - 1, x + 1, z + 1, 6 * s2], color: 0x3e5a34, tree: true }); } return; }
+      if (k < 0.45) { lawn(r.x0, r.z0, r.x1, r.z1); for (let n = 0; n < Math.floor(W * Dd / 260); n++) { const x = r.x0 + 3 + rnd() * (W - 6), z = r.z0 + 3 + rnd() * (Dd - 6), s2 = 1.1 + rnd() * 0.9; treeSpec(spec, x, z, s2, 0x3e5a34); } return; }
       const paddy = () => mat('paddy', () => flatMat(0x8a9a52, { roughness: 1, key: 'paddy' })), dirt = () => mat('farmroad', () => flatMat(0xa08a6a, { roughness: 1, key: 'farmroad' }));
       for (let z = r.z0; z < r.z1 - 6; z += 34) for (let x = r.x0; x < r.x1 - 6; x += 46) { const w2 = Math.min(44, r.x1 - x), d2 = Math.min(32, r.z1 - z); flat(() => boxGeo(w2, 0.05, d2, x + w2 / 2, CURB, z + d2 / 2), paddy, x + w2 / 2, z + d2 / 2, [x, z, x + w2, z + d2, 0.05], 0x8a9a52); }
       for (let z = r.z0 + 33; z < r.z1; z += 34) flat(() => boxGeo(W, 0.07, 2, (r.x0 + r.x1) / 2, CURB, z), dirt, (r.x0 + r.x1) / 2, z, [r.x0, z - 1, r.x1, z + 1, 0.07], 0xa08a6a);
@@ -384,7 +418,7 @@ function fillBlock(spec, r, D, T, { edge, hotter, rnd, pick, occl }) {
     }
     case 'park': {
       lawn(r.x0, r.z0, r.x1, r.z1);
-      for (let k = 0; k < Math.floor(W * Dd / 700); k++) { const x = r.x0 + 6 + rnd() * (W - 12), z = r.z0 + 6 + rnd() * (Dd - 12), s2 = 0.9 + rnd() * 0.8; spec(x, z, { geo: () => treeGeo(x, z, s2), mat: () => treeMat(), box: [x - 1, z - 1, x + 1, z + 1, 6 * s2], color: 0x4a6a3a, tree: true }); }
+      for (let k = 0; k < Math.floor(W * Dd / 700); k++) { const x = r.x0 + 6 + rnd() * (W - 12), z = r.z0 + 6 + rnd() * (Dd - 12), s2 = 0.9 + rnd() * 0.8; treeSpec(spec, x, z, s2, 0x4a6a3a); }
       return;
     }
     case 'stadium': {
