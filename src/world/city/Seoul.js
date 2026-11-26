@@ -22,6 +22,7 @@ import { CityKit } from '../CityProps.js';
 import { groundMat } from './CityMaterials.js';
 import { buildNewDistrict, inLake } from './NewDistrict.js';
 import { buildHaneulDistrict } from './HaneulDistrict.js';
+import { buildInteriors } from './ShopInterior.js';
 import { CityLod } from './CityLod.js';
 import { Region, outerGround, REGION_EXT } from './Region.js';
 import { hanGround } from './HanRiver.js';
@@ -235,6 +236,7 @@ export function buildSeoul(game, { station = null, early = null, corridors = [],
   fac.build(plan.removedSet);
   landmarkBatch.build();
   // LOD: building volumes per 60 m cell (HLOD proxies + occluders), then sort the city meshes into near / mid / full
+  buildInteriors(ctx);   // shops added after the hand-made streets built theirs (하늘길 office rows, …): build the rest
   const lod = new CityLod(game);
   const tint = { apartment: 0xe4e0d6, villa: 0x9a6a54, office: 0x6a8090, officeTall: 0x5a7486, shops: 0xd0c8b8, shopsTall: 0xa8b0b8, bank: 0xbab4a6, school: 0x9a5a44, hospital: 0xe6e4de, mixedShops: 0xc8a890, apartmentShops: 0xd8d2c4, warehouse: 0xa9b0b4, logistics: 0xa9b0b4, factory: 0xa9b0b4, gas: 0xe8e6e0, house: 0xd8ccb8, civic: 0x8a9ca8 };
   for (const it of plan.items) if (it.kind === 'building' && it.id !== 'landmark' && it.rect) lod.box(it.rect, it.y0, it.h, tint[it.use] ?? 0xc8c4bc);

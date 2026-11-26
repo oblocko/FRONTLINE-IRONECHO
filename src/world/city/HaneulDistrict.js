@@ -216,7 +216,7 @@ function themedSpec(theme, i, len, depth) {
     else if (e === 'point') extra.push(['point', [[...name.replace(/ /g, '')].slice(0, 2).join(''), { shape: pickN(['round', 'square', 'cube'], i), bg: c[0], fg: c[1], size: 0.65 }], a, 3.6]);
     else if (e === 'blade' && T.podium + floors * 3.8 > 9) extra.push(['blade', [pickN(['필라테스', '영어학원', '치과', '네일', '스튜디오', '연습실'], i) + ' ' + (i % 9 + 1) + 'F', { bg: pickN(['#1d3f8a', '#141414', '#f4f2ee', '#7a2a6a'], i), fg: pickN(['#ffffff', '#ffd040', '#1a1a1a'], i), w: 0.7 }], k ? half : -half, T.podium + 1.6]);
   }
-  return { name: `${name}-${i}`, podium: T.podium, body: pickN(T.body, i * 3 + 1), interiors: theme !== 'office',
+  return { name: `${name}-${i}`, podium: T.podium, body: pickN(T.body, i * 3 + 1), interiors: true,   // every ground-floor unit is a walk-in shop (offices too: bank, pharmacy, optician, café)
     shops, tower: { floors, setback: theme === 'fashion' || theme === 'office' ? (i % 3) * 1.5 : 0, skin, finMat, fins: skin === 'fins', finStep: pickN([1.0, 1.2, 1.5, 1.8], i), glass, frame, spandrel: frame, bays: 3 + (i % 3) },
     brand: theme === 'fashion' && i % 2 ? { text: name, color: c[0] === '#141414' ? c[2] : '#ffffff', h: 1.8 } : null,
     led: theme === 'fashion' && i % 4 === 1 ? { kind: pickN(['shoes', 'serum', 'tea', 'tour'], i), w: Math.min(8, len - 4), h: 5, y: T.podium + 2 } : theme === 'culture' && i % 5 === 2 ? { kind: 'music', w: Math.min(7, len - 4), h: 4.5, y: T.podium + 1.5 } : null,
@@ -275,7 +275,8 @@ function modernVilla(ctx, r0, [fx, fz], i, { floors = null, shop = false } = {})
       : sk === 'wood' ? SK.wood(nm, { tone: ['#6a4a2e', '#8a6440', '#3a2a1e'][i % 3], ink: '#f4ecd8', h: 0.5 }) : sk === 'neon' ? SK.neon(nm, { color: ['#ff4ad8', '#7ad8ff', '#ffb040'][i % 3], h: 0.5 })
       : sk === 'metal' ? SK.metal(nm, { kind: ['brass', 'corten', 'black', 'steel'][i % 4], h: 0.5, font: 'serif' }) : SK.flex(nm, { bg: cc[0], fg: cc[1], w: sw, h: 0.7 });
     if (sx.userData.width > sw) sx.scale.setScalar(sw / sx.userData.width);
-    boxF(glass, along - 1.2, gH - 0.6, 0.06, 0, y0 + (gH - 0.6) / 2 + 0.1, -0.6); const [x, z] = at(0, 0.02); sx.position.set(x, y0 + gH - 0.35, z); sx.rotation.y = rot; SK.bake(ctx, sx); }
+    { const [gx, gz] = at(0, -0.6); ctx.fac.get('commercial').shop(gx, y0 + (gH - 0.6) / 2 + 0.1, gz, rot, along - 1.2, gH - 0.6, { type: NAMES.cafe.includes(nm) ? 1 : 2, lit: 1 }); }   // the shop lit inside behind its glass (was an empty pane)
+    const [x, z] = at(0, 0.02); sx.position.set(x, y0 + gH - 0.35, z); sx.rotation.y = rot; SK.bake(ctx, sx); }
   else { const cm = flatMat(0xe8e4d8, { key: 'v_stall' }); for (let a = -along / 2 + 1.2; a < along / 2 - 1; a += 2.5) boxF(cm, 0.1, 0.01, deep * 0.55, a, y0 + 0.02, -deep * 0.3); }
   // facades: ribbon windows on front and back each floor, glass balconies on the front (alternate floors), accent strip
   for (let f = 0; f < upF; f++) { const yy = y0 + gH + f * fH + 1.45;
@@ -310,14 +311,14 @@ function pocketGarden(ctx, r) { ctx.plan.walk(r, 'path'); ctx.batch.box(groundMa
 function cafeRow(ctx, parcel, r, front) {
   const rnd = ctx.rnd; let z = r.z0 + 0.4, k = 0;
   while (r.z1 - z > 8) { const wdt = Math.min(r.z1 - z, 9 + Math.floor(rnd() * 5));
-    B.commercial(ctx, parcel(r.x0, z, r.x1, z + wdt - 0.5, 'residential', front), { use: 'mixedShops', floors: 3 + (k % 3), upper: k % 2 ? 'villa' : undefined, cats: ['cafe', 'cafe', 'restaurant', 'cafe', 'store', 'salon'], wall: { kind: ['brick', 'render', 'tile', 'stone'][k % 4], color: [0x9a5a44, 0xece8e0, 0xd8d0c0, 0x6a6460][k % 4] }, signStyle: 'mixed', vacant: 0.04, lit: 0.6 });
+    B.commercial(ctx, parcel(r.x0, z, r.x1, z + wdt - 0.5, 'residential', front), { use: 'mixedShops', floors: 3 + (k % 3), upper: k % 2 ? 'villa' : undefined, cats: ['cafe', 'cafe', 'restaurant', 'cafe', 'store', 'salon'], wall: { kind: ['brick', 'render', 'tile', 'stone'][k % 4], color: [0x9a5a44, 0xece8e0, 0xd8d0c0, 0x6a6460][k % 4] }, signStyle: 'mixed', vacant: 0, lit: 0.6 });
     z += wdt; k++; }
 }
 function commRow(ctx, parcel, r, front, { floors = [4, 7], wide = false } = {}) {
   const rnd = ctx.rnd; let z = r.z0 + 0.4;
   if (r.x1 - r.x0 < 10) return;
   while (r.z1 - z > 10) { const wdt = Math.min(r.z1 - z, (wide ? 20 : 13) + Math.floor(rnd() * 8));
-    B.commercial(ctx, parcel(r.x0, z, r.x1, z + wdt - 0.6, 'commercial', front), { use: wide ? 'shopsTall' : 'shops', floors: floors[0] + Math.floor(rnd() * (floors[1] - floors[0] + 1)), cats: ['store', 'cafe', 'restaurant', 'phone', 'optician', 'salon', 'clinic', 'pharmacy'], signStyle: 'mixed', vacant: 0.06, lit: 0.55 });
+    B.commercial(ctx, parcel(r.x0, z, r.x1, z + wdt - 0.6, 'commercial', front), { use: wide ? 'shopsTall' : 'shops', floors: floors[0] + Math.floor(rnd() * (floors[1] - floors[0] + 1)), cats: ['store', 'cafe', 'restaurant', 'phone', 'optician', 'salon', 'clinic', 'pharmacy'], signStyle: 'mixed', vacant: 0, lit: 0.55 });
     z += wdt; }
 }
 // back courtyards between the rows: parking stalls, a few trees
