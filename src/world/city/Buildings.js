@@ -159,7 +159,7 @@ function shopfronts(ctx, item, rect, nx, nz, { y0, gfH = 4.2, cats, lobby = true
       const [ax, az] = P(c, 0.02); aw.position.set(ax, gy + gh + 0.02, az); aw.rotation.y = rot; SK.bake(ctx, aw);
     }
     // a small projecting point sign at the unit edge (some shops)
-    if (r() < 0.22) { const pt = SK.point(cat === 'pharmacy' ? '약' : [...name].slice(0, 2).join(''), { shape: ['square', 'round', 'cube'][Math.floor(r() * 3)], bg: cols[0], fg: cols[1], size: 0.6 });
+    if (r() < 0.32) { const pt = SK.point(cat === 'pharmacy' ? '약' : [...name].slice(0, 2).join(''), { shape: ['square', 'round', 'cube'][Math.floor(r() * 3)], bg: cols[0], fg: cols[1], size: 0.6 });
       const [qx2, qz2] = P(u.a + 0.35, 0); pt.position.set(qx2, y0 + gfH + 0.6, qz2); pt.rotation.y = rot; SK.bake(ctx, pt); }
     // a free-standing board in front of the door (A-frame, stand or X-banner), only on open ground
     if (r() < 0.3) { const [fx2, fz2] = P(dc + ds * 1.3, 1.3);
@@ -173,11 +173,15 @@ function shopfronts(ctx, item, rect, nx, nz, { y0, gfH = 4.2, cats, lobby = true
 // which sign a trade gets: cafés lean wood / scashi / neon, restaurants flex / wood, clinics and offices
 // channel / metal, chains a lit box; a street's signStyle ('box' | 'channel') keeps its say
 function signKind(cat, style, r) {
+  // the signage reference: LED channel (전광 / 후광 / 측광), scashi, galva / metal, wood, neon, flex, lit box.
+  // Flex and the lit box are the cheap default of real streets, but here they are one choice among many
+  // (no street of identical printed boxes). A street's signStyle only tilts the odds.
   const x = r();
-  if (style === 'box' && x < 0.7) return 'box';
-  if (style === 'channel' && x < 0.6) return 'channel';
-  const T = { cafe: ['wood', 'scashi', 'neon', 'channel', 'flex'], restaurant: ['flex', 'flex', 'wood', 'box', 'neon'], store: ['box', 'flex', 'channel', 'channel'], pharmacy: ['flex', 'box'], salon: ['neon', 'metal', 'scashi', 'channel'],
-    clinic: ['channel', 'metal', 'flex'], office: ['channel', 'metal', 'box'], phone: ['flex', 'channel', 'box'], optician: ['flex', 'channel', 'scashi'] }[cat] ?? ['box', 'channel', 'flex'];
+  if (style === 'box' && x < 0.18) return 'box';
+  if (style === 'channel' && x < 0.4) return 'channel';
+  const T = { cafe: ['wood', 'scashi', 'neon', 'channel', 'metal', 'wood'], restaurant: ['wood', 'channel', 'flex', 'neon', 'scashi', 'metal'], store: ['channel', 'channel', 'box', 'metal', 'flex'],
+    pharmacy: ['channel', 'box', 'scashi'], salon: ['neon', 'metal', 'scashi', 'channel'], clinic: ['channel', 'metal', 'scashi'], office: ['channel', 'metal', 'scashi'],
+    phone: ['channel', 'box', 'neon'], optician: ['scashi', 'channel', 'metal'] }[cat] ?? ['channel', 'scashi', 'metal', 'wood', 'neon', 'flex'];
   return T[Math.floor(r() * T.length)];
 }
 

@@ -107,7 +107,17 @@ export class Player {
       const fwd = new THREE.Vector3(-Math.sin(this.yaw) * Math.cos(this.pitch), Math.sin(this.pitch), -Math.cos(this.yaw) * Math.cos(this.pitch));
       const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
       const up = ctl ? (inp.down('jump') ? 1 : 0) - (inp.down('crouch') ? 1 : 0) : 0;
-      this.position.addScaledVector(fwd, z * sp * dt).addScaledVector(right, x * sp * dt); this.position.y = Math.max(this.flyMinY ?? 1, this.position.y + up * sp * dt);
+      // solid city: buildings stop the flight (colliders, plus the background region's roofs via world.flyBlock), so
+      // the camera never ends up inside a building (white / black screen)
+      const P = this.position, W = this.world, ox = P.x, oz = P.z, oy = P.y;
+      const dx = (fwd.x * z + right.x * x) * sp * dt, dz = (fwd.z * z + right.z * x) * sp * dt, dy = (fwd.y * z + up) * sp * dt;
+      const feet = new THREE.Vector3(ox, oy - 1.2, oz); W.moveCylinder(feet, { x: dx, z: dz }, 1.0, 2.6, 0);
+      let nx = feet.x, nz = feet.z; const fb = W.flyBlock, low = oy - 1.2;
+      if (fb && fb(nx, nz) > low) { if (fb(nx, oz) <= low) nz = oz; else if (fb(ox, nz) <= low) nx = ox; else { nx = ox; nz = oz; } }
+      let floor = Math.max(W.heightFn ? W.heightFn(nx, nz) : 0, fb ? fb(nx, nz) : 0);
+      for (const c of W.query(nx - 1, nz - 1, nx + 1, nz + 1)) if (nx > c.min.x - 1 && nx < c.max.x + 1 && nz > c.min.z - 1 && nz < c.max.z + 1 && c.max.y <= low + 0.6 && c.max.y > floor) floor = c.max.y;
+      const ceil = W.ceilingAbove(nx, nz, oy + 0.2, 1.0) - 0.3;
+      P.set(nx, Math.min(Math.max(oy + dy, floor + 1.6, this.flyMinY ?? 1), Math.max(ceil, oy)), nz);
       this.velocity.set(0, 0, 0); this.speed = 0; this.grounded = false;
       const cam = this.camera; cam.position.copy(this.position); cam.rotation.order = 'YXZ'; cam.rotation.set(this.pitch, this.yaw, 0);
       const base = settings.data.graphics.fov; cam.fov = damp(cam.fov, base, 10, dt); cam.updateProjectionMatrix();

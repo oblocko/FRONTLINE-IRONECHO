@@ -18,7 +18,13 @@ export class Sky {
     };
     const mat = new THREE.ShaderMaterial({
       uniforms: this.uniforms, side: THREE.BackSide, depthWrite: false, fog: false,
-      vertexShader: `varying vec3 vDir; void main(){ vDir = normalize(position); vec4 p = projectionMatrix * modelViewMatrix * vec4(position,1.0); gl_Position = p.xyww; }`,
+      vertexShader: `varying vec3 vDir; void main(){ vDir = normalize(position); vec4 p = projectionMatrix * modelViewMatrix * vec4(position,1.0); 
+#ifdef USE_REVERSED_DEPTH_BUFFER
+ gl_Position = vec4(p.xy, 0.0, p.w);
+#else
+ gl_Position = p.xyww;
+#endif
+}`,
       fragmentShader: `
         uniform vec3 zenith, horizon, ground, sunDir, sunColor, glowDir, glowColor; uniform float sunSize, stars, glow, time;
         varying vec3 vDir;

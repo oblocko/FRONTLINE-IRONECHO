@@ -19,6 +19,8 @@ import { wallMat, flatMat, groundMat } from './CityMaterials.js';
 import { curtainMat, gridMat, outline, shell, cap } from './Modern.js';
 import { CURB } from './Streets.js';
 import { DISTRICT as HAND } from './HaneulDistrict.js';
+import { frontSigns, facility } from './RegionExtras.js';
+import { waterMat, worldUV } from './Water.js';
 
 const EXT = { x0: -1500, x1: 1900, z0: -1400, z1: 1400 };
 const CORE = { x0: -206, x1: 726, z0: -306, z1: 306 };
@@ -100,8 +102,8 @@ export class Region {
   const gm = groundMat('plaza', { color: 0x8a8882 });
   if (!DBG.includes('noground')) B.add(slab(EXT.x0 - 160, RIVER.z1, EXT.x1 + 160, EXT.z1 + 160, [[-200, -270, 200, 270], [200, -300, 720, 300], [HAND.x0, HAND.z0, HAND.x1, HAND.z1]]), gm, { cast: false });
   if (!DBG.includes('noground')) B.add(slab(EXT.x0 - 160, EXT.z0 - 160, EXT.x1 + 160, RIVER.z0, []), gm, { cast: false });
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(9000, RIVER.z1 - RIVER.z0), new THREE.MeshStandardMaterial({ color: 0x4a6468, roughness: 0.08, metalness: 0.35, envMapIntensity: 1.1 }));
-  water.rotation.x = -Math.PI / 2; water.position.set(200, -2.0, (RIVER.z0 + RIVER.z1) / 2); if (!DBG.includes('nowater')) scene.add(water);
+  const wg = new THREE.PlaneGeometry(9000, RIVER.z1 - RIVER.z0); wg.rotateX(-Math.PI / 2); wg.translate(200, -2.0, (RIVER.z0 + RIVER.z1) / 2);
+  const water = new THREE.Mesh(worldUV(wg), waterMat(0x264a52)); if (!DBG.includes('nowater')) scene.add(water);
   for (const z of [RIVER.z0, RIVER.z1]) { B.add(boxGeo(9000, 0.1, 60, 200, CURB, z + (z === RIVER.z1 ? 30 : -30)), groundMat('lawn'), { cast: false }); }   // riverside parks
   // the land must not cover the river: cut it with a dark trough (the ground slab is drawn under it)
   B.add(boxGeo(9000, 0.4, RIVER.z1 - RIVER.z0, 200, -4.0, (RIVER.z0 + RIVER.z1) / 2), flatMat(0x2a3436, { key: 'riverbed' }), { cast: false });
@@ -177,13 +179,20 @@ export class Region {
     if (best && !this.noDetail) { const B = new Batch(this.ctx.scene); for (const sp of best.specs) { B.add(sp.geo(), sp.mat()); if (sp.roof) { const [x0, z0, x1, z1, h] = sp.box; B.add(boxGeo(x1 - x0 - 0.6, 0.5, z1 - z0 - 0.6, (x0 + x1) / 2, CURB + h, (z0 + z1) / 2), sp.roofMat ? sp.roofMat() : roofM()); } }
       best.detail = B.build(); for (const m of best.detail) { m.castShadow = false; m.userData.lodAlways = true; } if (best.proxy) best.proxy.visible = false; }
   }
+  // roof height of the background buildings at (x, z) (they have no colliders): free flight stops on / at them
+  heightAt(x, z) {
+    let h = 0; const i0 = Math.floor(x / CH), j0 = Math.floor(z / CH);
+    for (let i = i0 - 1; i <= i0 + 1; i++) for (let j = j0 - 1; j <= j0 + 1; j++) { const c = this.chunks.get(`${i},${j}`); if (!c) continue;
+      for (const sp of c.specs) { if (sp.tree || sp.np) continue; const b = sp.box; if (x > b[0] - 0.8 && x < b[2] + 0.8 && z > b[1] - 0.8 && z < b[3] + 0.8 && b[4] + CURB > h) h = b[4] + CURB; } }
+    return h;
+  }
   stats() { let d = 0; for (const c of this.chunks.values()) if (c.detail) d++; return { chunks: this.chunks.size, detailed: d }; }
 }
 function proxyTex() { const cv = document.createElement('canvas'); cv.width = cv.height = 64; const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 64, 64); g.fillStyle = '#80909a'; for (let y = 4; y < 64; y += 11) for (let x = 3; x < 64; x += 8) g.fillRect(x, y, 5, 6); const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t; }
 function proxyMesh(specs, mat, scene) {
   if (!specs.length) return null;
   const pos = [], nor = [], uv = [], col = [], c = new THREE.Color();
-  for (const sp of specs) { if (sp.tree) continue; const [x0, z0, x1, z1, h] = sp.box; const g = boxGeo(x1 - x0, h, z1 - z0, (x0 + x1) / 2, CURB, (z0 + z1) / 2).toNonIndexed(); const p = g.attributes.position, n = g.attributes.normal; c.set(sp.color ?? 0xc8c4bc);
+  for (const sp of specs) { if (sp.tree || sp.np) continue; const [x0, z0, x1, z1, h] = sp.box; const g = boxGeo(x1 - x0, h, z1 - z0, (x0 + x1) / 2, CURB, (z0 + z1) / 2).toNonIndexed(); const p = g.attributes.position, n = g.attributes.normal; c.set(sp.color ?? 0xc8c4bc);
     for (let i = 0; i < p.count; i++) { pos.push(p.getX(i), p.getY(i), p.getZ(i)); nor.push(n.getX(i), n.getY(i), n.getZ(i)); const ay = Math.abs(n.getY(i)) > 0.5, ax = Math.abs(n.getX(i)) > 0.5; uv.push(ay ? 0 : (ax ? p.getZ(i) : p.getX(i)) / 8, ay ? 0 : p.getY(i) / 8); const k = ay ? 0.7 : 1; col.push(c.r * k, c.g * k, c.b * k); } }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.computeBoundingSphere();
   const m = new THREE.Mesh(g, mat); m.userData.lodAlways = true; scene.add(m); return m;
@@ -200,7 +209,7 @@ function noise2(x, z) { const xi = Math.floor(x), zi = Math.floor(z), xf = x - x
 function fbm(x, z) { let a = 0, f = 1, w = 0.5; for (let i = 0; i < 6; i++) { a += w * noise2(x * f, z * f); f *= 2.03; w *= 0.5; } return a; }
 export function terrainHeight(x, z) {
   const dx = Math.max(EXT.x0 - 140 - x, 0, x - EXT.x1 - 140), dz = Math.max(EXT.z0 - 140 - z, 0, z - EXT.z1 - 140), d = Math.hypot(dx, dz);
-  if (d <= 0) return CURB - 0.6;
+  if (d <= 0) return -4.6;   // under the city: below every lake / river bed (it used to sit at -0.45 and covered the lakes with meadow)
   const rise = Math.min(1, d / 1400), ridge = 1 - Math.abs(fbm(x / 1700, z / 1700) * 2 - 1);   // sharp ridges
   let h = rise * rise * (60 + 520 * Math.pow(ridge, 1.6) + 160 * fbm(x / 500 + 7, z / 500 - 3)) + Math.min(d, 300) * 0.05;
   const rc = (RIVER.z0 + RIVER.z1) / 2, rw = (RIVER.z1 - RIVER.z0) / 2 + 40 + Math.max(0, Math.abs(x - 200) - 2000) * 0.05;   // the valley widens away from the city
@@ -255,18 +264,27 @@ function fillBlock(spec, r, D, T, { edge, hotter, rnd, pick, occl }) {
   const lawn = (x0, z0, x1, z1) => flat(() => boxGeo(x1 - x0, 0.05, z1 - z0, (x0 + x1) / 2, CURB, (z0 + z1) / 2), () => groundMat('lawn'), (x0 + x1) / 2, (z0 + z1) / 2, [x0, z0, x1, z1, 0.05], 0x56603a);
   const pave = (x0, z0, x1, z1, c = 0x9a9890) => flat(() => boxGeo(x1 - x0, 0.04, z1 - z0, (x0 + x1) / 2, CURB, (z0 + z1) / 2), () => groundMat('plaza', { color: c }), (x0 + x1) / 2, (z0 + z1) / 2, [x0, z0, x1, z1, 0.04], c);
   const COM = [0xd8d2c4, 0xb8b4aa, 0xc9c0ae, 0x9aa0a4, 0xe0dcd0, 0xa89c88, 0xcfc6b4], GL = [0x46586a, 0x3e4a52, 0x5a6a74];
-  const comBox = (x, z, w, d, h) => { const wc = pick(COM), gc = pick(GL), sg = rnd() < 0.35; put(x, z, w, d, h, () => comMat(wc, gc, sg), wc); };
+  // shops get real signs on their street faces (RegionExtras.frontSigns), not a sign band printed on every floor tile
+  const comBox = (x, z, w, d, h, faces = []) => { const wc = pick(COM), gc = pick(GL); put(x, z, w, d, h, () => comMat(wc, gc, false), wc);
+    if (faces.length && w >= 4 && d >= 4 && h >= 2) frontSigns(spec, rnd, [x - w / 2, z - d / 2, x + w / 2, z + d / 2], h, faces); };
   // perimeter frontage: buildings of varied width / height along the chosen block faces, depth dep
   const frontage = (faces, dep, hmin, hmax) => {
     for (const f of faces) {
       const along = f === 'n' || f === 's'; const len = along ? W : Dd; let a = 0;
       while (a < len - 8) { const w = Math.min(len - a, 12 + rnd() * 20), h = hmin + rnd() * (hmax - hmin);
         const c = along ? [r.x0 + a + w / 2, f === 'n' ? r.z0 + dep / 2 : r.z1 - dep / 2] : [f === 'w' ? r.x0 + dep / 2 : r.x1 - dep / 2, r.z0 + a + w / 2];
-        if (!(along ? false : (c[1] - w / 2 < r.z0 + dep - 0.5 && (faces.includes('n'))) || (c[1] + w / 2 > r.z1 - dep + 0.5 && faces.includes('s')))) comBox(c[0], c[1], along ? w - 0.6 : dep, along ? dep : w - 0.6, h);
+        if (!(along ? false : (c[1] - w / 2 < r.z0 + dep - 0.5 && (faces.includes('n'))) || (c[1] + w / 2 > r.z1 - dep + 0.5 && faces.includes('s')))) comBox(c[0], c[1], along ? w - 0.6 : dep, along ? dep : w - 0.6, h, [f]);
         a += w; }
     }
   };
   const arterialFaces = Object.entries(edge).filter(([, v]) => v).map(([k]) => k);
+  // a city is not only shops and flats: some blocks are a school, a church, a gas station, a market, a park …
+  const FAC = { villa: ['church', 'houses', 'playpark', 'market', 'parking', 'houses', 'school'], slab: ['school', 'playpark', 'courts', 'church', 'hospital'], highrise: ['school', 'playpark', 'courts', 'hospital'],
+    downtown: ['market', 'parking', 'gas', 'hospital', 'construction', 'church'], mixed: ['construction', 'parking', 'gas', 'playpark'], business: ['construction', 'parking'] }[D.type];
+  if (FAC && W >= 44 && Dd >= 38 && hotter < 2 && rnd() < (D.type === 'business' ? 0.12 : 0.3)) {
+    const tree = (x, z, s2) => spec(x, z, { geo: () => treeGeo(x, z, s2), mat: () => treeMat(), box: [x - 1, z - 1, x + 1, z + 1, 6 * s2], color: 0x4a6a3a, tree: true });
+    facility(pick(FAC), r, { put, flat, lawn, pave, tree, occl, rnd, pick, spec }); return;
+  }
   switch (D.type) {
     case 'park': {
       lawn(r.x0, r.z0, r.x1, r.z1);
@@ -317,7 +335,7 @@ function fillBlock(spec, r, D, T, { edge, hotter, rnd, pick, occl }) {
       for (let a = 0; a < n; a++) for (let b = 0; b < m; b++) {
         const cx = r.x0 + (a + 0.5) * gw, cz = r.z0 + (b + 0.5) * gd;
         if (D.type === 'mixed') { // 주상복합: a commercial podium + slender residential tower
-          comBox(cx, cz, gw - 6, gd - 6, 14);
+          comBox(cx, cz, gw - 6, gd - 6, 14, arterialFaces.length ? arterialFaces : ['s']);
           const h = T.h[0] + rnd() * (T.h[1] - T.h[0]), w = Math.min(28, gw - 16), wall = pick([0xe8e4da, 0xd8d4cc, 0xc8ccd0]);
           const MP = outline(pick(['round', 'chamfer', 'cross']), w, w * 0.8, { r: 5, c: 4, n: 20 }), mst = pick([0, 2]);   // one outline for both rings (same vertex count)
           spec(cx, cz, { geo: () => shell([{ y: CURB + 14, pts: MP }, { y: CURB + 14 + h, pts: MP }], { cx, cz, uM: 6.8, vM: 2.8 }), mat: () => aptMat(wall, mst), box: [cx - w / 2, cz - w * 0.4, cx + w / 2, cz + w * 0.4, 14 + h], color: wall });
@@ -346,7 +364,7 @@ function fillBlock(spec, r, D, T, { edge, hotter, rnd, pick, occl }) {
       const wall = pick([0xe8e4da, 0xdcd6c8, 0xe2e0d8, 0xd8d4c8, 0xe6e0d0]), acc = pick([0x3a6a9a, 0x8a3a2a, 0x2a6a4a, 0x6a6a7a]);
       lawn(r.x0 + 4, r.z0 + 4, r.x1 - 4, r.z1 - 4);
       const sh = arterialFaces.includes('s') ? 's' : arterialFaces[0] || 's';
-      if (sh === 's' || sh === 'n') comBox(r.x0 + 30, sh === 's' ? r.z1 - 14 : r.z0 + 14, 50, 20, 8); else comBox(sh === 'w' ? r.x0 + 14 : r.x1 - 14, r.z0 + 30, 20, 50, 8);
+      if (sh === 's' || sh === 'n') comBox(r.x0 + 30, sh === 's' ? r.z1 - 14 : r.z0 + 14, 50, 20, 8, [sh]); else comBox(sh === 'w' ? r.x0 + 14 : r.x1 - 14, r.z0 + 30, 20, 50, 8, [sh]);
       const style = D.type === 'slab' ? pick([0, 1, 1]) : pick([0, 2, 2]);       // one façade design per complex
       const crown = pick(['frame', 'plant', 'brand']);
       if (D.type === 'highrise') {
@@ -369,7 +387,7 @@ function fillBlock(spec, r, D, T, { edge, hotter, rnd, pick, occl }) {
         for (let z = r.z0 + 30; z < r.z1 - 26; z += 40) for (let x = r.x0 + 18; x + len <= r.x1 - 14; x += len + 18) {
           const cut = len * (0.4 + rnd() * 0.2), h1 = 3 + 2.8 * fl, h2 = 3 + 2.8 * (fl - 2 - Math.floor(rnd() * 3));
           put(x + cut / 2, z + 6, cut, 12, h1, () => aptMat(wall, style), wall); put(x + cut + (len - cut) / 2, z + 6, len - cut, 12, h2, () => aptMat(wall, style), wall);
-          spec(x + 1, z + 6, { geo: () => boxGeo(2, h1 - 4, 12.2, x + 1, CURB + 2, z + 6), mat: () => flatMat(acc, { key: 'acc' + acc }), box: [x, z, x + 2, z + 12, h1], color: acc });
+          spec(x + 1, z + 6, { geo: () => boxGeo(2, h1 - 4, 12.2, x + 0.85, CURB + 2, z + 6), mat: () => flatMat(acc, { key: 'acc' + acc }), box: [x, z, x + 2, z + 12, h1], color: acc });
           for (const lx of [x + cut * 0.5, x + cut + (len - cut) * 0.5]) spec(lx, z + 6, { geo: () => boxGeo(5, 3, 6, lx, CURB + (lx < x + cut ? h1 : h2), z + 6), mat: () => flatMat(0x9a9c98, { key: 'plant' }), box: [lx - 2, z + 4, lx + 2, z + 8, 3], color: 0x9a9c98 });
         }
       }

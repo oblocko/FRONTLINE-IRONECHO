@@ -10,10 +10,10 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 
 const DistanceBlurShader = {
-  uniforms: { tDiffuse: { value: null }, tDepth: { value: null }, cameraNear: { value: 0.05 }, cameraFar: { value: 1500 }, start: { value: 150 }, end: { value: 600 }, radius: { value: 2.5 }, resolution: { value: new THREE.Vector2(1, 1) } },
+  uniforms: { tDiffuse: { value: null }, tDepth: { value: null }, cameraNear: { value: 0.05 }, cameraFar: { value: 1500 }, reversed: { value: 0 }, start: { value: 150 }, end: { value: 600 }, radius: { value: 2.5 }, resolution: { value: new THREE.Vector2(1, 1) } },
   vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-  fragmentShader: `uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform float cameraNear, cameraFar, start, end, radius; uniform vec2 resolution; varying vec2 vUv;
-    float lin(float d) { float z = d * 2.0 - 1.0; return 2.0 * cameraNear * cameraFar / (cameraFar + cameraNear - z * (cameraFar - cameraNear)); }
+  fragmentShader: `uniform sampler2D tDiffuse; uniform sampler2D tDepth; uniform float cameraNear, cameraFar, reversed, start, end, radius; uniform vec2 resolution; varying vec2 vUv;
+    float lin(float d) { if (reversed > 0.5) return cameraNear * cameraFar / ((cameraFar - cameraNear) * d + cameraNear); float z = d * 2.0 - 1.0; return 2.0 * cameraNear * cameraFar / (cameraFar + cameraNear - z * (cameraFar - cameraNear)); }
     void main() {
       vec4 c = texture2D(tDiffuse, vUv); float k = smoothstep(start, end, lin(texture2D(tDepth, vUv).x));
       if (k < 0.01) { gl_FragColor = c; return; }
@@ -72,7 +72,10 @@ const GradeShader = {
 export class Renderer {
   constructor(container) {
     this.container = container;
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance', stencil: false });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance', stencil: false, reversedDepthBuffer: true });
+    // reversed depth (+ a float depth buffer below): even precision from 0.05 m to 6 km, so big maps (Seoul) don't
+    // z-fight / flicker on ground layers and facades at distance. Falls back to normal depth without EXT_clip_control.
+    this.reversedDepth = this.renderer.capabilities.reversedDepthBuffer === true;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.0;
@@ -97,7 +100,7 @@ export class Renderer {
     // the composer's own target would drop the canvas' antialiasing, so the scene renders into a
     // multisampled one (samples follow graphics.aa)
     this.sceneTarget = new THREE.WebGLRenderTarget(innerWidth, innerHeight, { type: THREE.HalfFloatType, samples: 4 });
-    this.sceneTarget.depthTexture = new THREE.DepthTexture(innerWidth, innerHeight);   // read by the distance blur
+    this.sceneTarget.depthTexture = new THREE.DepthTexture(innerWidth, innerHeight, THREE.FloatType);   // read by the distance blur; float for reversed depth
     this.composer = new EffectComposer(this.renderer, this.sceneTarget);
     this.renderPass = new RenderPass(this.scene, this.camera);
     this.composer.addPass(this.renderPass);
@@ -120,7 +123,13 @@ export class Renderer {
     // on (setDistanceBlur); levels pair it with distance culling of small detail, which the blur hides
     this.dblur = new ShaderPass(DistanceBlurShader); this.dblur.enabled = false; this.composer.addPass(this.dblur);
     { const rp = this.renderPass, orig = rp.render.bind(rp), self = this; rp.render = function (r, w, rb, ...a) { self._depthRT = rb; return orig(r, w, rb, ...a); };
-      const db = this.dblur, dorig = db.render.bind(db); db.render = function (r, w, rb, ...a) { const u = db.uniforms; u.tDepth.value = self._depthRT?.depthTexture ?? null; u.cameraNear.value = self.camera.near; u.cameraFar.value = self.camera.far; u.resolution.value.set(rb.width, rb.height); return dorig(r, w, rb, ...a); }; }
+      const db = this.dblur, dorig = db.render.bind(db); db.render = function (r, w, rb, ...a) { const u = db.uniforms; u.tDepth.value = self._depthRT?.depthTexture ?? null; u.cameraNear.value = self.camera.near; u.cameraFar.value = self.camera.far; u.reversed.value = self.reversedDepth ? 1 : 0; u.resolution.value.set(rb.width, rb.height); return dorig(r, w, rb, ...a); }; }
+    // clamp HDR before the bloom: a sun glint on glass / a metal roof is 10-50x brighter than white and the bloom
+    // turned it into a screen-wide white flash for a frame while the camera moved. Above ~3 the tone map is white anyway.
+    this.clampPass = new ShaderPass({ uniforms: { tDiffuse: { value: null }, maxL: { value: 3.0 } },
+      vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: 'uniform sampler2D tDiffuse; uniform float maxL; varying vec2 vUv; void main() { vec4 c = texture2D(tDiffuse, vUv); float m = max(c.r, max(c.g, c.b)); if (!(m < 1e6)) c.rgb = vec3(0.0); else if (m > maxL) c.rgb *= maxL / m; gl_FragColor = c; }' });
+    this.composer.addPass(this.clampPass);
     this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.45, 0.6, 0.85);
     this.composer.addPass(this.bloom);
     this.grade = new ShaderPass(GradeShader);

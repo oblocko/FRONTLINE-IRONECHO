@@ -197,7 +197,7 @@ function themedSpec(theme, i, len, depth) {
     return ['metal', txt, { kind: pickN(['brass', 'corten', 'black', 'steel'], k), h: 0.75, font: 'serif' }]; };
   const T = {
     cafe:    { kinds: ['wood', 'scashi', 'neon', 'channel'], podium: 5.5, floors: [1, 3], skins: [['fins', 'wood'], ['grid', null], ['curtain', null]], body: [0xf0ede6, 0xe6e0d8, 0xd8d0c4, 0x2a2c30], int: ['cafe', 'cafe', 'books'], extra: ['awning', 'aFrame', 'point'] },
-    food:    { kinds: ['flex', 'flex', 'wood', 'neon'], podium: 5.5, floors: [2, 4], skins: [['grid', null], ['curtain', null], ['fins', 'alu']], body: [0xece6d8, 0xd8d0c0, 0x3a3440, 0xc8c0b4], int: ['salad', 'cafe'], extra: ['awning', 'stand', 'point', 'blade'] },
+    food:    { kinds: ['wood', 'channel', 'neon', 'flex', 'scashi', 'metal'], podium: 5.5, floors: [2, 4], skins: [['grid', null], ['curtain', null], ['fins', 'alu']], body: [0xece6d8, 0xd8d0c0, 0x3a3440, 0xc8c0b4], int: ['salad', 'cafe'], extra: ['awning', 'stand', 'point', 'blade'] },
     fashion: { kinds: ['channel', 'metal', 'channel', 'scashi'], podium: 10, floors: [3, 7], skins: [['curtain', null], ['grid', null], ['fins', 'alu']], body: [0x2a2c30, 0xd0d4d8, 0xeeece8, 0x18181a], int: ['fashion', 'cosmetics', 'sports'], extra: ['xBanner', 'blade', 'point'] },
     culture: { kinds: ['neon', 'scashi', 'metal', 'neon'], podium: 6, floors: [1, 4], skins: [['grid', null], ['fins', 'wood'], ['curtain', null]], body: [0x2a2828, 0x6a6460, 0xb8b4ae, 0x18181a], int: ['music', 'books', 'cafe'], extra: ['xBanner', 'blade', 'aFrame'] },
     office:  { kinds: ['channel', 'channel', 'flex'], podium: 8, floors: [7, 13], skins: [['curtain', null], ['grid', null]], body: [0xb8c0c4, 0xd8d6d0, 0x2a2c30], int: ['bank', 'pharmacy', 'glasses', 'cafe'], extra: ['point', 'blade'] },
@@ -270,7 +270,11 @@ function modernVilla(ctx, r0, [fx, fz], i, { floors = null, shop = false } = {})
   const core = fx ? new Rect(fx > 0 ? rect.x0 : rect.x1 - deep * 0.35, rect.z0, fx > 0 ? rect.x0 + deep * 0.35 : rect.x1, rect.z1) : new Rect(rect.x0, fz > 0 ? rect.z0 : rect.z1 - deep * 0.35, rect.x1, fz > 0 ? rect.z0 + deep * 0.35 : rect.z1);
   Bt.box(conc, core.w, gH, core.d, core.cx, y0 + gH / 2, core.cz); it.colliders.push(w.addBox(V(core.x0, y0, core.z0), V(core.x1, y0 + gH, core.z1), { surface: 'concrete', cover: true, walkable: false }));
   for (const a of [-along / 2 + 0.4, along / 2 - 0.4, 0]) { const [x, z] = at(a, -0.5); Bt.box(conc, 0.45, gH, 0.45, x, y0 + gH / 2, z); w.addBoxCentered(V(x, y0 + gH / 2, z), V(0.45, gH, 0.45), { surface: 'concrete', walkable: false }); }
-  if (shop) { const sx = SK.flex(pickN(NAMES.cafe.concat(NAMES.food), i), { bg: pickN(Object.values(COLORS), i)[0], fg: pickN(Object.values(COLORS), i)[1], w: Math.min(5, along - 2), h: 0.7 });
+  if (shop) { const nm = pickN(NAMES.cafe.concat(NAMES.food), i), cc = pickN(Object.values(COLORS), i), sk = ['scashi', 'channel', 'wood', 'neon', 'metal', 'flex'][i % 6], sw = Math.min(5, along - 2);   // one of each kind in turn, not all flex
+    const sx = sk === 'scashi' ? SK.scashi(nm, { color: '#2a2a2a', panel: i % 2 ? '#f4f2ee' : null, h: 0.45, font: 'sans', lamps: 2, w: sw }) : sk === 'channel' ? SK.channel(nm, { color: cc[0] === '#ffffff' ? cc[1] : cc[0], h: 0.5, light: ['front', 'halo', 'side'][i % 3], returns: '#2a2a2a' })
+      : sk === 'wood' ? SK.wood(nm, { tone: ['#6a4a2e', '#8a6440', '#3a2a1e'][i % 3], ink: '#f4ecd8', h: 0.5 }) : sk === 'neon' ? SK.neon(nm, { color: ['#ff4ad8', '#7ad8ff', '#ffb040'][i % 3], h: 0.5 })
+      : sk === 'metal' ? SK.metal(nm, { kind: ['brass', 'corten', 'black', 'steel'][i % 4], h: 0.5, font: 'serif' }) : SK.flex(nm, { bg: cc[0], fg: cc[1], w: sw, h: 0.7 });
+    if (sx.userData.width > sw) sx.scale.setScalar(sw / sx.userData.width);
     boxF(glass, along - 1.2, gH - 0.6, 0.06, 0, y0 + (gH - 0.6) / 2 + 0.1, -0.6); const [x, z] = at(0, 0.02); sx.position.set(x, y0 + gH - 0.35, z); sx.rotation.y = rot; SK.bake(ctx, sx); }
   else { const cm = flatMat(0xe8e4d8, { key: 'v_stall' }); for (let a = -along / 2 + 1.2; a < along / 2 - 1; a += 2.5) boxF(cm, 0.1, 0.01, deep * 0.55, a, y0 + 0.02, -deep * 0.3); }
   // facades: ribbon windows on front and back each floor, glass balconies on the front (alternate floors), accent strip
