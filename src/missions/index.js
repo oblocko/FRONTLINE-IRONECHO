@@ -67,8 +67,11 @@ export const MISSIONS = [
 
 // dev-only levels (not listed in the campaign / menu)
 export const DEV_MISSIONS = [
-  { id: 'dev_city', act: 0, num: '--', title: 'SEOUL (DEV)', ko: '서울 도심 (개발용)', pov: 'minjae', location: '서울 도심', locEn: 'Seoul, downtown', date: '2029-03-27', time: '06:10 KST', weather: '맑음', unit: '—',
-    summary: '서울 대도시 레이아웃 확인용 자유 이동.', objectives: [], cast: [], status: 'playable', load: () => import('./dev_city.js') },
+  { id: 'dev_city', act: 0, num: 'FREE', title: 'SEOUL FREE ROAM', ko: '서울 대도시 자유 탐험', pov: 'minjae', location: '서울 — 옛 도심 · 신도심 · 하늘길 지구', locEn: 'Seoul', date: '2029-03-27', time: '06:10 KST', weather: '맑음', unit: '—',
+    summary: '전투 없이 서울 대도시를 둘러봅니다. 걸어서 거리와 가게 안을 다니거나, 공중에서 날아다니며 도시 전체를 볼 수 있습니다. T: 도보 ↔ 공중 비행 전환 · N: 다음 장소.', objectives: ['T — 도보 / 공중 비행 전환', 'N — 다음 장소로 이동', '공중: Space 상승 · C 하강 · Shift 빠르게'], cast: [], status: 'playable', load: () => import('./dev_city.js') },
 ];
+// The main-menu FREE ROAM entry exists only until a campaign mission uses the Seoul big city (user's request):
+// mark such a mission with city: 'seoul'; once it is playable the menu entry disappears by itself.
+export const FREE_ROAM_MENU = !MISSIONS.some((m) => m.city === 'seoul' && m.status === 'playable');
 export const missionById = (id) => MISSIONS.find((m) => m.id === id) || DEV_MISSIONS.find((m) => m.id === id);
 export const nextMission = (id) => { const i = MISSIONS.findIndex((m) => m.id === id); return MISSIONS[i + 1] || null; };

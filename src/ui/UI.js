@@ -6,7 +6,7 @@ import { events } from '../core/Events.js';
 import { settings, QUALITY_PRESETS, DEFAULT_BINDINGS } from '../core/Settings.js';
 import { saves } from '../core/SaveSystem.js';
 import { VERSION, BUILD } from '../version.js';
-import { MISSIONS, ACTS, missionById } from '../missions/index.js';
+import { MISSIONS, ACTS, missionById, FREE_ROAM_MENU } from '../missions/index.js';
 import { CHARACTERS, speakerLabel } from '../story/Characters.js';
 import { keyName } from '../player/Player.js';
 import { audio } from '../audio/AudioEngine.js';
@@ -53,7 +53,8 @@ export class UI {
           <button class="btn" data-a="select"><span class="idx">03</span>MISSION SELECT<span class="sub">임무 선택</span></button>
           <button class="btn" data-a="settings"><span class="idx">04</span>SETTINGS<span class="sub">설정</span></button>
           <button class="btn" data-a="credits"><span class="idx">05</span>CREDITS<span class="sub">제작진</span></button>
-          <button class="btn" data-a="exit" data-snd="back"><span class="idx">06</span>EXIT<span class="sub">종료</span></button>
+          ${FREE_ROAM_MENU ? '<button class="btn" data-a="freeroam"><span class="idx">06</span>FREE ROAM<span class="sub">서울 대도시 자유 탐험</span></button>' : ''}
+          <button class="btn" data-a="exit" data-snd="back"><span class="idx">${FREE_ROAM_MENU ? '07' : '06'}</span>EXIT<span class="sub">종료</span></button>
         </nav>
         <div class="foot">VERSION ${VERSION} · BUILD ${BUILD}<br/>MISSIONS 01–07 PLAYABLE<br/>ALL CHARACTERS AND EVENTS ARE FICTIONAL</div>
       </div>
@@ -95,7 +96,29 @@ export class UI {
     else if (a === 'select') this.missionSelect();
     else if (a === 'settings') this.settingsScreen(() => this.mainMenu());
     else if (a === 'credits') this.credits();
+    else if (a === 'freeroam') this.freeRoam();
     else if (a === 'exit') this.exitGame();
+  }
+  // FREE ROAM: pick how to move (on foot / in the air) and where to start, then the usual loading screen
+  async freeRoam() {
+    const { SPOTS } = await import('../missions/dev_city.js');
+    const st = (this.game.freeRoam ??= { mode: 'walk', spot: 'haneul' });
+    const el = this.mount('select', h(`<div class="overlay grid-bg"><div class="panel dialog"><span class="corner tl"></span><span class="corner br"></span>
+      <div class="head"><div><div class="tag">FREE ROAM // 자유 탐험</div><h2>SEOUL</h2></div><div class="tag">전투 없음</div></div>
+      <p style="color:var(--muted);margin:4px 0 14px">서울 대도시를 둘러봅니다. 플레이 중 <b>T</b>로 도보와 공중 비행을 바꾸고, <b>N</b>으로 다음 장소로 이동합니다.</p>
+      <div class="tag" style="margin-bottom:6px">이동 방식</div>
+      <div class="fr-mode" style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="btn" data-m="walk">사람 (도보)<span class="sub">걸어서 거리 · 가게 안</span></button>
+        <button class="btn" data-m="air">공중 (비행)<span class="sub">하늘에서 도시 전체</span></button></div>
+      <div class="tag" style="margin-bottom:6px">시작 장소</div>
+      <div class="fr-spot" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">${SPOTS.map((s) => `<button class="btn small" data-s="${s.id}">${esc(s.name)}</button>`).join('')}</div>
+      <div class="row-actions"><button class="btn small" data-a="back" data-snd="back">BACK</button><button class="btn primary" data-a="go">START ▸</button></div></div></div>`));
+    const sync = () => { el.querySelectorAll('[data-m]').forEach((b) => b.classList.toggle('sel', b.dataset.m === st.mode)); el.querySelectorAll('[data-s]').forEach((b) => b.classList.toggle('sel', b.dataset.s === st.spot)); };
+    el.querySelectorAll('[data-m]').forEach((b) => b.onclick = () => { st.mode = b.dataset.m; sync(); });
+    el.querySelectorAll('[data-s]').forEach((b) => b.onclick = () => { st.spot = b.dataset.s; sync(); });
+    $('[data-a=back]', el).onclick = () => this.mainMenu();
+    $('[data-a=go]', el).onclick = () => this.briefing('dev_city');
+    this.wireSounds(el); sync(); this.show('select');
   }
   confirm(text, yes, no) {
     const el = this.mount('confirm', h(`<div class="overlay"><div class="panel dialog" style="width:520px"><span class="corner tl"></span><span class="corner br"></span><p style="line-height:1.7">${esc(text)}</p><div class="row-actions"><button class="btn small" data-a="no" data-snd="back">취소</button><button class="btn small" data-a="yes" style="border-color:var(--accent);color:var(--accent)">확인</button></div></div></div>`));
@@ -146,7 +169,7 @@ export class UI {
     const m = missionById(id);
     const el = this.mount('briefing', h(`<div class="scanlines">
       <div class="bl">
-        <div class="num">MISSION ${m.num} // ${ACTS[m.act - 1]?.title ?? "DEV"}</div>
+        <div class="num">${m.act ? `MISSION ${m.num} // ${ACTS[m.act - 1].title}` : "FREE ROAM // 자유 탐험"}</div>
         <h1>${m.title}</h1><div class="ko">${m.ko}</div>
         <div class="meta">
           <div class="k">AREA</div><div>${esc(m.location)}</div>

@@ -100,6 +100,19 @@ export class Player {
     if (this.recoilPitch > 0) { const r = Math.min(this.recoilPitch, dt * 0.6); this.pitch -= r * 0.6; this.recoilPitch -= r; }
 
     if (ctl && this.input.pressed('flashlight')) this.setFlashlight(!this.flashOn);
+    // free flight (free-roam city): no gravity or collision; W/S along the view, A/D strafe, Space up, crouch down,
+    // sprint = fast. The camera is the eye.
+    if (this.flying) {
+      const { x, z } = ctl ? inp.moveAxes() : { x: 0, z: 0 }, sp = (inp.down('sprint') ? 90 : 22) * (this.flySpeed ?? 1);
+      const fwd = new THREE.Vector3(-Math.sin(this.yaw) * Math.cos(this.pitch), Math.sin(this.pitch), -Math.cos(this.yaw) * Math.cos(this.pitch));
+      const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
+      const up = ctl ? (inp.down('jump') ? 1 : 0) - (inp.down('crouch') ? 1 : 0) : 0;
+      this.position.addScaledVector(fwd, z * sp * dt).addScaledVector(right, x * sp * dt); this.position.y = Math.max(this.flyMinY ?? 1, this.position.y + up * sp * dt);
+      this.velocity.set(0, 0, 0); this.speed = 0; this.grounded = false;
+      const cam = this.camera; cam.position.copy(this.position); cam.rotation.order = 'YXZ'; cam.rotation.set(this.pitch, this.yaw, 0);
+      const base = settings.data.graphics.fov; cam.fov = damp(cam.fov, base, 10, dt); cam.updateProjectionMatrix();
+      return;
+    }
     if (this.seat) { this.updateSeat(dt); this.updateCamera(dt, time); this.updateInteract(dt); return; }
 
     // ---- vault in progress ----

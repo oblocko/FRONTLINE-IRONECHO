@@ -191,6 +191,7 @@ export class Game {
     if (!this.missionId) return;
     this.checkpointId = id;
     this.cpStats = { time: this.stats.time, kills: this.stats.kills, fired: this.weapons.shotsFired, hit: this.weapons.shotsHit };
+    if (this.missionMeta?.act === 0) return;   // free roam never overwrites the campaign's checkpoint (CONTINUE)
     saves.saveCheckpoint({ missionId: this.missionId, checkpointId: id, weapons: this.weapons.serialize(), stats: { ...this.stats } });
   }
 

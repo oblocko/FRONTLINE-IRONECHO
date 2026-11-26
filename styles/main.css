@@ -381,3 +381,8 @@ html.js #about { display: none; }
 #hud .markers .mk.enemy { color: #ff5a4a; }
 #hud .markers .mk.enemy::before { border: none; width: 0; height: 0; transform: none; border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 10px solid #ff5a4a; }
 #hud .compass .pin.enemy { border-color: #ff5a4a; background: rgba(255, 90, 74, .35); }
+
+/* free roam picker: the chosen mode / start spot */
+.fr-mode .btn.sel, .fr-spot .btn.sel { border-color: var(--accent); border-left-color: var(--accent); background: var(--accent-dim); color: var(--accent); }
+.fr-mode .btn { flex-direction: column; align-items: flex-start; gap: 4px; }
+.fr-mode .btn .sub { margin-left: 0; }
