@@ -210,8 +210,14 @@ export function facility(kind, r, H) {
       occl(cx - w / 2, hz - d / 2, cx + w / 2, hz + d / 2, 34);
       parking(r.x0 + 6, hz + d / 2 + 16, r.x1 - 6, r.z1 - 6); return;
     }
-    case 'construction': {   // 공사장: hoarding round the site, a concrete frame rising, a tower crane
+    case 'construction': {   // 공사장: hoarding round the site, a concrete frame rising, a tower crane, site offices, stacked material
+      // a big block is only partly a site: the rest stays a car park
+      if (W > 96 || D > 76) { const sw = Math.min(W, 90), sd = Math.min(D, 70); pave(r.x0, r.z0, r.x1, r.z1, 0x8a8a86); parking(r.x0 + sw + 6, r.z0 + 4, r.x1 - 4, r.z1 - 4); if (sd < D - 14) parking(r.x0 + 4, r.z0 + sd + 6, r.x0 + sw, r.z1 - 4);
+        return facility('construction', { x0: r.x0, z0: r.z0, x1: r.x0 + sw, z1: r.z0 + sd }, H); }
       flat(() => boxGeo(W - 4, 0.05, D - 4, cx, CURB, cz), M.dirt, cx, cz, [r.x0 + 2, r.z0 + 2, r.x1 - 2, r.z1 - 2, 0.05], 0xb89a72);
+      for (let k = 0; k < 3; k++) { box(M.white, 6, 2.6, 2.5, r.x0 + 8, CURB + (k === 2 ? 2.6 : 0), r.z0 + 6 + (k % 2) * 2.7, 0xeeece6); }   // 현장사무실 containers
+      for (let k = 0; k < 4; k++) deco(k % 2 ? M.steel : M.conc, 6, 0.6, 1.2, r.x1 - 12, CURB + k * 0.6, r.z1 - 8, 0x8a8e92);   // rebar / formwork stacks
+      deco(M.dark, 8, 0.05, 6, r.x1 - 14, CURB + 0.06, r.z0 + 8, 0x2a2c2e);   // wheel wash
       for (const [w, d, x, z] of [[W - 4, 0.2, cx, r.z0 + 2], [W - 4, 0.2, cx, r.z1 - 2], [0.2, D - 4, r.x0 + 2, cz], [0.2, D - 4, r.x1 - 2, cz]]) deco(M.fence, w, 2.6, d, x, CURB, z, 0x2a5a8a);
       const fw = Math.min(W - 24, 40), fd = Math.min(D - 24, 26), fl = 4 + Math.floor(rnd() * 8);
       box(M.conc, fw, 3.2 * fl - 3.2, fd, cx, CURB, cz, 0xa8a6a0);

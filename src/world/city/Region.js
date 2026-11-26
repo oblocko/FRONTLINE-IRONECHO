@@ -23,6 +23,7 @@ import { frontSigns, facility } from './RegionExtras.js';
 import { HAN, hanC, hanNorth, hanSouth, inHan, buildHan } from './HanRiver.js';
 import { blockStreetscape, arterialScape, tickSignals, lotMat } from './RegionStreets.js';
 import { Traffic } from './Traffic.js';
+import { shopDetails, villaPiloti, towerDetails, complexDetails, slabDetails, parkingRow, officeDetails, civic, CIVIC } from './RegionBuildings.js';
 
 const EXT = { x0: -1500, x1: 1900, z0: -2050, z1: 1400 };   // the Han runs through it (z ≈ -1000): 강북 north of it, 강남 south
 const CORE = { x0: -206, x1: 726, z0: -306, z1: 306 };
@@ -37,7 +38,7 @@ export const SUB = [{ x: -960, z: 660, name: '서부 부도심' }, { x: 1380, z:
 export const SAT = [{ x: -2750, z: 1450, R: 430, name: '서쪽 위성도시' }, { x: 3250, z: 1450, R: 430, name: '동쪽 위성도시' }];
 function zoneOf(x, z) {
   for (const s of SUB) { const d = Math.hypot(x - s.x, z - s.z); if (d < 300) return { type: d < 170 ? 'cbd' : 'business', x: s.x, z: s.z }; }
-  if (Math.hypot(x - 1550, z + 600) < 190) return { type: 'stadium', x, z };
+  if (Math.hypot(x - 1600, z + 240) < 190) return { type: 'stadium', x, z };
   const dx = (x - CEN.x) / 1650, dz = (z - CEN.z) / 1380, r = Math.hypot(dx, dz), ang = Math.atan2(dz, dx), v = (Math.sin(x * 0.011 + 1.3) * Math.cos(z * 0.009) + 1) / 2;
   // 강북: riverside apartment complexes along the river, the old downtown in the middle, villas / 주상복합 round it,
   // the greenbelt at the edge
@@ -46,10 +47,14 @@ function zoneOf(x, z) {
     if (dn < 230) return { type: v < 0.6 ? 'highrise' : 'slab', x, z };
     if (Math.abs(rx) < 0.3) return { type: Math.abs(Math.sin(x * 0.005 + z * 0.003)) < 0.45 ? 'business' : 'downtown', x: CEN.x, z: -1720 };
     return { type: v < 0.55 ? 'villa' : 'mixed', x, z }; }
-  if (r > 0.9) return { type: 'greenbelt', x, z };
+  const nearSub = SUB.some((s) => Math.hypot(x - s.x, z - s.z) < 560);
+  if (r > 0.9 && !nearSub) return { type: 'greenbelt', x, z };
+  if (r > 0.9) return { type: v < 0.6 ? 'highrise' : 'mixed', x, z };
   if (z - hanSouth(x) < 200 && Math.abs(x - CEN.x) > 380) return { type: v < 0.6 ? 'highrise' : 'slab', x, z };   // 강남 riverside apartments
-  if (r < 0.52) return { type: Math.abs(Math.sin(ang * 2)) < 0.3 ? 'business' : 'downtown', x: CEN.x, z: CEN.z };
-  if (r < 0.72) return { type: v < 0.5 ? 'villa' : 'mixed', x, z };
+  // the master plan: north and east of the centre offices (업무), the centre commercial (상업), west and south-west
+  // housing with schools, south-east the culture quarter (공연장 / 미술관 / 도서관)
+  if (r < 0.52) { if ((ang < -0.9 && ang > -2.3) || Math.abs(ang) < 0.55) return { type: 'business', x: CEN.x, z: CEN.z }; return { type: 'downtown', x: CEN.x, z: CEN.z }; }
+  if (r < 0.72) { if (ang > 0.25 && ang < 1.15) return { type: 'culture', x, z }; if (Math.abs(ang) > 2.2) return { type: v < 0.4 ? 'highrise' : 'villa', x, z }; return { type: v < 0.5 ? 'villa' : 'mixed', x, z }; }
   if (Math.abs(ang) > 2.55) return { type: 'industrial', x, z };                       // west: 공장
   if (ang < -1.05 && ang > -2.1) return { type: 'campus', x, z };                       // north: 학교 / 대학
   return { type: v < 0.55 ? 'highrise' : 'slab', x, z };                                // 아파트 단지
@@ -130,7 +135,7 @@ function mergeGeos(gs) { const pos = [], nor = []; for (const g0 of gs) { const 
 const inCore = (x0, z0, x1, z1) => x1 > CORE.x0 && x0 < CORE.x1 && z1 > CORE.z0 && z0 < CORE.z1;
 // the hand-made quarter (HandStreets.js) replaces the generated blocks, their streets and trees
 const inHand = (x0, z0, x1, z1) => x1 > HAND.x0 - 2 && x0 < HAND.x1 + 2 && z1 > HAND.z0 - 2 && z0 < HAND.z1 + 2;
-const inRiver = (z0, z1, x0 = -1e4, x1 = 1e4) => inHan(Math.max(x0, EXT.x0 - 160), z0, Math.min(x1, EXT.x1 + 160), z1, 10);
+const inRiver = (z0, z1, x0 = -1e4, x1 = 1e4, m = 10) => inHan(Math.max(x0, EXT.x0 - 160), z0, Math.min(x1, EXT.x1 + 160), z1, m);
 function boxGeo(w, h, d, x, y, z) { return new THREE.BoxGeometry(w, h, d).translate(x, y + h / 2, z); }
 
 // Streaming: every 240 m chunk keeps its buildings as SPECS (data). At load each chunk gets an HLOD proxy (boxes,
@@ -142,7 +147,7 @@ export class Region {
   chunk(x, z) { const k = `${Math.floor(x / CH)},${Math.floor(z / CH)}`; if (!this.chunks.has(k)) this.chunks.set(k, { k, cx: (Math.floor(x / CH) + 0.5) * CH, cz: (Math.floor(z / CH) + 0.5) * CH, specs: [], proxy: null, detail: null }); return this.chunks.get(k); }
   build() {
   const ctx = this.ctx, lod = this.lod, scene = ctx.scene; let s = 77; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647); const pick = (a) => a[Math.floor(rnd() * a.length)];
-  const B = new Batch(scene);
+  const B = new Batch(scene); STADIUM.done = false;
   const DBG0 = typeof location !== 'undefined' ? location.search : '';
   const occl = (x0, z0, x1, z1, h) => { if (!DBG0.includes('noocc')) lod?.occluder?.({ x0, z0, x1, z1, y1: CURB + h }); };
   const self = this; const DBG = typeof location !== 'undefined' ? (location.search.match(/rg=([a-z,]+)/)?.[1] || '') : '';
@@ -175,8 +180,8 @@ export class Region {
   if (!DBG.includes('nohan')) this.han = buildHan({ B, world, scene, rnd, tree: (x, y, z, s2) => { for (const [g, m] of treeParts(x, z, s2, y)) B.add(g, m, { cast: false }); } });
   // highways out through the greenbelt to the satellite towns (the terrain is levelled along them)
   for (const h of HWY) { const [ax, az] = h.a, [bx, bz] = h.b, L2 = Math.hypot(bx - ax, bz - az), ang = Math.atan2(bz - az, bx - ax);
-    const g = new THREE.BoxGeometry(L2, 0.8, 24); g.rotateY(-ang); g.translate((ax + bx) / 2, CURB - 0.38, (az + bz) / 2); B.add(g, asph, { cast: false });
-    const ln = new THREE.BoxGeometry(L2, 0.02, 0.3); ln.rotateY(-ang); ln.translate((ax + bx) / 2, CURB + 0.03, (az + bz) / 2); B.add(ln, flatMat(0xd8b020, { key: 'hwyline' }), { cast: false }); }
+    const g = new THREE.BoxGeometry(L2, 0.8, 24); g.rotateY(-ang); g.translate((ax + bx) / 2, CURB - 0.33, (az + bz) / 2); B.add(g, asph, { cast: false });   // top 7 cm above the land (over the edge lawn)
+    const ln = new THREE.BoxGeometry(L2, 0.02, 0.3); ln.rotateY(-ang); ln.translate((ax + bx) / 2, CURB + 0.08, (az + bz) / 2); B.add(ln, flatMat(0xd8b020, { key: 'hwyline' }), { cast: false }); }
 
   // ---------------------------------------------------------------- master plan: districts
   // Voronoi districts around seeds; each district has a template (see DISTRICTS) that decides block size,
@@ -202,8 +207,16 @@ export class Region {
     const cuts = (a, b, n) => { const wts = Array.from({ length: n }, () => 0.65 + rnd() * 0.7), sum = wts.reduce((p, q) => p + q, 0), out = [a]; let acc = a; for (const q of wts) { acc += (q / sum) * (b - a); out.push(acc); } return out; };
     const CX = cuts(ax0, ax1, nx), CZ = cuts(az0, az1, nz);
     for (let a2 = 0; a2 < nx; a2++) for (let b2 = 0; b2 < nz; b2++) {
-      const x0 = CX[a2] + st / 2, x1 = CX[a2 + 1] - st / 2, z0 = CZ[b2] + st / 2, z1 = CZ[b2 + 1] - st / 2;
-      if (x1 - x0 < 24 || z1 - z0 < 24 || inCore(x0 - 30, z0 - 30, x1 + 30, z1 + 30) || inRiver(z0, z1, x0, x1)) continue;
+      const x0 = CX[a2] + st / 2, x1 = CX[a2 + 1] - st / 2; let z0 = CZ[b2] + st / 2, z1 = CZ[b2 + 1] - st / 2;
+      // a block by the river is cut back to the levee top (the curve, conservatively); a thin leftover becomes a
+      // riverside green strip (lawn, trees, a path) like the parks along the real 한강 embankments
+      if (inRiver(z0, z1, x0, x1) && x1 - x0 >= 24) { let zs = -Infinity, zn = Infinity; for (let x = x0; x <= x1 + 0.1; x += 10) { const xx = Math.min(x, x1); zs = Math.max(zs, hanSouth(xx) + 6); zn = Math.min(zn, hanNorth(xx) - 6); }
+        const mid = (z0 + z1) / 2 > hanC((x0 + x1) / 2) ? 's' : 'n'; if (mid === 's') z0 = Math.max(z0, zs); else z1 = Math.min(z1, zn);
+        if (z1 - z0 >= 8 && z1 - z0 < 30 && !inCore(x0 - 30, z0 - 30, x1 + 30, z1 + 30) && !inHand(x0, z0, x1, z1)) { const za = z0, zb = z1;
+          spec((x0 + x1) / 2, (za + zb) / 2, { geo: () => boxGeo(x1 - x0, 0.05, zb - za, (x0 + x1) / 2, CURB, (za + zb) / 2), mat: () => groundMat('lawn'), box: [x0, za, x1, zb, 0.05], color: 0x56603a, np: true });
+          spec((x0 + x1) / 2, (za + zb) / 2, { geo: () => boxGeo(x1 - x0, 0.04, 2.4, (x0 + x1) / 2, CURB + 0.02, (za + zb) / 2), mat: () => groundMat('plaza', { color: 0xd8d0c0 }), box: [x0, za, x1, zb, 0.05], color: 0xd8d0c0, np: true });
+          for (let x = x0 + 5; x < x1 - 3; x += 9) for (const zz of [za + 2.5, zb - 2.5]) if (zb - za > 9 && rnd() < 0.8) treeSpec(spec, x + rnd() * 3, zz, 0.8 + rnd() * 0.5); continue; } }
+      if (x1 - x0 < 24 || z1 - z0 < 24 || inCore(x0 - 30, z0 - 30, x1 + 30, z1 + 30) || inRiver(z0, z1, x0, x1, 0)) continue;
       if (a2 < nx - 1 && !inHand(x1, z0, x1 + st, z1 + st)) B.add(boxGeo(st, 0.04, z1 - z0 + st, x1 + st / 2, CURB - 0.02, (z0 + z1) / 2), asph, { cast: false });
       if (b2 < nz - 1 && !inHand(x0, z1, x1 + st, z1 + st)) B.add(boxGeo(x1 - x0 + st, 0.04, st, (x0 + x1) / 2, CURB - 0.02, z1 + st / 2), asph, { cast: false });
       const edge = { n: b2 === 0, s: b2 === nz - 1, w: a2 === 0, e: a2 === nx - 1 };   // block faces an arterial
@@ -224,6 +237,14 @@ export class Region {
     for (let x = ax0; x < ax1; x += 12) for (const z of [az0 - 3, az1 + 3]) treeSpots.push([x, z]);
     for (let z = az0; z < az1; z += 12) for (const x of [ax0 - 3, ax1 + 3]) treeSpots.push([x, z]);
   }
+  // the land between the last arterial and the edge of the city ground: woods and meadow, not bare paving
+  { const lawnRect = (x0, z0, x1, z1) => { if (x1 - x0 < 4 || z1 - z0 < 4) return; const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+      B.add(boxGeo(x1 - x0, 0.05, z1 - z0, cx, CURB, cz), groundMat('lawn'), { cast: false });
+      for (let k = 0; k < Math.floor((x1 - x0) * (z1 - z0) / 420); k++) { const x = x0 + 3 + rnd() * (x1 - x0 - 6), z = z0 + 3 + rnd() * (z1 - z0 - 6); if (HWY.some((h) => segDist(x, z, h.a, h.b) < 22)) continue; treeSpec(spec, x, z, 0.9 + rnd() * 0.7, 0x3e5a34); } };
+    const split = (x0, z0, x1, z1) => { if (!inHan(x0, z0, x1, z1, 4)) return lawnRect(x0, z0, x1, z1); let zn = Infinity, zs = -Infinity; for (let x = x0; x <= x1 + 0.1; x += 10) { const xx = Math.min(x, x1); zn = Math.min(zn, hanNorth(xx) - 4); zs = Math.max(zs, hanSouth(xx) + 4); } lawnRect(x0, z0, x1, Math.min(z1, zn)); lawnRect(x0, Math.max(z0, zs), x1, z1); };
+    const L0 = EXT.x0 - 160, L1 = EXT.x1 + 160, Z0 = EXT.z0 - 160, Z1 = EXT.z1 + 160, xw = ARTX[0] - 15, xe = ARTX[ARTX.length - 1] + 15, zn = EXT.z0, zsB = ARTZ[ARTZ.length - 1] + 15;
+    for (let z = Z0; z < Z1; z += 200) { split(L0, z, xw, Math.min(z + 200, Z1)); split(xe, z, L1, Math.min(z + 200, Z1)); }
+    for (let x = xw; x < xe; x += 200) { split(x, Z0, Math.min(x + 200, xe), zn); split(x, zsB, Math.min(x + 200, xe), Z1); } }
   // 위성 도시: a town on the plain beyond the greenbelt — a centre of offices / 주상복합, apartment complexes
   // round it, a school, a park; its own street grid on a paved slab
   for (const t of SAT) {
@@ -385,6 +406,7 @@ const DISTRICTS = {
   campus:     { block: [260, 220], street: 14, intensity: 1, h: [12, 30] },      // university / hospital campus
   stadium:    { block: [300, 260], street: 14, intensity: 1, h: [0, 36] },
   greenbelt:  { block: [240, 200], street: 8, intensity: 0, h: [0, 0] },        // 개발제한구역
+  culture:    { block: [140, 120], street: 14, intensity: 2, h: [10, 30] },      // 문화지구
 };
 const SEEDS = [
   { type: 'cbd', x: 1080, z: -60 }, { type: 'business', x: 1100, z: -480 }, { type: 'business', x: 860, z: 420 },
@@ -412,7 +434,8 @@ function treeSpec(spec, x, z, s, color = 0x4a6a3a) { const k = Math.abs(Math.sin
 
 // fill one block according to its district template. ctx: { edge (faces an arterial), hotter (neighbour intensity
 // above ours → mid-rise transition edge), rnd, pick, occl }
-function fillBlock(spec, r, D, T, { edge, hotter, rnd, pick, occl }) {
+const STADIUM = { done: false };
+function fillBlock(spec, r, D, T, { edge, hotter, rnd, pick, occl, noFac = false }) {
   const W = r.x1 - r.x0, Dd = r.z1 - r.z0, cx0 = (r.x0 + r.x1) / 2, cz0 = (r.z0 + r.z1) / 2;
   const put = (x, z, w, d, h, m, color, roof = null) => { if (w < 4 || d < 4 || h < 2) return; if (roof === roofGreen && rnd() < 0.8) roof = roofOf(x * 7 + z * 3); spec(x, z, { geo: () => boxGeo(w, h, d, x, CURB, z), mat: m, box: [x - w / 2, z - d / 2, x + w / 2, z + d / 2, h], color, roof: true, roofMat: roof ?? roofOf(x * 5 + z * 11) }); if (h > 6 && w > 7 && d > 7 && rnd() < 0.75) roofKit(spec, rnd, x, z, w, d, h); if (h > 12) occl(x - w / 2, z - d / 2, x + w / 2, z + d / 2, h); };
   const flat = (geoF, matF, x, z, box, color) => spec(x, z, { geo: geoF, mat: matF, box, color });
@@ -421,7 +444,7 @@ function fillBlock(spec, r, D, T, { edge, hotter, rnd, pick, occl }) {
   const COM = [0xd8d2c4, 0xb8b4aa, 0xc9c0ae, 0x9aa0a4, 0xe0dcd0, 0xa89c88, 0xcfc6b4], GL = [0x46586a, 0x3e4a52, 0x5a6a74];
   // shops get real signs on their street faces (RegionExtras.frontSigns), not a sign band printed on every floor tile
   const comBox = (x, z, w, d, h, faces = []) => { const wc = pick(COM), gc = pick(GL); put(x, z, w, d, h, () => comMat(wc, gc, false), wc);
-    if (faces.length && w >= 4 && d >= 4 && h >= 2) frontSigns(spec, rnd, [x - w / 2, z - d / 2, x + w / 2, z + d / 2], h, faces); };
+    if (faces.length && w >= 4 && d >= 4 && h >= 2) { frontSigns(spec, rnd, [x - w / 2, z - d / 2, x + w / 2, z + d / 2], h, faces); shopDetails(spec, rnd, [x - w / 2, z - d / 2, x + w / 2, z + d / 2], h, faces); } };
   // perimeter frontage: buildings of varied width / height along the chosen block faces, depth dep
   const frontage = (faces, dep, hmin, hmax) => {
     for (const f of faces) {
@@ -434,11 +457,20 @@ function fillBlock(spec, r, D, T, { edge, hotter, rnd, pick, occl }) {
   };
   const arterialFaces = Object.entries(edge).filter(([, v]) => v).map(([k]) => k);
   // a city is not only shops and flats: some blocks are a school, a church, a gas station, a market, a park …
-  const FAC = { villa: ['church', 'houses', 'playpark', 'market', 'parking', 'houses', 'school'], slab: ['school', 'playpark', 'courts', 'church', 'hospital'], highrise: ['school', 'playpark', 'courts', 'hospital'],
-    downtown: ['market', 'parking', 'gas', 'hospital', 'construction', 'church'], mixed: ['construction', 'parking', 'gas', 'playpark'], business: ['construction', 'parking'] }[D.type];
-  if (FAC && W >= 44 && Dd >= 38 && hotter < 2 && rnd() < (D.type === 'business' ? 0.12 : 0.3)) {
+  const FAC = { villa: ['church', 'houses', 'playpark', 'market', 'parking', 'houses', 'school', 'fire', 'post', 'library'], slab: ['school', 'playpark', 'courts', 'church', 'hospital', 'library', 'police'], highrise: ['school', 'playpark', 'courts', 'hospital', 'library'],
+    downtown: ['market', 'parking', 'gas', 'hospital', 'construction', 'church', 'gu', 'police', 'post', 'fire'], mixed: ['construction', 'parking', 'gas', 'playpark', 'police', 'post'], business: ['construction', 'parking', 'gu'],
+    culture: ['hall', 'museum', 'library', 'playpark', 'hall', 'museum'], industrial: ['logistics', 'logistics', 'gas'] }[D.type];
+  const facP = { business: 0.12, culture: 0.7, industrial: 0.4 }[D.type] ?? 0.3;
+  if (FAC && !noFac && W >= 44 && Dd >= 38 && hotter < 2 && rnd() < facP) {
     const tree = (x, z, s2) => treeSpec(spec, x, z, s2, 0x4a6a3a);
-    facility(pick(FAC), r, { put, flat, lawn, pave, tree, occl, rnd, pick, spec }); return;
+    const kind = pick(FAC), Hh = { put, flat, lawn, pave, tree, occl, rnd, pick, spec };
+    // a small facility does not take a whole big block: it gets one end, the rest is built as usual
+    if (!['school', 'hall', 'logistics'].includes(kind) && (W > 110 || Dd > 90)) {
+      const alongX = W >= Dd, cut = Math.min(90, (alongX ? W : Dd) * 0.5), f0 = alongX ? { ...r, x1: r.x0 + cut - 3 } : { ...r, z1: r.z0 + cut - 3 }, rest = alongX ? { ...r, x0: r.x0 + cut + 3 } : { ...r, z0: r.z0 + cut + 3 };
+      pave(alongX ? r.x0 + cut - 3 : r.x0, alongX ? r.z0 : r.z0 + cut - 3, alongX ? r.x0 + cut + 3 : r.x1, alongX ? r.z1 : r.z0 + cut + 3, 0xa8a8a4);   // a service lane between
+      if (CIVIC.includes(kind)) civic(kind, f0, Hh); else facility(kind, f0, Hh);
+      fillBlock(spec, rest, D, T, { edge: alongX ? { ...edge, w: false } : { ...edge, n: false }, hotter, rnd, pick, occl, noFac: true }); return; }
+    if (CIVIC.includes(kind)) { if (kind !== 'logistics' || (W >= 80 && Dd >= 70)) { civic(kind, r, Hh); return; } } else { facility(kind, r, Hh); return; }
   }
   switch (D.type) {
     case 'greenbelt': {   // 개발제한구역: wooded hills, paddy fields with farm roads, vinyl greenhouse rows, a few farmhouses
@@ -452,12 +484,19 @@ function fillBlock(spec, r, D, T, { edge, hotter, rnd, pick, occl }) {
       for (let i = 0; i < 2; i++) { const x = r.x0 + 15 + rnd() * (W - 30), z = r.z0 + 15 + rnd() * (Dd - 30); put(x, z, 10, 8, 3.5, () => villaMat(0xd8cab0), 0xd8cab0, () => flatMat(0x3a5a7a, { key: 'farmroof' })); }
       return;
     }
+    case 'culture': {
+      for (const f of ['n', 's', 'w', 'e']) frontage([f], 14, 8, 16);
+      lawn(r.x0 + 15, r.z0 + 15, r.x1 - 15, r.z1 - 15); for (let k = 0; k < Math.floor(W * Dd / 600); k++) { const x = r.x0 + 18 + rnd() * (W - 36), z = r.z0 + 18 + rnd() * (Dd - 36); treeSpec(spec, x, z, 0.8 + rnd() * 0.5); }
+      return;
+    }
     case 'park': {
       lawn(r.x0, r.z0, r.x1, r.z1);
       for (let k = 0; k < Math.floor(W * Dd / 700); k++) { const x = r.x0 + 6 + rnd() * (W - 12), z = r.z0 + 6 + rnd() * (Dd - 12), s2 = 0.9 + rnd() * 0.8; treeSpec(spec, x, z, s2, 0x4a6a3a); }
       return;
     }
     case 'stadium': {
+      if (STADIUM.done) return fillBlock(spec, r, { type: 'highrise', x: r.x0, z: r.z0 }, DISTRICTS.highrise, { edge, hotter, rnd, pick, occl, noFac: true });   // one stadium; the blocks round it are housing
+      STADIUM.done = true;
       const R = Math.min(W, Dd) * 0.38; flat(() => new THREE.CylinderGeometry(R, R * 0.92, 32, 40, 1, true).translate(cx0, CURB + 16, cz0), () => flatMat(0xd8d8d0, { key: 'stadium' }), cx0, cz0, [cx0 - R, cz0 - R, cx0 + R, cz0 + R, 32], 0xd8d8d0);
       flat(() => boxGeo(R * 1.2, 0.06, R * 0.8, cx0, CURB, cz0), () => groundMat('lawn'), cx0, cz0, [cx0 - R * 0.6, cz0 - R * 0.4, cx0 + R * 0.6, cz0 + R * 0.4, 0.06], 0x56603a);
       pave(r.x0, r.z0, r.x1, r.z1, 0xe0dcd4); occl(cx0 - R, cz0 - R, cx0 + R, cz0 + R, 32); return;
@@ -482,7 +521,8 @@ function fillBlock(spec, r, D, T, { edge, hotter, rnd, pick, occl }) {
         if (rnd() < 0.06) { pave(x, z, x + lotW, z + lotD, 0xb4b4b0); continue; }   // a small parking lot / empty lot
         const corner = x < r.x0 + 2 || x + lotW > r.x1 - 2; const fl = 3 + Math.floor(rnd() * 2) + (corner ? 1 : 0), bc = pick([0x8a4a3a, 0x9a5a44, 0xd0c8b8, 0xc8c0b0, 0x7a4234, 0xb8a890]);
         const vh = 2.6 + 2.8 * fl, vx = x + lotW / 2, vz = z + lotD / 2;
-        put(vx, vz, lotW - 1.4, lotD - 1.4, vh, () => villaMat(bc), bc, roofGreen);
+        if (rnd() < 0.6) { villaPiloti(spec, rnd, vx, vz, lotW - 1.4, lotD - 1.4, vh, () => villaMat(bc), bc, roofOf(vx * 7 + vz * 3)); if (rnd() < 0.75) roofKit(spec, rnd, vx, vz, lotW - 1.4, lotD - 1.4, vh); }   // 필로티 다세대
+        else put(vx, vz, lotW - 1.4, lotD - 1.4, vh, () => villaMat(bc), bc, roofGreen);
         if (rnd() < 0.3) spec(vx, vz, { geo: () => { const g = new THREE.CylinderGeometry(0.01, (lotW - 1) / Math.SQRT2, 2.2, 4, 1); g.rotateY(Math.PI / 4); g.scale(1, 1, (lotD - 1) / (lotW - 1)); g.translate(vx, CURB + vh + 1.6, vz); return g; }, mat: () => flatMat(pick([0x5a3a2a, 0x3a4650, 0x4a5a4a]), { key: 'vroof' }), box: [vx - 1, vz - 1, vx + 1, vz + 1, 0.1], color: 0x5a3a2a });
       }
       return;
@@ -515,7 +555,9 @@ function fillBlock(spec, r, D, T, { edge, hotter, rnd, pick, occl }) {
         const mm = () => (sys === 'curtain' ? curtainMat({ glass: gl, spandrel: sp, floorH: fh, key: 'reg' }) : sys === 'fins' ? finMat(gl, pick([0xd8dcde, 0xb8bcc0, 0x9aa0a4])) : sys === 'ribbon' ? ribbonMat(pick([0xe8e6e0, 0xc8ccd0, 0x9aa2a8]), gl) : gridMat({ frame: fr, floorH: 3.8, key: 'reg' }));
         const uM = sys === 'grid' ? 3 : 6, vM = sys === 'grid' ? 3.8 : fh, tint = curtain ? gl : fr;
         const pts = outline(kind, w, d, { r: 6, c: 5, n: 24 }), podH = 8 + Math.floor(rnd() * 3) * 4;
-        put(cx, cz, Math.min(gw - 4, w + 12), Math.min(gd - 4, d + 12), podH, () => comMat(pick([0x9aa0a4, 0xb8b4aa, 0x7e8488]), 0x3e4a52), 0x9aa0a4);
+        const pw = Math.min(gw - 4, w + 12), pd = Math.min(gd - 4, d + 12);
+        put(cx, cz, pw, pd, podH, () => comMat(pick([0x9aa0a4, 0xb8b4aa, 0x7e8488]), 0x3e4a52), 0x9aa0a4);
+        officeDetails(spec, rnd, cx, cz, pw, pd, podH, arterialFaces[0] ?? pick(['s', 'n', 'e', 'w']), Math.min(w, d), H, rnd() < 0.14);
         const tiers = H > 120 ? 3 : H > 70 ? 2 : 1; let y = CURB + podH, k = 1;
         for (let t = 0; t < tiers; t++) { const hh = (H - podH) / tiers, sc = k, p2 = pts.map(([px, pz]) => [px * sc, pz * sc]), yb = y;   // yb: this tier's base, fixed now (the geometry is built later)
           flat(() => shell([{ y: yb, pts: p2 }, { y: yb + hh, pts: p2 }], { cx, cz, uM, vM }), mm, cx, cz, [cx - w * sc / 2, cz - d * sc / 2, cx + w * sc / 2, cz + d * sc / 2, yb - CURB + hh], tint);
@@ -532,6 +574,7 @@ function fillBlock(spec, r, D, T, { edge, hotter, rnd, pick, occl }) {
       const sh = arterialFaces.includes('s') ? 's' : arterialFaces[0] || 's';
       if (sh === 's' || sh === 'n') comBox(r.x0 + 30, sh === 's' ? r.z1 - 14 : r.z0 + 14, 50, 20, 8, [sh]); else comBox(sh === 'w' ? r.x0 + 14 : r.x1 - 14, r.z0 + 30, 20, 50, 8, [sh]);
       const style = D.type === 'slab' ? pick([0, 1, 1]) : pick([0, 2, 2]);       // one façade design per complex
+      complexDetails(spec, rnd, r, sh, acc);
       const crown = pick(['frame', 'plant', 'brand']);
       if (D.type === 'highrise') {
         const fl = 28 + Math.floor(rnd() * 14), plans = [pick(['round', 'chamfer', 'rect', 'cross']), pick(['round', 'chamfer', 'cross'])];
@@ -542,6 +585,7 @@ function fillBlock(spec, r, D, T, { edge, hotter, rnd, pick, occl }) {
           spec(cx, cz, { geo: () => shell([{ y: CURB, pts: P }, { y: CURB + h, pts: P }], { cx, cz, uM: 6.8, vM: 2.8 }), mat: () => aptMat(wall, style), box: [cx - w / 2, cz - d / 2, cx + w / 2, cz + d / 2, h], color: wall });
           spec(cx, cz, { geo: () => cap(P, CURB + h, { cx, cz }), mat: roofM, box: [cx - 1, cz - 1, cx + 1, cz + 1, 0.1], color: 0x6e7270 });
           spec(cx, cz, { geo: () => boxGeo(1.2, h - 6, 4, cx - w / 2 + 0.2, CURB + 3, cz), mat: () => flatMat(acc, { key: 'acc' + acc }), box: [cx - w / 2, cz - 2, cx - w / 2 + 1, cz + 2, h - 3], color: acc });
+          towerDetails(spec, rnd, cx, cz, P, h, acc);
           // roof crown: an open frame, a plant room, or the complex's brand box
           if (crown === 'frame') spec(cx, cz, { geo: () => { const Q = P.map(([a, b]) => [a * 0.9, b * 0.9]); return shell([{ y: CURB + h, pts: Q }, { y: CURB + h + 5, pts: Q }], { cx, cz, uM: 2, vM: 5 }); }, mat: () => flatMat(acc, { key: 'accf' + acc }), box: [cx - 1, cz - 1, cx + 1, cz + 1, h + 5], color: acc });
           else spec(cx, cz, { geo: () => boxGeo(w * 0.45, crown === 'brand' ? 6 : 3.5, d * 0.4, cx, CURB + h, cz), mat: () => (crown === 'brand' ? flatMat(acc, { key: 'acc' + acc }) : flatMat(0x9a9c98, { key: 'plant' })), box: [cx - 4, cz - 3, cx + 4, cz + 3, h + 6], color: crown === 'brand' ? acc : 0x9a9c98 });
@@ -553,6 +597,8 @@ function fillBlock(spec, r, D, T, { edge, hotter, rnd, pick, occl }) {
         for (let z = r.z0 + 30; z < r.z1 - 26; z += 40) for (let x = r.x0 + 18; x + len <= r.x1 - 14; x += len + 18) {
           const cut = len * (0.4 + rnd() * 0.2), h1 = 3 + 2.8 * fl, h2 = 3 + 2.8 * (fl - 2 - Math.floor(rnd() * 3));
           put(x + cut / 2, z + 6, cut, 12, h1, () => aptMat(wall, style), wall); put(x + cut + (len - cut) / 2, z + 6, len - cut, 12, h2, () => aptMat(wall, style), wall);
+          slabDetails(spec, rnd, x, z, x + cut, z + 12, h1, acc); slabDetails(spec, rnd, x + cut, z, x + len, z + 12, h2, acc);
+          if (z + 40 < r.z1 - 26) { parkingRow(spec, rnd, x + 2, z + 21, x + len - 2); for (let tx = x + 4; tx < x + len; tx += 9) treeSpec(spec, tx, z + 30, 0.8 + rnd() * 0.4); }
           spec(x + 1, z + 6, { geo: () => boxGeo(2, h1 - 4, 12.2, x + 0.85, CURB + 2, z + 6), mat: () => flatMat(acc, { key: 'acc' + acc }), box: [x, z, x + 2, z + 12, h1], color: acc });
           for (const lx of [x + cut * 0.5, x + cut + (len - cut) * 0.5]) spec(lx, z + 6, { geo: () => boxGeo(5, 3, 6, lx, CURB + (lx < x + cut ? h1 : h2), z + 6), mat: () => flatMat(0x9a9c98, { key: 'plant' }), box: [lx - 2, z + 4, lx + 2, z + 8, 3], color: 0x9a9c98 });
         }
