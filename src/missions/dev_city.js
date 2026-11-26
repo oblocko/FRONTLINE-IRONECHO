@@ -16,9 +16,15 @@ export const SPOTS = [
   { id: 'culture', name: '공연 · 맛집 골목', pos: [-885, -60], yaw: 0 },
   { id: 'station', name: '중앙역', pos: [330, -160], yaw: 0 },
   { id: 'old', name: '옛 도심 대로', pos: [-6, -30], yaw: Math.PI },
+  { id: 'river', name: '석촌천 · 다리', pos: [395, 60], yaw: -Math.PI / 2 },
+  { id: 'hanriver', name: '한강 다리', pos: [0, -760], yaw: 0 },
+  { id: 'subw', name: '서부 부도심', pos: [-985, 640], yaw: 0 },
+  { id: 'sube', name: '동부 부도심', pos: [1355, 640], yaw: 0 },
+  { id: 'green', name: '개발제한구역', pos: [-1430, 1300], yaw: Math.PI * 0.75 },
+  { id: 'sat', name: '위성 도시', pos: [-2750, 1450], yaw: 0 },
 ];
 export async function build(game) {
-  const lv = new SeoulMetro(game, { bounds: { minX: -950, maxX: 718, minZ: -435, maxZ: 435 } }); game.level = lv; await lv.build();
+  const lv = new SeoulMetro(game, { bounds: { minX: -3300, maxX: 3800, minZ: -1450, maxZ: 2000 } /* the whole metropolitan area + the satellite towns */ }); game.level = lv; await lv.build();
   game.squad = {}; game.squadList = [];
 }
 const spotOf = (game) => SPOTS.find((s) => s.id === game.freeRoam?.spot) ?? SPOTS[0];

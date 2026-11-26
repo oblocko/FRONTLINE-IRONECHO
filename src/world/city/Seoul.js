@@ -23,7 +23,7 @@ import { groundMat } from './CityMaterials.js';
 import { buildNewDistrict, inLake } from './NewDistrict.js';
 import { buildHaneulDistrict } from './HaneulDistrict.js';
 import { CityLod } from './CityLod.js';
-import { Region } from './Region.js';
+import { Region, outerGround, REGION_EXT } from './Region.js';
 import { carType } from '../korea/Cars.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -44,6 +44,7 @@ export function buildSeoul(game, { station = null, early = null, corridors = [],
     if (S && x > 290) return x > S.pit[0] && x < S.pit[1] && z > S.z0 && z < S.z1 ? -1.3 : 0;
     if (x > 216 && inLake(x, z)) return -0.9;
     for (const r of plan.carriageways) if (r.rect.has(x, z)) return 0;
+    if (x < REGION_EXT.x0 - 150 || x > REGION_EXT.x1 + 150 || z < REGION_EXT.z0 - 150 || z > REGION_EXT.z1 + 150) return outerGround(x, z);   // greenbelt hills, satellite towns
     return CURB;
   };
   plan.heightFn = heightFn;

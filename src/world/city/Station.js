@@ -174,7 +174,28 @@ export function footbridge(ctx, { x0, z0, x1, z1 }) {
   const m = flatMat(0xe0dcd4, { roughness: 0.6, key: 'fbdeck' }), gl = flatMat(0x9ab4c2, { roughness: 0.08, metalness: 0.3, key: 'fbglass' });
   batch.box(m, x1 - x0, 0.8, w, (x0 + x1) / 2, y, z0); batch.box(m, w, 0.8, Math.abs(z1 - z0), x1, y, (z0 + z1) / 2);
   for (const s of [-1, 1]) { batch.box(gl, x1 - x0, 1.1, 0.06, (x0 + x1) / 2, y + 0.95, z0 + s * w / 2); batch.box(gl, 0.06, 1.1, Math.abs(z1 - z0), x1 + s * w / 2, y + 0.95, (z0 + z1) / 2); }
-  for (const [px, pz] of [[x0 + 20, z0], [(x0 + x1) / 2, z0], [x1, (z0 + z1) / 2]]) { batch.box(m, 1.2, y - CURB, 1.2, px, (y + CURB) / 2, pz); }
+  for (const [px, pz] of [[x0 + 20, z0], [(x0 + x1) / 2, z0], [x1, (z0 + z1) / 2]]) { batch.box(m, 1.2, y - CURB, 1.2, px, (y + CURB) / 2, pz); world.addBox(V(px - 0.6, 0, pz - 0.6), V(px + 0.6, y - 0.4, pz + 0.6), { surface: 'concrete', cover: true, walkable: false }); }
+  // walkable: the deck, glass parapets that hold you in, and a stair down at each end (west onto the station plaza,
+  // south onto the landmark forecourt)
+  const top = y + 0.4, h2 = w / 2, wall = (a, b) => world.addBox(V(...a), V(...b), { surface: 'glass', cover: false, walkable: false });
+  world.addBox(V(x0, y - 0.4, z0 - h2), V(x1 + h2, top, z0 + h2), { surface: 'concrete', walkable: true });
+  world.addBox(V(x1 - h2, y - 0.4, z0 - h2), V(x1 + h2, top, z1), { surface: 'concrete', walkable: true });
+  wall([x0, top, z0 - h2 - 0.05], [x1 + h2, top + 1.1, z0 - h2 + 0.05]); wall([x0, top, z0 + h2 - 0.05], [x1 - h2, top + 1.1, z0 + h2 + 0.05]);
+  wall([x1 + h2 - 0.05, top, z0 - h2], [x1 + h2 + 0.05, top + 1.1, z1]); wall([x1 - h2 - 0.05, top, z0 + h2], [x1 - h2 + 0.05, top + 1.1, z1]);
+  const st = wallMat('stone', 0xb8b4ac), N = Math.ceil((top - CURB) / 0.18), rise = (top - CURB) / N, run = 0.3, sw = 3.4;
+  for (const [ax, az, dx, dz] of [[x0, z0, -1, 0], [x1, z1, 0, 1]]) {
+    for (let k = 0; k < N; k++) {   // step k: its top is k+1 risers below the deck, k runs out from the deck end
+      const t = top - (k + 1) * rise, a = k * run, cx = ax + dx * (a + run / 2), cz = az + dz * (a + run / 2), sx = dx ? run : sw, sz = dx ? sw : run;
+      batch.box(st, sx, t - CURB, sz, cx, (t + CURB) / 2, cz);
+      world.addBox(V(cx - sx / 2, CURB, cz - sz / 2), V(cx + sx / 2, t, cz + sz / 2), { surface: 'concrete', walkable: true });
+    }
+    const L = N * run, mx = ax + dx * L / 2, mz = az + dz * L / 2;
+    for (const s of [-1, 1]) {   // side parapets along the stair (glass on a stone kerb), sloping with it
+      const ox = dz ? s * (sw / 2 + 0.05) : 0, oz = dx ? s * (sw / 2 + 0.05) : 0, g = new THREE.BoxGeometry(dx ? Math.hypot(L, top - CURB) : 0.06, 1.0, dz ? Math.hypot(L, top - CURB) : 0.06);
+      if (dx) g.rotateZ(dx * Math.atan2(top - CURB, L)); else g.rotateX(-dz * Math.atan2(top - CURB, L)); g.translate(mx + ox, (top + CURB) / 2 + 0.9, mz + oz); batch.add(g, gl);
+      for (let k = 0; k < N; k += 4) { const t = top - (k + 1) * rise, cx = ax + dx * (k * run + 0.6) + ox, cz = az + dz * (k * run + 0.6) + oz; wall([cx - 0.06 - (dx ? 0.6 : 0), t, cz - 0.06 - (dz ? 0.6 : 0)], [cx + 0.06 + (dx ? 0.6 : 0), t + 1.1, cz + 0.06 + (dz ? 0.6 : 0)]); }
+    }
+  }
   plan.add({ kind: 'structure', id: 'footbridge', rect: new Rect(x0, z0 - w / 2, x1 + w / 2, z1), y0: y - 0.4, h: 2, tags: ['elevated', 'onRoad'] });
 }
 
