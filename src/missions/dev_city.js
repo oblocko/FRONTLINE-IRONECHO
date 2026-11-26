@@ -24,7 +24,7 @@ export const SPOTS = [
   { id: 'sat', name: '위성 도시', pos: [-2750, 1450], yaw: 0 },
 ];
 export async function build(game) {
-  const lv = new SeoulMetro(game, { bounds: { minX: -3300, maxX: 3800, minZ: -1450, maxZ: 2000 } /* the whole metropolitan area + the satellite towns */ }); game.level = lv; await lv.build();
+  const lv = new SeoulMetro(game, { bounds: { minX: -3300, maxX: 3800, minZ: -2050, maxZ: 2000 } /* the whole metropolitan area + the satellite towns */, navBounds: { minX: -950, maxX: 718, minZ: -435, maxZ: 435 } /* AI / nav grid: the detailed streets only (a 1 m grid over the whole region froze the page) */ }); game.level = lv; await lv.build();
   game.squad = {}; game.squadList = [];
 }
 const spotOf = (game) => SPOTS.find((s) => s.id === game.freeRoam?.spot) ?? SPOTS[0];

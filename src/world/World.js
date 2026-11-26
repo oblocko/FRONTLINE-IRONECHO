@@ -26,9 +26,15 @@ export class World {
     return this.addBox(center.clone().sub(h), center.clone().add(h), opts);
   }
   removeCollider(c) {
-    this.colliders = this.colliders.filter((x) => x !== c);
-    for (const set of this.grid.values()) set.delete(c);
+    const i = this.colliders.indexOf(c); if (i >= 0) this.colliders.splice(i, 1);
+    this.unindex(c);
     this.navRegion(c);
+  }
+  // drop a collider from the grid cells it covers (not every cell of the world: the Seoul region has ~10^5)
+  unindex(c) {
+    const s = this.cell;
+    for (let x = Math.floor(c.min.x / s); x <= Math.floor(c.max.x / s); x++)
+      for (let z = Math.floor(c.min.z / s); z <= Math.floor(c.max.z / s); z++) this.grid.get(x * 73856093 ^ z * 19349663)?.delete(c);
   }
   index(c) {
     const s = this.cell;
@@ -46,7 +52,7 @@ export class World {
     return out;
   }
   moveCollider(c, dx, dy, dz) {
-    for (const set of this.grid.values()) set.delete(c);
+    this.unindex(c);
     const old = { min: c.min.clone(), max: c.max.clone() };
     c.min.x += dx; c.max.x += dx; c.min.y += dy; c.max.y += dy; c.min.z += dz; c.max.z += dz;
     this.index(c); this.navRegion(old); this.navRegion(c);
@@ -160,7 +166,7 @@ export class World {
 
   // ---------- navigation grid ----------
   buildNav(cellSize = 1.0) {
-    const b = this.bounds; const cs = cellSize;
+    const b = this.navBounds || this.bounds; const cs = cellSize;   // navBounds: a level whose roaming bounds are huge (Seoul region) keeps the AI grid on the detailed streets
     const w = Math.ceil((b.maxX - b.minX) / cs), h = Math.ceil((b.maxZ - b.minZ) / cs);
     this.nav = { w, h, cs, blocked: new Uint8Array(w * h), heights: new Float32Array(w * h), minX: b.minX, minZ: b.minZ, comp: null };
     for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) this.navCompute(i, j);

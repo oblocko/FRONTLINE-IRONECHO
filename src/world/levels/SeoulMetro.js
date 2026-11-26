@@ -21,7 +21,7 @@ export class SeoulMetro {
   constructor(game, opts = {}) { this.game = game; this.opts = opts; }
   async build() {
     const g = this.game, w = g.world;
-    w.bounds = { ...(this.opts.bounds || METRO.bounds) };
+    w.bounds = { ...(this.opts.bounds || METRO.bounds) }; w.navBounds = this.opts.navBounds ? { ...this.opts.navBounds } : null;
     this.atmosphere();
     const city = buildSeoul(g, { corridors: this.opts.corridors || [], jam: !!this.opts.jam, early: (ctx) => this.buildOverpass(165, ctx) });
     this.city = city; this.plan = city.plan; this.report = city.report; this.kit = city.kit; this.hf = w.heightFn;
