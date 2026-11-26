@@ -61,7 +61,9 @@ export function ammoFromDead(game, m, { giveRifle } = {}) {
           const had = !!game.weapons.inventory.carbine;
           gun.parent?.remove(gun); a.actor.droppedWeapon = null; it.enabled = false; p.removeInteractable(it);
           game.audio.click(0.3, 1500, 0.05);
-          if (!giveRifle(game) && had) { const got = game.weapons.addAmmo('carbine', 30); game.ui.hint(`탄약 +${got}`, 1.5); }
+          // no giveRifle hook (M07, M08): an empty-handed pick-up gives the carbine, otherwise it is ammo
+          const gave = giveRifle ? giveRifle(game) : (!had && (game.weapons.give('carbine', { mag: 30, reserve: 30 }), game.weapons.equip('carbine'), true));
+          if (!gave && had) { const got = game.weapons.addAmmo('carbine', 30); game.ui.hint(`탄약 +${got}`, 1.5); }
         } });
         m.bind(() => p.removeInteractable(it));
       }
