@@ -12,9 +12,9 @@ export class Traffic {
   // opts: { y (road surface), maxCars }
   constructor(game, { y = 0, rnd = Math.random } = {}) { this.game = game; this.y = y; this.rnd = rnd; this.lanes = []; this.junctions = []; this.cars = []; this.t = 0; }
   // a straight lane from a to b ([x, z]); axis 'ns' | 'ew' decides which signal phase it obeys
-  lane(a, b, { speed = 11, axis = null, count = 4, y = null } = {}) {
+  lane(a, b, { speed = 11, axis = null, count = 4, y = null, junctions = null } = {}) {
     const dx = b[0] - a[0], dz = b[1] - a[1], len = Math.hypot(dx, dz);
-    const L = { a, b, len, y, dir: [dx / len, dz / len], speed, axis: axis ?? (Math.abs(dz) > Math.abs(dx) ? 'ns' : 'ew'), cars: [] };
+    const L = { a, b, len, y, dir: [dx / len, dz / len], speed, axis: axis ?? (Math.abs(dz) > Math.abs(dx) ? 'ns' : 'ew'), cars: [], junctions };   // junctions: this lane's own (long lanes in the region), else all
     this.lanes.push(L);
     for (let i = 0; i < count; i++) this.addCar(L, (i + this.rnd() * 0.5) * len / count);
     return L;
@@ -52,7 +52,7 @@ export class Traffic {
         if (ahead) { const gap = ahead.s - c.s - (ahead.len + c.len) / 2; limit = Math.min(limit, Math.max(0, (gap - 3) * 1.2)); }
         // signals: stop before a junction box on red / the other axis' green
         const x = L.a[0] + L.dir[0] * c.s, z = L.a[1] + L.dir[1] * c.s;
-        if (phase !== L.axis) for (const J of this.junctions) {
+        if (phase !== L.axis) for (const J of L.junctions ?? this.junctions) {
           const inside = (px, pz) => px > J.x0 && px < J.x1 && pz > J.z0 && pz < J.z1;
           if (inside(x, z)) continue;   // already in: clear it
           for (let d = 1; d < 22; d += 1.5) { if (inside(x + L.dir[0] * (d + c.len / 2), z + L.dir[1] * (d + c.len / 2))) { limit = Math.min(limit, Math.max(0, (d - 2) * 0.9)); break; } }
