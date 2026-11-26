@@ -22,13 +22,15 @@ export function mergeGeos(gs) { const pos = [], nor = []; for (const g0 of gs) {
   const m = new THREE.BufferGeometry(); m.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); m.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); m.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(pos.length / 3 * 2), 2)); return m; }
 
 // sidewalk: light grey interlocking blocks with a few warm-tinted ones and worn joints (tile = 2 m)
-function sidewalkMat() {
+let SWM = null;
+export function sidewalkMat() {
+  if (SWM) return SWM;
   const cv = document.createElement('canvas'); cv.width = cv.height = 256; const g = cv.getContext('2d'); let s = 5; const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
   g.fillStyle = '#8e8a84'; g.fillRect(0, 0, 256, 256);
   for (let y = 0; y < 256; y += 16) for (let x = (y / 16) % 2 ? -16 : 0; x < 256; x += 32) { const v = 178 + r() * 26, warm = r() < 0.12 ? 18 : 0; g.fillStyle = `rgb(${v + warm},${v - 2},${v - 8 - warm})`; g.fillRect(x + 1, y + 1, 30, 14); }
   for (let i = 0; i < 600; i++) { g.fillStyle = `rgba(60,56,50,${r() * 0.12})`; g.fillRect(r() * 256, r() * 256, 2, 2); }
   const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4;
-  const m = new THREE.MeshStandardMaterial({ map: t, roughness: 0.85 }); m.userData.texMeters = 2; return m;
+  const m = new THREE.MeshStandardMaterial({ map: t, roughness: 0.85 }); m.userData.texMeters = 2; SWM = m; return m;
 }
 // open ground / lots / courtyards: light concrete paving, expansion joints every 4 m, weathering (tile = 8 m)
 let LOT = null;

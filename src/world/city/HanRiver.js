@@ -14,6 +14,7 @@ import * as THREE from 'three';
 import { CURB } from './Streets.js';
 import { wallMat, flatMat, groundMat } from './CityMaterials.js';
 import { waterMat, worldUV } from './Water.js';
+import { sidewalkMat } from './RegionStreets.js';
 
 export const HAN = { hw: 250, dun: 72, lev: 26, water: -10, dunY: -6.4, bed: -16, xa: -1660, xb: 2060 };
 HAN.half = HAN.hw + HAN.dun + HAN.lev;
@@ -65,7 +66,7 @@ export function buildHan({ B, world, scene, rnd, tree }) {
   const H = HAN, xa = H.xa, xb = H.xb, W = (min, max, o = {}) => world?.addBox(new THREE.Vector3(...min), new THREE.Vector3(...max), { surface: 'concrete', ...o });
   const asph = groundMat('asphalt', { roughness: 0.85 }), lawn = groundMat('lawn'), conc = wallMat('concrete', 0xb0aea6), stone = dbl(wallMat('stone', 0x9a968a));
   const rail = flatMat(0x50565a, { metalness: 0.5, roughness: 0.5, key: 'hanrail' }), white = flatMat(0xe8e8e2, { key: 'hanline' }), yellow = flatMat(0xd8b020, { key: 'hwyline' });
-  const bikeM = flatMat(0x9a5446, { roughness: 0.9, key: 'hanbike' }), walkM = groundMat('plaza', { color: 0xb4b0a6 });
+  const bikeM = flatMat(0x9a5446, { roughness: 0.9, key: 'hanbike' }), walkM = sidewalkMat();
   // water (the river continues past the city into the plain), river bed
   const water = new THREE.Mesh(worldUV(ribbon(-4600, 5000, 40, (x) => [hanC(x) - H.hw - 30, H.water], (x) => [hanC(x) + H.hw + 30, H.water])), waterMat(0x2a4c54));
   water.userData.lodAlways = true; water.userData.region = true; scene.add(water);
@@ -132,7 +133,7 @@ export function buildHan({ B, world, scene, rnd, tree }) {
       for (const ox of [-6.8, 6.8]) B.add(box(0.3, 4.4, 0.3, x + ox, y + 0.8, zc + s * 9.8), rail);
       W([x - 7, y, zc + s * 6 - 4], [x + 7, y + 0.8, zc + s * 6 + 4], { walkable: true });
     } else if (kind === 'bikes') {   // 따릉이-like rental stand
-      B.add(box(16, 0.05, 2.2, x, y + 0.02, zc), groundMat('plaza', { color: 0x8a8a84 }), { cast: false });
+      B.add(box(16, 0.05, 2.2, x, y + 0.02, zc), sidewalkMat(), { cast: false });
       for (let k = 0; k < 10; k++) { B.add(box(0.06, 0.9, 1.7, x - 7 + k * 1.5, y + 0.1, zc), flatMat(0x2a8a4a, { key: 'rbike' })); B.add(new THREE.TorusGeometry(0.33, 0.04, 4, 10).rotateY(Math.PI / 2).translate(x - 7 + k * 1.5, y + 0.4, zc - 0.55), rail, { cast: false }); }
       B.add(box(0.5, 1.6, 0.4, x - 8.5, y, zc), flatMat(0x2a8a4a, { key: 'rbike' }));
     }
@@ -173,7 +174,7 @@ export function buildHan({ B, world, scene, rnd, tree }) {
     const sm = flatMat(steel, { roughness: 0.5, metalness: 0.45, key: 'brsteel' + T });
     // deck, asphalt, lane paint, sidewalks, parapets, lamps
     B.add(box(30, 2.35, L, x, dbot, zm), conc); B.add(box(29.6, 0.05, L, x, CURB - 0.04, zm), asph, { cast: false });
-    for (const o of [-12.6, 12.6]) B.add(box(2.6, 0.05, L, x + o + Math.sign(o) * 0.6, CURB - 0.02, zm), groundMat('plaza', { color: 0xa8a49a }), { cast: false });
+    for (const o of [-12.6, 12.6]) B.add(box(2.6, 0.05, L, x + o + Math.sign(o) * 0.6, CURB - 0.02, zm), sidewalkMat(), { cast: false });
     const med = T === 'arch' ? 4.6 : 0.4; for (const o of [-med, med]) B.add(box(0.15, 0.02, L, x + o, CURB + 0.02, zm), yellow, { cast: false });
     for (const o of [-7.6, -3.9, 3.9, 7.6]) { if (T === 'arch' && Math.abs(o) < 5) continue; for (let z = zN; z < zS - 6; z += 12) B.add(box(0.15, 0.02, 6, x + o + (T === 'arch' ? Math.sign(o) * 1.2 : 0), CURB + 0.02, z + 3), white, { cast: false }); }
     W([x - 15, dbot, zN], [x + 15, CURB, zS], { walkable: true });
@@ -251,7 +252,7 @@ export function buildHan({ B, world, scene, rnd, tree }) {
     } else if (T === 'double') {   // 물빛대교 + 물빛잠수교 underneath at the 둔치 level, rainbow fountain on the upper deck's edges
       const lz0 = c - H.hw - 6, lz1 = c + H.hw + 6, ly = H.dunY;
       B.add(box(18, 1.4, lz1 - lz0, x, ly - 1.4, (lz0 + lz1) / 2), conc); B.add(box(13, 0.05, lz1 - lz0, x, ly, (lz0 + lz1) / 2), asph, { cast: false });
-      for (const o of [-7.8, 7.8]) B.add(box(2.4, 0.06, lz1 - lz0, x + o, ly, (lz0 + lz1) / 2), groundMat('plaza', { color: 0xa8a49a }), { cast: false });
+      for (const o of [-7.8, 7.8]) B.add(box(2.4, 0.06, lz1 - lz0, x + o, ly, (lz0 + lz1) / 2), sidewalkMat(), { cast: false });
       W([x - 9, ly - 1.4, lz0], [x + 9, ly, lz1], { walkable: true });
       for (const o of [-9, 9]) { for (let z = lz0 + 2; z < lz1; z += 3) B.add(box(0.1, 1.0, 0.1, x + o, ly, z), rail, { cast: false }); B.add(box(0.08, 0.08, lz1 - lz0, x + o, ly + 1.0, (lz0 + lz1) / 2), rail, { cast: false }); W([x + o - 0.1, ly, lz0 + 4], [x + o + 0.1, ly + 1.1, lz1 - 4], { surface: 'metal', walkable: false }); }
       for (let z = lz0 + 20; z < lz1 - 10; z += 30) if (!pierZ.some((pz) => Math.abs(pz - z) < 6)) B.add(box(12, ly - 1.4 - H.bed, 2.4, x, H.bed, z), conc);

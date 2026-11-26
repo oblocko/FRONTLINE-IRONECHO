@@ -21,7 +21,7 @@ import { CURB } from './Streets.js';
 import { DISTRICT as HAND } from './HaneulDistrict.js';
 import { frontSigns, facility } from './RegionExtras.js';
 import { HAN, hanC, hanNorth, hanSouth, inHan, buildHan } from './HanRiver.js';
-import { blockStreetscape, arterialScape, tickSignals, lotMat } from './RegionStreets.js';
+import { blockStreetscape, arterialScape, tickSignals, lotMat, sidewalkMat } from './RegionStreets.js';
 import { Traffic } from './Traffic.js';
 import { shopDetails, villaPiloti, towerDetails, complexDetails, slabDetails, parkingRow, officeDetails, civic, CIVIC } from './RegionBuildings.js';
 
@@ -214,7 +214,7 @@ export class Region {
         const mid = (z0 + z1) / 2 > hanC((x0 + x1) / 2) ? 's' : 'n'; if (mid === 's') z0 = Math.max(z0, zs); else z1 = Math.min(z1, zn);
         if (z1 - z0 >= 8 && z1 - z0 < 30 && !inCore(x0 - 30, z0 - 30, x1 + 30, z1 + 30) && !inHand(x0, z0, x1, z1)) { const za = z0, zb = z1;
           spec((x0 + x1) / 2, (za + zb) / 2, { geo: () => boxGeo(x1 - x0, 0.05, zb - za, (x0 + x1) / 2, CURB, (za + zb) / 2), mat: () => groundMat('lawn'), box: [x0, za, x1, zb, 0.05], color: 0x56603a, np: true });
-          spec((x0 + x1) / 2, (za + zb) / 2, { geo: () => boxGeo(x1 - x0, 0.04, 2.4, (x0 + x1) / 2, CURB + 0.02, (za + zb) / 2), mat: () => groundMat('plaza', { color: 0xd8d0c0 }), box: [x0, za, x1, zb, 0.05], color: 0xd8d0c0, np: true });
+          spec((x0 + x1) / 2, (za + zb) / 2, { geo: () => boxGeo(x1 - x0, 0.04, 2.4, (x0 + x1) / 2, CURB + 0.02, (za + zb) / 2), mat: () => sidewalkMat(), box: [x0, za, x1, zb, 0.05], color: 0xd8d0c0, np: true });
           for (let x = x0 + 5; x < x1 - 3; x += 9) for (const zz of [za + 2.5, zb - 2.5]) if (zb - za > 9 && rnd() < 0.8) treeSpec(spec, x + rnd() * 3, zz, 0.8 + rnd() * 0.5); continue; } }
       if (x1 - x0 < 24 || z1 - z0 < 24 || inCore(x0 - 30, z0 - 30, x1 + 30, z1 + 30) || inRiver(z0, z1, x0, x1, 0)) continue;
       if (a2 < nx - 1 && !inHand(x1, z0, x1 + st, z1 + st)) B.add(boxGeo(st, 0.04, z1 - z0 + st, x1 + st / 2, CURB - 0.02, (z0 + z1) / 2), asph, { cast: false });
