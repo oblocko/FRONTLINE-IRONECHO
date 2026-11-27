@@ -85,7 +85,10 @@ async function clear(game, m, id, text, list, { timeout = 900 } = {}) {
 }
 // a bar on the HUD (progress / breath)
 function bar(game, m, label) {
-  const el = document.createElement('div'); el.className = 'stealth-meter'; el.innerHTML = `<div class="lbl">${label}</div><div class="bar"><i></i></div><div class="st"></div>`; game.ui.hud.appendChild(el);
+  const el = document.createElement('div'); el.className = 'stealth-meter'; el.innerHTML = `<div class="lbl">${label}</div><div class="bar"><i></i></div><div class="st"></div>`;
+  const used = new Set([...game.ui.hud.querySelectorAll('.stealth-meter')].map((e) => e.dataset.slot)); let slot = 0; while (used.has(String(slot))) slot++;
+  el.dataset.slot = slot; el.style.top = `${92 + slot * 54}px`;   // a second bar (breath, progress) stacks under the first
+  game.ui.hud.appendChild(el);
   const off = m.bind(() => el.remove());
   return { set(v, txt = '', cls = '') { el.querySelector('i').style.width = `${Math.round(Math.max(0, Math.min(1, v)) * 100)}%`; el.querySelector('.st').textContent = txt; el.classList.toggle('warn', cls === 'warn'); el.classList.toggle('danger', cls === 'danger'); }, remove() { el.remove(); off(); } };
 }
@@ -152,7 +155,6 @@ function buildRib() {
   const con = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.9, 0.6), dark); con.position.set(0, 0.62, -1.1); g.add(con);
   const ws = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.35), new THREE.MeshStandardMaterial({ color: 0x9ab0b8, transparent: true, opacity: 0.3, side: THREE.DoubleSide })); ws.position.set(0, 1.22, -0.84); ws.rotation.x = -0.4; g.add(ws);
   const eng = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.95, 0.55), dark); eng.position.set(0, 0.62, -3.1); g.add(eng);
-  const bags = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.35, 0.6), new THREE.MeshStandardMaterial({ color: 0x1a1e1a, roughness: 0.9 })); bags.position.set(-0.3, 0.36, 1.7); g.add(bags);
   return g;
 }
 function toTunnel(game) { const lv = game.level; lv.setArea('tunnel'); game.player.teleport(V(403, 0, 0.5), facing(1, 0)); }
@@ -197,9 +199,9 @@ export const SEGMENTS = [
       const boat = buildRib(); game.renderer.scene.add(boat); lv.boat = boat;
       const path = new THREE.CatmullRomCurve3([V(-150, 0, 230), V(-132, 0, 185), V(-112, 0, 140), V(-96, 0, 100), V(-89, 0, 72), V(-86.5, 0, 57.5)]);
       const len = path.getLength(); let u = 0, v = 4.5, target = 4.5;
-      const place = () => { const a = path.getPoint(u), b = path.getPoint(Math.min(1, u + 0.01)); const yaw = Math.atan2(b.x - a.x, b.z - a.z); const [gx, gz] = lv.seaTilt(a.x, a.z); const fwd = gx * Math.sin(yaw) + gz * Math.cos(yaw), side = gx * Math.cos(yaw) - gz * Math.sin(yaw); boat.position.set(a.x, lv.seaY(a.x, a.z) + 0.05, a.z); boat.rotation.set(-Math.atan(fwd) * 0.8, yaw, Math.atan(side) * 0.8, 'YXZ'); };
+      const place = () => { const a = path.getPoint(u), b = path.getPoint(Math.min(1, u + 0.01)); const yaw = Math.atan2(b.x - a.x, b.z - a.z); const [gx, gz] = lv.seaTilt(a.x, a.z); const fwd = gx * Math.sin(yaw) + gz * Math.cos(yaw), side = gx * Math.cos(yaw) - gz * Math.sin(yaw); boat.position.set(a.x, lv.seaY(a.x, a.z) + 0.2, a.z); boat.rotation.set(-Math.atan(fwd) * 0.6, yaw, Math.atan(side) * 0.6, 'YXZ'); };
       place();
-      p.enterSeat(boat, { offset: V(0.55, 1.12, 0.5), yawBase: Math.PI, yawRange: Math.PI * 0.95, pitchRange: [-0.6, 0.5] });
+      p.enterSeat(boat, { offset: V(0.3, 1.45, 0.3), yawBase: Math.PI, yawRange: Math.PI * 0.95, pitchRange: [-0.6, 0.5] });
       game.weapons.hidden = true;
       const nadia = nadiaAt(game, boat.position.clone()); const unN = ride(m, nadia, boat, V(-0.2, 0.2, -1.7));
       const eng = game.audio.engineLoop?.('truck'); eng?.set(0.35, 0.35);
@@ -250,7 +252,7 @@ export const SEGMENTS = [
       const lv = game.level, p = game.player, L = CH.ledge, P = CH.plat;
       let nadia = lv.nadia; nadia.hold(nadia.position.clone()); nadia.lookAt(p.position);
       const split = nadiaSplits();
-      await m.talk(split ? [
+      const opening = m.talk(split ? [
         ['nadia', '보안실은 내가 맡을게. 저 서쪽 골짜기에 옛날 등반로가 있어. 고정 로프가 아직 붙어 있다면.', { priority: 3 }],
         ['daniel', '"있다면"이 마음에 걸리는데.', { priority: 3 }],
         ['nadia', '내 걱정은 위에서 해. 카메라를 끄고 무전을 막을게. 당신은 그 파일만 생각해.', { priority: 3 }],
@@ -262,7 +264,9 @@ export const SEGMENTS = [
         ['daniel', '그럼 카메라는 살아 있겠군.', { priority: 3 }],
         ['nadia', '그럼 카메라에 안 걸리면 되겠네.', { priority: 3 }],
       ]);
-      if (split) { nadia.moveTo(V(CH.land.x - 10, CH.SHELF, 46), { run: false }); m.spawn(async () => { await m.wait(5); dropNadia(game); }); nadia = null; }
+      // the mechanics run from the first step; the talk plays over them
+      if (split) { const n0 = nadia; m.spawn(async () => { await opening; n0.moveTo(V(CH.land.x - 10, CH.SHELF, 46), { run: false }); await m.wait(5); dropNadia(game); }); nadia = null; }
+      else m.spawn(() => opening);
       game.objectives.add('climb', '절벽을 올라 펌프실로', { marker: CH.pumpDoor.clone().setY(P.y + 2) });
       game.objectives.add('ladder', '버트레스의 사다리', { marker: V(CH.ladder.x0 - 0.2, CH.SHELF + 2.5, (CH.ladder.z0 + CH.ladder.z1) / 2) });
       game.ui.hint(`사다리를 마주 보고 ${k(game, 'forward')} — 위에서는 오른쪽(동쪽)으로 올라선다`, 6);
@@ -290,7 +294,7 @@ export const SEGMENTS = [
       const det = detector(game, m, '발각 위험', [beamSrc, () => seeRate(game, sentry, 16)], onSpot);
       m.every(() => { if (spotted) return false; const s = game.weapons.lastShot; if (s && s !== lv._lastShot) { lv._lastShot = s; if (!s.suppressed) det.bump(1); else if (!sentry.dead && sentry.position.distanceTo(p.position) < 8) det.bump(0.4); } });
       // gusts on the ledge: a warning, then 2 s of wind pushing toward the drop; crouch against the rock to ride it out
-      let gustT = 5, gust = 0;
+      let gustT = 5, gust = 0, gustN = 0;
       const onLedge = () => p.position.x > L.x0 - 1 && p.position.x < L.x1 && Math.abs(p.position.y - L.y) < 0.6 && p.position.z < L.z1 + 0.4;
       let ledgeTold = false;
       m.every((dt) => {
@@ -301,9 +305,9 @@ export const SEGMENTS = [
         if (gustT <= 1.4 && gustT + dt > 1.4) { game.ui.hint('<b>돌풍!</b>', 1.4); game.audio.startWind?.(0.34); }
         if (gustT <= 0 && gust <= 0) { gust = 2.2; }
         if (gust > 0) {
-          gust -= dt; const push = (p.crouching ? 0.16 : 1.25) * dt; game.world.moveCylinder(p.position, V(push * 0.15, 0, push), p.radius, 1.75, 0.45); p.addShake?.(0.02);
+          gust -= dt; const push = (p.crouching ? 0.16 : gustN === 0 ? 0.3 : 1.25) * dt;   // the first gust only shoves: it teaches game.world.moveCylinder(p.position, V(push * 0.15, 0, push), p.radius, 1.75, 0.45); p.addShake?.(0.02);
           if (Math.random() < dt * 6) game.effects.smoke.spawn({ x: p.position.x + rand(-3, 3), y: L.y - 2, z: 43, vx: 1, vy: 3, vz: -4, size: 1, endSize: 3.5, life: 1.2, alpha: 0.35, r: 0.85, g: 0.88, b: 0.9, drag: 0.5 });
-          if (gust <= 0) { gustT = rand(6, 10); game.audio.startWind?.(0.16); }
+          if (gust <= 0) { gustT = rand(6, 10); game.audio.startWind?.(0.16); if (gustN++ === 0) game.ui.hint(`다음 돌풍은 더 세다 — ${k(game, 'crouch')} 앉아서 벽 쪽에 붙어라`, 5); }
         }
       });
       m.spawn(async () => { await m.until(() => onLedge(), 900); await m.say('maya', '바위턱 위야? 그 동네 풍속계가 초속 25미터를 찍고 있어. 붙어서 가.', { radio: true, priority: 2 }); });
@@ -372,7 +376,7 @@ export const SEGMENTS = [
         // breath under the baffle
         const breath = { v: 1 }; let b = null; let told = false;
         m.every((dt) => {
-          if (lv.under) { if (!b) b = bar(game, m, '호흡'); breath.v = Math.max(0, breath.v - dt / 24); b.set(breath.v, breath.v < 0.3 ? '숨이 차오른다 — 수면으로!' : '숨을 참는 중', breath.v < 0.3 ? 'danger' : breath.v < 0.55 ? 'warn' : ''); if (breath.v <= 0 && Math.random() < dt * 2) p.takeDamage(9, null, null, { kind: 'mission', label: '익사' }); }
+          if (lv.under) { if (!b) b = bar(game, m, '호흡'); breath.v = Math.max(0, breath.v - dt / 28); b.set(breath.v, breath.v < 0.3 ? '숨이 차오른다 — 수면으로!' : '숨을 참는 중', breath.v < 0.3 ? 'danger' : breath.v < 0.55 ? 'warn' : ''); if (breath.v <= 0 && Math.random() < dt * 2) p.takeDamage(9, null, null, { kind: 'mission', label: '익사' }); }
           else { breath.v = Math.min(1, breath.v + dt / 3); if (b) { b.set(breath.v, '숨을 고르는 중'); if (breath.v >= 1) { b.remove(); b = null; } } }
           if (!told && p.position.x > D.x0 + 6 && lv.swimming) { told = true; game.ui.hint(`물이 천장까지 차 있다 — ${k(game, 'crouch')} 앉아서 잠수, 수문 아래를 지나 반대편에서 일어선다`, 7); }
           if (p.position.x > D.x1 + 8) { if (b) b.remove(); return false; }
@@ -428,8 +432,8 @@ export const SEGMENTS = [
         }
         m.every(() => { for (const cw of cams) cw.yaw = cw.c.yaw ?? cw.c.base; });
       } else for (const cw of cams) { cw.dead = true; cw.c.led.visible = false; cw.c.dead = true; }
-      // talk
-      await m.talk(nadiaSplits() ? [
+      // talk (in parallel: the guards are already walking)
+      m.spawn(() => m.talk(nadiaSplits() ? [
         ['nadia', '(무전) 보안실. 경비 둘은 묶어 뒀어. 카메라는 어제 화면을 반복해서 내보내는 중이야. 30분.', { radio: true }],
         ['daniel', '30분이면 넉넉해.', {}],
         ['nadia', '당신 일이 넉넉하게 끝난 적이 있었나?', { radio: true }],
@@ -437,7 +441,7 @@ export const SEGMENTS = [
         ['nadia', '(속삭이며) 천장 카메라. 다섯 대야. 랙 뒤로 붙어서 가.', {}],
         ['daniel', '아니면 렌즈를 쏘거나.', {}],
         ['nadia', '소리 안 나게라면.', {}],
-      ]);
+      ]));
       if (live) game.ui.hint('천장 카메라 — 시야에 오래 머물면 경보 · 소음 권총으로 쏴서 끌 수 있다', 6);
       // the rack: known from the Kestrel copy, or looked up at the asset terminal
       const known = flag('m07_server') === 'copy';
@@ -706,8 +710,9 @@ export const SEGMENTS = [
       m.spawn(async () => { await m.wait(9); T(fromWest.slice(0, 12), 12, 650, 'west1'); await m.wait(6); T(fromWest.slice(0, 10), 12, 650, 'west2'); });
       // keep them on the ground (the path is only sampled at its points)
       m.every(() => { for (const t of trucks) if (!t.dead) t.position.y = lv.hf(t.position.x, t.position.z); });
-      const path = [V(-26, 1.6, 12), V(-28, 14, 22), V(-70, 26, 75), V(-200, 30, 95), V(-360, 32, 85), V(-520, 34, 70), V(-660, 38, 60), V(-780, 44, 120), V(-760, 60, 320)];
-      const look = (q) => { let best = null, bd = 260; for (const t of trucks) { if (t.dead) continue; const d = Math.hypot(t.position.x - q.x, t.position.z - q.z); if (d < bd) { bd = d; best = t.position; } } return best; };
+      const path = [V(-26, 1.6, 12), V(-28, 14, 22), V(-70, 24, 60), V(-200, 28, 70), V(-360, 30, 66), V(-520, 32, 60), V(-610, 36, 85), V(-620, 52, 280)];
+      // the door (right-hand side) stays on the coast road: the nearest truck, or the road abeam when none is in range
+      const look = (q) => { let best = null, bd = 260; for (const t of trucks) { if (t.dead) continue; const d = Math.hypot(t.position.x - q.x, t.position.z - q.z); if (d < bd) { bd = d; best = t.position; } } return best || (q.z > 150 ? null : V(q.x - 25, 0, roadZ(q.x - 25))); };
       const run = fly(game, m, heli, path, { speed: 15, look });
       game.objectives.add('road', '도어건으로 추격 차량 저지');
       // the helicopter takes hits from trucks in range
@@ -745,7 +750,7 @@ export const SEGMENTS = [
       game.cine.letterbox(true);
       // out over the sea, the coast falling behind in the rain
       lv.noHazard = true; boardExfil(game);
-      const gun = lv.doorGun; if (!gun.manned) { gun.enabled = true; gun.mount(); } gun.locked = true;
+      const gun = lv.doorGun; if (!gun.manned) { gun.enabled = true; gun.mount(); game.ui.hint('', 0.01); } gun.locked = true;
       m.every(() => { gun.fireT = 1e9; });   // the gun is quiet now: just the view out of the door
       m.every((dt) => { heli.position.add(V(-dt * 6, Math.sin(m.time) * dt * 0.3, dt * 18)); heli.rotation.z = Math.sin(m.time * 0.9) * 0.04; });
       await m.talk([
@@ -777,7 +782,7 @@ export const SEGMENTS = [
       // ---- back in the helicopter ----
       if (u) u.tint.value.set(1, 1, 1); game.renderer.fx.desat = 0;
       lv.setArea('ext'); game.audio.startWind(0.16);
-      gun.mount(); gun.locked = true;
+      gun.mount(); gun.locked = true; game.ui.hint('', 0.01);
       events.emit('ui:fade', { to: 0, dur: 1.4 });
       await m.talk([
         ['daniel', '…그 순찰조는 자기들이 뭘 확인하러 나가는지 몰랐겠지.', { priority: 3 }],

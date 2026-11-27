@@ -19,6 +19,7 @@ import { Weather } from '../../render/Effects.js';
 import { settings } from '../../core/Settings.js';
 import { signTexture } from '../CityProps.js';
 import { buildCar } from '../korea/Cars.js';
+import { buildTruck } from '../Props.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 let seedN = 31; const rnd = () => ((seedN = (seedN * 16807) % 2147483647) / 2147483647);
@@ -87,7 +88,7 @@ export function heightAt(x, z) {
 }
 
 // ---- waves: one function for the sea mesh (GLSL) and anything floating (JS) --------------------------------
-const WAVES = [[-0.25, 1, 1.35, 52], [0.45, 1, 0.75, 27], [-0.8, 0.6, 0.45, 14], [0.2, 1, 0.22, 7.5]].map(([dx, dz, a, L]) => { const l = Math.hypot(dx, dz); const k = 2 * Math.PI / L; return { dx: dx / l, dz: dz / l, a, k, w: Math.sqrt(9.8 * k) }; });
+const WAVES = [[-0.25, 1, 0.95, 52], [0.45, 1, 0.5, 27], [-0.8, 0.6, 0.28, 14], [0.2, 1, 0.12, 7.5]].map(([dx, dz, a, L]) => { const l = Math.hypot(dx, dz); const k = 2 * Math.PI / L; return { dx: dx / l, dz: dz / l, a, k, w: Math.sqrt(9.8 * k) }; });
 export function waveH(x, z, t) { let h = 0; for (const w of WAVES) h += w.a * Math.sin(w.k * (w.dx * x + w.dz * z) - w.w * t); return h; }
 function waveGrad(x, z, t) { let gx = 0, gz = 0; for (const w of WAVES) { const c = w.a * w.k * Math.cos(w.k * (w.dx * x + w.dz * z) - w.w * t); gx += c * w.dx; gz += c * w.dz; } return [gx, gz]; }
 
@@ -141,6 +142,14 @@ const screenTex = (k) => canvasTex(`ch_scr${k}`, 256, 144, (g, W, H) => {
   }
 });
 
+// a light shaft: brightest at the lamp, fading along its length and toward its silhouette edges
+function beamMaterial(color, opacity, length) {
+  return new THREE.ShaderMaterial({ uniforms: { color: { value: new THREE.Color(color) }, opacity: { value: opacity }, len: { value: length } },
+    vertexShader: 'uniform float len; varying float vT; varying vec3 vN; varying vec3 vV; void main(){ vT = length(position) / len; vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }',
+    fragmentShader: 'uniform vec3 color; uniform float opacity; varying float vT; varying vec3 vN; varying vec3 vV; void main(){ float t = clamp(vT, 0.0, 1.0); float edge = pow(abs(dot(normalize(vN), normalize(vV))), 2.0); gl_FragColor = vec4(color, opacity * pow(1.0 - t, 1.6) * edge); }',
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+}
+
 export class CorrinHead {
   constructor(game) { this.game = game; this.anchors = []; this.area = null; this.areaMeshes = null; this.alarm = false; this.gas = 0; this.waterLevel = CH.WL_RUN; this.under = false; this.flashT = 8; this.time = 0; }
 
@@ -168,7 +177,12 @@ export class CorrinHead {
     const M = this.M = {};
     M.rock = pbr('rock', { color: 0x8e8880, key: 'ch_rock' });
     M.rockDark = pbr('rock', { color: 0x605c58, key: 'ch_rockd' });
-    M.moor = pbr('grassdead', { color: 0x7a7a5a, key: 'ch_moor' });
+    M.moor = new THREE.MeshStandardMaterial({ map: canvasTex('ch_moor', 512, 512, (g2, W, H) => {
+      g2.fillStyle = '#4e5238'; g2.fillRect(0, 0, W, H);
+      for (let i = 0; i < 260; i++) { const x = rnd() * W, y = rnd() * H, r = 8 + rnd() * 40; const c = rnd(); g2.fillStyle = c < 0.4 ? 'rgba(92,84,58,0.35)' : c < 0.75 ? 'rgba(58,70,40,0.4)' : 'rgba(84,66,70,0.3)'; g2.beginPath(); g2.ellipse(x, y, r, r * (0.6 + rnd() * 0.6), rnd() * 3, 0, 6.3); g2.fill(); }
+      for (let i = 0; i < 9000; i++) { const v = rnd(); g2.fillStyle = v < 0.5 ? 'rgba(120,118,80,0.5)' : v < 0.8 ? 'rgba(40,46,28,0.55)' : 'rgba(140,120,96,0.4)'; const x = rnd() * W, y = rnd() * H; g2.fillRect(x, y, 1.5, 2 + rnd() * 3); }
+      for (let i = 0; i < 40; i++) { g2.fillStyle = 'rgba(110,108,104,0.5)'; const x = rnd() * W, y = rnd() * H; g2.beginPath(); g2.ellipse(x, y, 3 + rnd() * 6, 2 + rnd() * 4, 0, 0, 6.3); g2.fill(); }   // stones
+    }), roughness: 0.92 });
     M.conc = pbr('concrete', { color: 0x8a8a84, key: 'ch_conc' });
     M.concDark = pbr('concrete', { color: 0x5a5a56, key: 'ch_concd' });
     M.asph = pbr('asphalt', { color: 0x5a5a5a, key: 'ch_asph' });
@@ -202,14 +216,14 @@ export class CorrinHead {
 
   atmosphere() {
     const g = this.game, scene = g.renderer.scene;
-    this.fogExt = new THREE.FogExp2(0x232c34, 0.0075);
+    this.fogExt = new THREE.FogExp2(0x2a343e, 0.0042);
     this.fogTun = new THREE.FogExp2(0x0a0c0c, 0.045);
     this.fogFlash = new THREE.FogExp2(0x0e1420, 0.012);
     scene.fog = this.fogExt;
     scene.environment = g.renderer.envMap; scene.environmentIntensity = 0.25;
-    this.sky = new Sky(scene, { zenith: 0x0a0e12, horizon: 0x2a333b, stars: 0, sunDir: [0.3, 0.2, -0.9], sunColor: 0x10161c, sunSize: 0.9999 });
-    this.hemi = new THREE.HemisphereLight(0x7088a0, 0x23261f, 0.6); scene.add(this.hemi);
-    const key = new THREE.DirectionalLight(0x8a9ab8, 0.42); const sh = settings.data.graphics.shadows;
+    this.sky = new Sky(scene, { zenith: 0x10151b, horizon: 0x36424c, stars: 0, sunDir: [0.3, 0.2, -0.9], sunColor: 0x10161c, sunSize: 0.9999 });
+    this.hemi = new THREE.HemisphereLight(0x8098b4, 0x2a2c24, 0.85); scene.add(this.hemi);
+    const key = new THREE.DirectionalLight(0x9aaac8, 0.62); const sh = settings.data.graphics.shadows;
     key.castShadow = sh !== 'off'; const size = { medium: 1024, high: 2048, ultra: 4096 }[sh] || 1024;
     key.shadow.mapSize.set(size, size); Object.assign(key.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 260 }); key.shadow.bias = -0.0004; key.shadow.normalBias = 0.04;
     scene.add(key); scene.add(key.target); g.sun = key; g.sunOffset = V(-45, 55, 80); this.key = key;
@@ -283,7 +297,7 @@ export class CorrinHead {
         .replace('#include <beginnormal_vertex>', `vec3 p0 = position; float h = 0.0; vec2 g = vec2(0.0);\n{ vec3 p = p0; ${W} }\nvec3 objectNormal = normalize(vec3(-g.x, 1.0, -g.y));\n#ifdef USE_TANGENT\nvec3 objectTangent = vec3( tangent.xyz );\n#endif`)
         .replace('#include <begin_vertex>', 'vec3 transformed = vec3(p0.x, p0.y + h, p0.z); vCrest = h; vWorld = p0.xz;');
       sh.fragmentShader = 'varying float vCrest; varying vec2 vWorld;\n' + sh.fragmentShader
-        .replace('#include <color_fragment>', '#include <color_fragment>\n float fo = smoothstep(1.2, 2.3, vCrest) * (0.55 + 0.45 * sin(vWorld.x * 0.7) * sin(vWorld.y * 0.9));\n diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.62, 0.68, 0.7), clamp(fo, 0.0, 0.8));')
+        .replace('#include <color_fragment>', '#include <color_fragment>\n float fo = smoothstep(0.8, 1.6, vCrest) * (0.55 + 0.45 * sin(vWorld.x * 0.7) * sin(vWorld.y * 0.9));\n diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.62, 0.68, 0.7), clamp(fo, 0.0, 0.8));')
         .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>');
     };
     // world-space UVs for the ripple normal map (14 m tile)
@@ -355,10 +369,10 @@ export class CorrinHead {
     w.addBox(V(H.x0, P.y, H.z0), V(H.x1, P.y + 5.5, H.z1), { walkable: false, surface: 'concrete' });
     const door = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.2, 0.08), M.rust); door.position.set(CH.pumpDoor.x, P.y + 1.1, H.z1 + 0.04); scene.add(door);
     const ds = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.3), new THREE.MeshBasicMaterial({ map: signTexture('PUMP HOUSE 2', 'SEAWATER INTAKE · AUTHORISED ONLY', '#c8a020', '#141414'), toneMapped: false })); ds.position.set(CH.pumpDoor.x, P.y + 2.5, H.z1 + 0.05); scene.add(ds);
-    this.anchors.push({ pos: V(CH.pumpDoor.x + 1.2, P.y + 2.8, H.z1 + 0.6), color: 0xffb060, power: 16, dist: 12, area: 'ext' });
-    const bulk = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), M.lamp); bulk.position.set(CH.pumpDoor.x + 1.2, P.y + 2.8, H.z1 + 0.15); scene.add(bulk);
+    this.anchors.push({ pos: V(CH.pumpDoor.x + 1.2, P.y + 2.6, H.z1 + 1.4), color: 0xffb060, power: 5, dist: 11, area: 'ext' });
+    const bulk = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), M.lamp); bulk.position.set(CH.pumpDoor.x + 1.2, P.y + 2.8, H.z1 + 0.15); scene.add(bulk); this.glow(V(CH.pumpDoor.x + 1.2, P.y + 2.8, H.z1 + 0.3), 0xffb060, 2.2);
     // intake pipes down the rock into the sea, louvred vents on the house
-    for (const x of [-44.5, -39.5]) { const len = 26; const pp = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, len, 16), M.rust); pp.position.set(x, P.y - 9.5, 49); pp.rotation.x = -0.68; pp.castShadow = true; scene.add(pp); }
+    for (const x of [-44.5, -39.5]) { const pp = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 20, 14), M.rust); pp.position.set(x, P.y - 9.7, 43.6); pp.rotation.x = -0.22; pp.castShadow = true; scene.add(pp); for (let y = P.y - 3; y > CH.SEA; y -= 4) { const cl = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.25, 1.6), M.steel); cl.position.set(x, y, 41.2 + (P.y - y) * 0.22); scene.add(cl); } }
     for (let i = 0; i < 3; i++) { const lv = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.2), M.steel); lv.position.set(-44.5, P.y + 3.6 + i * 0.25, H.z1 + 0.08); lv.rotation.x = 0.5; scene.add(lv); }
   }
 
@@ -396,10 +410,11 @@ export class CorrinHead {
     props.box(V(1.4, 3.2, 1.4), V(T.x, 1.6, T.z), M.paint, { surface: 'metal' }); const arm = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 3.6), M.steel); arm.position.set(T.x, 3.2, T.z + 1.6); scene.add(arm);
     const can = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 0.9, 14).rotateX(Math.PI / 2), M.steel); head.add(can);
     const lens = new THREE.Mesh(new THREE.CircleGeometry(0.44, 16), new THREE.MeshBasicMaterial({ color: 0xfff6e0, toneMapped: false })); lens.position.z = 0.46; head.add(lens);
-    const beamGeo = new THREE.CylinderGeometry(3.6, 0.35, 70, 20, 1, true).translate(0, -35, 0).rotateX(-Math.PI / 2);
-    const beamMat = new THREE.MeshBasicMaterial({ color: 0xd8e4f0, transparent: true, opacity: 0.07, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false });
+    const beamGeo = new THREE.CylinderGeometry(0.35, 3.6, 70, 20, 1, true).translate(0, -35, 0).rotateX(-Math.PI / 2);
+    const beamMat = beamMaterial(0xd8e4f0, 0.16, 70);
     const beam = new THREE.Mesh(beamGeo, beamMat); beam.position.z = 0.4; head.add(beam);
     const spot = new THREE.SpotLight(0xe8f0ff, 900, 140, 0.075, 0.35, 1.6); spot.position.set(0, 0, 0.5); head.add(spot); head.add(spot.target); spot.target.position.set(0, 0, 10);
+    const lg = this.glow(V(0, 0, 0.6), 0xeef4ff, 3.5); scene.remove(lg); head.add(lg);
     this.search = { head, beam, spot, on: true, t: 0, aim: V(-60, -20, 42), mode: 'sweep' };
     // floodlights on poles around the yard (sodium), each a pool anchor
     for (const [x, z] of [[-50, 26], [-4, 26], [10, -70], [-50, -70], [100, -10], [100, -80], [40, -110], [-20, -20]]) this.flood(x, z);
@@ -422,6 +437,13 @@ export class CorrinHead {
     const glow = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.4).rotateX(Math.PI / 2), M.lamp); glow.position.set(x, h - 0.14, z); scene.add(glow);
     this.game.world.addBox(V(x - 0.15, 0, z - 0.15), V(x + 0.15, h, z + 0.15), { walkable: false, cover: false });
     this.anchors.push({ pos: V(x, h - 1, z), color: 0xffb868, power: 70, dist: 30, area: 'ext' });
+    this.glow(V(x, h - 0.2, z), 0xffc070, 5);
+  }
+  // a soft halo round a lamp so the lights read through the rain from the sea and the air
+  glow(pos, color, size) {
+    if (!this._glowTex) this._glowTex = canvasTex('ch_glow', 64, 64, (g2, W, H) => { const gr = g2.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.25, 'rgba(255,255,255,0.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g2.fillStyle = gr; g2.fillRect(0, 0, W, H); });
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._glowTex, color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.7 }));
+    sp.position.copy(pos); sp.scale.set(size, size, 1); sp.userData.area = 'ext'; this.game.renderer.scene.add(sp); return sp;
   }
 
   // ---------------- data hall B: the server hall, the operations room, the plant room ----------------
@@ -508,6 +530,12 @@ export class CorrinHead {
     const P = CH.plant; wall(P.x0, P.z0, P.x0, -50, H.h, M.wall); wall(P.x0, -48, P.x0, P.z1, H.h, M.wall); wall(P.x0, P.z1, P.x1, P.z1, H.h, M.wall);
     for (const z of [-60, -52]) { props.box(V(4, 2.6, 3), V(88, 1.3, z + 1.5), M.pipeG, { surface: 'metal' }); }
     for (let y = 3.5; y < 6; y += 1.2) { const pp = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 21, 12).rotateX(Math.PI / 2), M.pipe); pp.position.set(81.5, y, -51); scene.add(pp); }
+    // electrical panels on the north wall, a pump skid, valve manifold, floor markings
+    for (let x = 81.5; x < 91; x += 1.6) { const cab = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.2, 0.6), M.paint); cab.position.set(x, 1.1, -40.6); scene.add(cab); const lt = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.02), (x * 10) % 3 < 1.5 ? M.green : M.lamp); lt.position.set(x - 0.4, 1.9, -40.92); scene.add(lt); }
+    w.addBox(V(80.6, 0, -41), V(91.6, 2.2, -40.2), { walkable: false, surface: 'metal' });
+    props.box(V(2.4, 1.4, 1.6), V(83, 0.7, -46), M.pipe, { surface: 'metal' });
+    for (let x = 82; x < 91; x += 1.4) { const v = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 3.2, 10), M.pipe); v.position.set(x, 1.6, -61.4); scene.add(v); const hw = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.03, 6, 14), new THREE.MeshStandardMaterial({ color: 0x8a1a14 })); hw.position.set(x, 1.4, -61.1); scene.add(hw); }
+    for (const [x, z, sx, sz] of [[86, -50.5, 9, 0.12], [81, -45, 0.12, 9]]) { const ln = new THREE.Mesh(new THREE.PlaneGeometry(sx, sz).rotateX(-Math.PI / 2), M.yellow); ln.position.set(x, 0.07, z); scene.add(ln); }
     const hatch = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.1, 1.4), M.yellow); hatch.position.set(CH.hatch.x, 0.08, CH.hatch.z); scene.add(hatch);
     this.anchors.push({ pos: V(86, 3.5, -54), color: 0xffd0a0, power: 12, dist: 12, area: 'ext', hall: true });
     // alarm beacons (spinning red) high on the walls
@@ -558,6 +586,36 @@ export class CorrinHead {
     }
     const jbm = new THREE.Mesh(mergeGeometries(jb), jm); jbm.castShadow = jbm.receiveShadow = true; scene.add(jbm);
     for (const [x, z] of [[14, -54], [14, -22], [-8, -24], [-30, -6]]) props.box(V(1.2, 1.2, 1.2), V(x, 0.6, z), pbr('wood', { color: 0x8a6a48, key: 'ch_crate' }), { surface: 'wood' });
+    // painted lines: parking bays, a yellow walkway along the hall, the hatched keep-clear box at the roll-up door
+    const paint = (x, z, sx, sz, col) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(sx, sz).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: col, roughness: 0.7 })); m.position.set(x, 0.045, z); m.receiveShadow = true; scene.add(m); };
+    for (let x = -52; x <= -14; x += 3) paint(x, -92, 0.12, 5, 0xd8d8d0);
+    paint(-33, -94.5, 38, 0.12, 0xd8d8d0);
+    paint(17.5, -35, 0.15, 50, 0xd8b020); paint(16, -35, 0.15, 50, 0xd8b020);
+    for (let x = 58; x < 70; x += 1.2) paint(x, -4, 0.25, 6, 0xd8b020);
+    paint(-26, -40, 0.15, 30, 0xd8d8d0);
+    // bollards at the hall door and along the walkway
+    for (let z = -58; z <= -12; z += 4) { if (Math.abs(z + 38) < 3) continue; const b = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 1.0, 10), M.yellow); b.position.set(15, 0.5, z); scene.add(b); w.addBox(V(14.85, 0, z - 0.15), V(15.15, 1, z + 0.15), { walkable: false, cover: false }); }
+    // a container stack by the gate, cable drums, a generator trailer and a fuel bowser by the plant yard
+    const cont3 = pbr('corrugated', { color: 0x5a6a4a, key: 'ch_cont3' });
+    props.box(V(12.2, 2.6, 2.45), V(74, 1.3, -112), cont2, { surface: 'metal' }); props.box(V(12.2, 2.6, 2.45), V(74, 1.3, -108.6), cont3, { surface: 'metal' }); props.box(V(12.2, 2.6, 2.45), V(74, 3.9, -110.3), cont, { surface: 'metal', collide: false });
+    for (const [x, z] of [[60, -100], [62.5, -101], [-20, -66]]) { const d = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 1.2, 18).rotateX(Math.PI / 2), pbr('wood', { color: 0x7a5a3a, key: 'ch_drum' })); d.position.set(x, 1.1, z); scene.add(d); w.addBox(V(x - 1.1, 0, z - 0.6), V(x + 1.1, 2.2, z + 0.6), { walkable: false }); }
+    const bowser = buildTruck({ model: true }); bowser.position.set(100, 0, -74); bowser.rotation.y = Math.PI / 2; scene.add(bowser); w.addBoxCentered(V(100, 1.5, -74), V(9, 3, 3), { walkable: false, surface: 'metal' });
+    props.box(V(5, 2.2, 2.2), V(86, 1.1, -96), M.yellow, { surface: 'metal' });
+    // a smokers' shelter by the security building, signs
+    for (const [x, z] of [[-6, -26], [-2, -26], [-6, -22], [-2, -22]]) { const pst = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.4, 0.08), M.steel); pst.position.set(x, 1.2, z); scene.add(pst); }
+    props.box(V(4.6, 0.1, 4.6), V(-4, 2.45, -24), new THREE.MeshStandardMaterial({ color: 0x5a6a70, transparent: true, opacity: 0.7, roughness: 0.3 }), { collide: false });
+    props.box(V(3, 0.45, 0.5), V(-4, 0.4, -25.4), pbr('wood', { color: 0x6a5a48, key: 'ch_bench' }), { surface: 'wood' });
+    for (const [x, z, t, sub, bg, ry] of [[-38, 27, 'HELIPAD', 'KEEP CLEAR · ROTORS TURNING', '#c8a020', Math.PI], [-40, -60, 'ASSEMBLY POINT', 'FIRE / EVACUATION', '#1a7a3a', 0], [18, -44, 'DATA HALL B', 'AUTHORISED STAFF ONLY', '#203040', -Math.PI / 2]]) {
+      const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.2, 6), M.steel); sp.position.set(x, 1.1, z); scene.add(sp);
+      const sg = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.5), new THREE.MeshBasicMaterial({ map: signTexture(t, sub, bg, '#ffffff'), toneMapped: false, side: THREE.DoubleSide })); sg.position.set(x, 2.2, z); sg.rotation.y = ry; scene.add(sg);
+    }
+    // the moor outside the wire: dry-stone walls along the fields, boulders
+    const walls = [], stones = [];
+    const dry = (pts) => { for (let i = 0; i < pts.length - 1; i++) { const [ax, az] = pts[i], [bx, bz] = pts[i + 1]; const len = Math.hypot(bx - ax, bz - az); for (let t = 0; t < len; t += 1.4) { const x = ax + (bx - ax) * t / len, z = az + (bz - az) * t / len; const y = plateauY(x, z); const bx2 = new THREE.BoxGeometry(1.5, 0.9 + hash(x, z) * 0.4, 0.8); bx2.rotateY(Math.atan2(bz - az, bx - ax) * -1 + (hash(z, x) - 0.5) * 0.2); walls.push(bx2.translate(x, y + 0.45, z).toNonIndexed()); } } };
+    dry([[-80, -140], [-80, -260], [-200, -300]]); dry([[-140, -170], [-260, -210], [-400, -190]]); dry([[160, -140], [200, -260]]); dry([[-300, -60], [-420, -110], [-560, -90]]); dry([[-620, -40], [-700, -120]]);
+    for (let i = 0; i < 160; i++) { const x = -880 + rnd() * 1100, z = -400 + rnd() * 360; if (x > -70 && x < 150 && z > -140) continue; if (z > edgeZ(x) - 8) continue; const r = 0.4 + rnd() * 1.3; const gg = new THREE.IcosahedronGeometry(r, 0); gg.scale(1, 0.6, 1); stones.push(gg.translate(x, plateauY(x, z) + r * 0.2, z).toNonIndexed()); }
+    const wm = new THREE.Mesh(mergeGeometries(walls), pbr('rock', { color: 0x7a766e, key: 'ch_wall' })); wm.castShadow = wm.receiveShadow = true; scene.add(wm);
+    const stm = new THREE.Mesh(mergeGeometries(stones), M.rock); stm.receiveShadow = true; scene.add(stm);
   }
 
   // ---------------- along the coast: the lighthouse on the far headland, a village, a few crofts ----------------
@@ -567,7 +625,7 @@ export class CorrinHead {
     const lh = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 3, 22, 16), M.white); lh.position.set(lx, ly + 11, lz); scene.add(lh);
     const band = new THREE.Mesh(new THREE.CylinderGeometry(2.25, 2.4, 3, 16), new THREE.MeshStandardMaterial({ color: 0x8a1a14 })); band.position.set(lx, ly + 16, lz); scene.add(band);
     const lamp = new THREE.Mesh(new THREE.SphereGeometry(1.2, 10, 8), new THREE.MeshBasicMaterial({ color: 0xfff2c8, toneMapped: false })); lamp.position.set(lx, ly + 23.5, lz); scene.add(lamp);
-    const lb = new THREE.Mesh(new THREE.CylinderGeometry(9, 0.8, 260, 12, 1, true).translate(0, 130, 0).rotateZ(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xfff0c0, transparent: true, opacity: 0.05, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false }));
+    const lb = new THREE.Mesh(new THREE.CylinderGeometry(9, 0.8, 260, 12, 1, true).translate(0, 130, 0).rotateZ(-Math.PI / 2), beamMaterial(0xfff0c0, 0.1, 260));
     lb.position.copy(lamp.position); lb.userData.dynamic = true; scene.add(lb); this.lightBeam = lb;
     // a few cottages with a lit window inland (Maya's village is past the headland)
     const houses = []; const wins = [];
@@ -602,7 +660,18 @@ export class CorrinHead {
     const Bf = CH.baffle; const bf = new THREE.Mesh(boxM(Bf.x1 - Bf.x0, 4.4 - Bf.y, T.z1 - T.z0, 3, 3), M.tunnel); bf.position.set((Bf.x0 + Bf.x1) / 2, (4.4 + Bf.y) / 2, 0); scene.add(bf);
     w.addBox(V(Bf.x0, Bf.y, T.z0), V(Bf.x1, 4.4, T.z1), { walkable: false, surface: 'concrete' });
     // pumps (three motors on volutes), the intake grilles, the control panel
-    for (const z of [-4, 0, 4]) { props.box(V(2.2, 1.6, 2.2), V(R.x0 + 4, 0.8, z), M.pipe, { surface: 'metal' }); const mot = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 1.6, 14), M.pipeG); mot.position.set(R.x0 + 4, 2.4, z); scene.add(mot); const pp = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 6, 12).rotateZ(Math.PI / 2), M.pipe); pp.position.set(R.x0 + 8, 0.9, z); scene.add(pp); }
+    for (const z of [-4, 0, 4]) {
+      props.box(V(2.8, 0.25, 2.4), V(R.x0 + 4, 0.13, z), M.steel, { surface: 'metal' });
+      const vol = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.9, 20).rotateX(Math.PI / 2), M.pipe); vol.position.set(R.x0 + 4, 1.1, z); scene.add(vol);
+      const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 0.7, 12), M.steel); neck.position.set(R.x0 + 4, 2.0, z); scene.add(neck);
+      const mot = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 1.3, 16), M.pipeG); mot.position.set(R.x0 + 4, 3.0, z); scene.add(mot);
+      for (let k = 0; k < 8; k++) { const fin = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.1, 0.14), M.pipeG); const a = k / 8 * Math.PI * 2; fin.position.set(R.x0 + 4 + Math.cos(a) * 0.58, 3.0, z + Math.sin(a) * 0.58); fin.rotation.y = -a; scene.add(fin); }
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.55, 0.25, 16), M.steel); cap.position.set(R.x0 + 4, 3.78, z); scene.add(cap);
+      const pp = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 6, 14).rotateZ(Math.PI / 2), M.pipe); pp.position.set(R.x0 + 8, 1.1, z); scene.add(pp);
+      for (const dx of [5.6, 9.6]) { const fl = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.52, 0.1, 14).rotateZ(Math.PI / 2), M.steel); fl.position.set(R.x0 + dx, 1.1, z); scene.add(fl); }
+      const valve = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.04, 6, 16), M.redLamp.clone()); valve.material = new THREE.MeshStandardMaterial({ color: 0x8a1a14, roughness: 0.5 }); valve.position.set(R.x0 + 7, 1.9, z); valve.rotation.x = Math.PI / 2; scene.add(valve);
+      w.addBox(V(R.x0 + 2.6, 0, z - 1.2), V(R.x0 + 5.4, 3.9, z + 1.2), { walkable: false, surface: 'metal' });
+    }
     const gr = new THREE.Mesh(new THREE.PlaneGeometry(10, 3), M.grate); gr.position.set(R.x0 + 0.02, 1.8, 0); gr.rotation.y = Math.PI / 2; scene.add(gr);
     props.box(V(1.6, 2, 0.5), V(CH.panel.x, 1, CH.panel.z - 0.1), M.paint, { surface: 'metal' });
     this.panelLeds = []; for (let i = 0; i < 3; i++) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.03), M.green.clone()); l.position.set(CH.panel.x - 0.4 + i * 0.4, 1.6, CH.panel.z + 0.17); l.userData.dynamic = true; scene.add(l); this.panelLeds.push(l); }
@@ -612,7 +681,7 @@ export class CorrinHead {
     for (let x = T.x0; x < T.x1; x += 4) { if (x > D.x0 && x < D.x1) continue; w.addBox(V(x, 0, 0.85), V(x + 4, 3.4, T.z1), { walkable: false, surface: 'metal' }); }
     for (let x = D.x0; x < D.x1; x += 4) w.addBox(V(x, -3.2, 0.85), V(x + 4, 3.4, T.z1), { walkable: false, surface: 'metal' });
     for (let x = T.x0 + 6; x < T.x1; x += 14) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.16, 0.16), M.redLamp); l.position.set(x, 3.6, -2.4); scene.add(l); this.anchors.push({ pos: V(x, 3.3, -1.8), color: 0xff4a2a, power: 9, dist: 10, area: 'tunnel', flicker: x % 3 === 0 }); }
-    this.anchors.push({ pos: V(406, 4, 0), color: 0xffe0b0, power: 18, dist: 14, area: 'tunnel' });
+    this.anchors.push({ pos: V(409, 3.4, 0), color: 0xffe0b0, power: 7, dist: 14, area: 'tunnel' }); for (const [x, z] of [[409, 0]]) { const fx = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.08, 0.3), M.strip); fx.position.set(x, 4.35, z); scene.add(fx); }
     // the sump water: a flat sheet whose height the mission sets (pumps running / stopped); a flowing channel
     const wm = new THREE.MeshStandardMaterial({ color: 0x0c1c1c, roughness: 0.08, metalness: 0.3, transparent: true, opacity: 0.85, normalMap: this.seaNormal, normalScale: new THREE.Vector2(0.4, 0.4) });
     wm.userData.noBatch = true;
@@ -697,7 +766,7 @@ export class CorrinHead {
     this.sky.mesh.visible = a !== 'tunnel';
     this.rain.points.visible = this.spray.points.visible = a === 'ext'; this.snowF.points.visible = a === 'flash';
     this.search.spot.visible = a === 'ext';
-    if (a === 'ext') { scene.fog = this.fogExt; this.hemi.color.setHex(0x7088a0); this.hemi.intensity = 0.6; this.key.intensity = 0.42; this.sky.uniforms.zenith.value.setHex(0x0a0e12); this.sky.uniforms.horizon.value.setHex(0x2a333b); this.sky.uniforms.stars.value = 0; }
+    if (a === 'ext') { scene.fog = this.fogExt; this.hemi.color.setHex(0x8098b4); this.hemi.intensity = 0.85; this.key.intensity = 0.62; this.sky.uniforms.zenith.value.setHex(0x10151b); this.sky.uniforms.horizon.value.setHex(0x36424c); this.sky.uniforms.stars.value = 0; }
     else if (a === 'tunnel') { scene.fog = this.fogTun; this.hemi.intensity = 0.07; this.key.intensity = 0; }
     else { scene.fog = this.fogFlash; this.hemi.color.setHex(0x6a7a9a); this.hemi.intensity = 0.3; this.key.intensity = 0.12; this.sky.uniforms.zenith.value.setHex(0x05070e); this.sky.uniforms.horizon.value.setHex(0x182030); this.sky.uniforms.stars.value = 0.3; }
     g.audio.setIndoor?.(a === 'tunnel' ? 1 : 0);
@@ -732,13 +801,13 @@ export class CorrinHead {
       if (!indoor) { this.rain.update(dt, cam); this.spray.update(dt, cam); }
       // inside the hall: cool fill light; outside: the storm
       const inH = this.inHall(cam);
-      const wantHemi = inH ? 0.75 : 0.6; this.hemi.intensity += (wantHemi + (this.lightning || 0) - this.hemi.intensity) * Math.min(1, dt * 6);
+      const wantHemi = inH ? 0.8 : 0.85; this.hemi.intensity += (wantHemi + (this.lightning || 0) - this.hemi.intensity) * Math.min(1, dt * 6);
       // gas in the hall
-      if (this.gas > 0 && inH) { this.fogExt.color.setRGB(0.6, 0.64, 0.66); this.fogExt.density = 0.012 + this.gas * 0.09; } else { this.fogExt.color.setHex(0x232c34); this.fogExt.density = 0.0075; }
+      if (this.gas > 0 && inH) { this.fogExt.color.setRGB(0.6, 0.64, 0.66); this.fogExt.density = 0.012 + this.gas * 0.09; } else { this.fogExt.color.setHex(0x2a343e); this.fogExt.density = 0.0042; }
       // lightning: a double flash over the sea, thunder a moment later
       this.flashT -= dt;
       if (this.flashT <= 0) { this.flashT = 9 + Math.random() * 16; this.lightning = 1.4; g.renderer.fx.flash = Math.max(g.renderer.fx.flash, inH ? 0.03 : 0.22); setTimeout(() => { this.lightning = 1.0; g.renderer.fx.flash = Math.max(g.renderer.fx.flash, inH ? 0.02 : 0.14); }, 140); setTimeout(() => g.audio.distantArtillery?.(), 900 + Math.random() * 2500); }
-      if (this.lightning) { this.lightning = Math.max(0, this.lightning - dt * 4); this.key.intensity = 0.42 + this.lightning * 1.2; }
+      if (this.lightning) { this.lightning = Math.max(0, this.lightning - dt * 4); this.key.intensity = 0.62 + this.lightning * 1.2; }
       // the searchlight sweeps the cliff face (or tracks what the mission gives it)
       const S = this.search;
       if (S.on) {
@@ -753,8 +822,8 @@ export class CorrinHead {
       if (this.surfT <= 0) {
         this.surfT = 0.35;
         for (let k = 0; k < 2; k++) {
-          const s = this.surfAt[Math.floor(Math.random() * this.surfAt.length)]; if (s.distanceTo(cam) > 240) continue;
-          for (let i = 0; i < 7; i++) g.effects.smoke.spawn({ x: s.x + (Math.random() - 0.5) * 6, y: CH.SEA + 1, z: s.z + (Math.random() - 0.5) * 3, vx: 2 + Math.random() * 2, vy: 5 + Math.random() * 7, vz: -2 - Math.random() * 3, size: 1.4, endSize: 5 + Math.random() * 3, life: 2.4, alpha: 0.45, r: 0.82, g: 0.86, b: 0.88, drag: 0.6, gravity: 3 });
+          const s = this.surfAt[Math.floor(Math.random() * this.surfAt.length)]; const sd = s.distanceTo(cam); if (sd > 240 || sd < 14) continue;
+          for (let i = 0; i < 7; i++) g.effects.smoke.spawn({ x: s.x + (Math.random() - 0.5) * 6, y: CH.SEA + 1, z: s.z + (Math.random() - 0.5) * 3, vx: 2 + Math.random() * 2, vy: 5 + Math.random() * 7, vz: -2 - Math.random() * 3, size: 0.9, endSize: 3 + Math.random() * 2, life: 2.0, alpha: 0.24, r: 0.82, g: 0.86, b: 0.88, drag: 0.6, gravity: 3 });
           if (s.distanceTo(cam) < 90 && Math.random() < 0.5) this.surfSound(s.clone(), 0.35);
         }
       }
@@ -772,12 +841,12 @@ export class CorrinHead {
       // under water in the sump: green murk, muffled, slower
       const D = CH.dip; const p = g.player; const eyeY = p.position.y + p.eye;
       const under = p.position.x > D.x0 && p.position.x < D.x1 + 4 && eyeY < this.waterLevel;
-      if (under !== this.under) { this.under = under; const u = g.renderer.grade?.uniforms; if (u) u.tint.value.set(...(under ? [0.45, 0.75, 0.72] : [1, 1, 1])); this.fogTun.color.setHex(under ? 0x0c2a26 : 0x0a0c0c); this.fogTun.density = under ? 0.22 : 0.045; p.speedScale = under ? 0.55 : (p.position.y < this.waterLevel - 0.6 && p.position.x > D.x0 && p.position.x < D.x1 + 4 ? 0.7 : 1); g.audio.setIndoor?.(1); }
+      if (under !== this.under) { this.under = under; const u = g.renderer.grade?.uniforms; if (u) u.tint.value.set(...(under ? [0.45, 0.75, 0.72] : [1, 1, 1])); this.fogTun.color.setHex(under ? 0x0c2a26 : 0x0a0c0c); this.fogTun.density = under ? 0.22 : 0.045; p.speedScale = under ? 0.85 : (p.position.y < this.waterLevel - 0.6 && p.position.x > D.x0 && p.position.x < D.x1 + 4 ? 0.7 : 1); g.audio.setIndoor?.(1); }
       const inSump = p.position.x > D.x0 && p.position.x < D.x1;
       if (!under) p.speedScale = inSump && p.position.y < this.waterLevel - 0.3 ? 0.7 : 1;
       // deep water floats you to the surface unless you dive (crouch); under the baffle the roof keeps you down
       const floatY = this.waterLevel - 1.45;
-      if (inSump && !p.crouching && p.position.y < floatY - 0.02 && g.world.ceilingAbove(p.position.x, p.position.z, p.position.y + 0.5) > this.waterLevel + 0.3) { p.position.y = Math.min(floatY, p.position.y + dt * 2.2); if (p.velocity.y < 0) p.velocity.y = 0; }
+      if (inSump && !p.crouching && p.position.y < floatY - 0.02 && g.world.ceilingAbove(p.position.x, p.position.z, p.position.y + 0.5) > this.waterLevel + 0.3) { p.position.y = Math.min(floatY, p.position.y + dt * 2.6); if (p.velocity.y < 0) p.velocity.y = 0; p.grounded = false; }
       this.swimming = inSump && p.position.y > tunnelFloor(p.position.x) + 0.3 && p.position.y < this.waterLevel;
       if (under) g.renderer.fx.blur = Math.max(g.renderer.fx.blur, 0.8);
     } else {

@@ -66,6 +66,7 @@ for (const name of pick) {
       }, !!B.stealth);
       if (st.state !== 'playing') { log(`state ${st.state}`); break; }
       const line = `${st.cp} [${st.obj}] ${st.did}`; if (line !== last) { log(line); last = line; }
+      if (process.env.SHOTEVERY && i % +process.env.SHOTEVERY === 0) await page.screenshot({ path: `${OUT}m08_${name}_t${String(i).padStart(4, '0')}_${st.cp}.png` });
       if (!shots.has(st.cp)) { shots.add(st.cp); await page.waitForTimeout(800); await page.screenshot({ path: `${OUT}m08_${name}_${st.cp}.png` }); }
       await page.waitForTimeout(700);
     }
